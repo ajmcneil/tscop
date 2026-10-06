@@ -1,0 +1,7 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.github$
+^\.claude$
+^docs$
+^CLAUDE\.md$
+^CLAUDE\.local\.md$

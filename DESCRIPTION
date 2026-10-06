@@ -1,0 +1,29 @@
+Package: tscop
+Type: Package
+Title: Time Series Copula Models
+Version: 0.0.0.9000
+Authors@R: c(
+    person(
+      "Alexander J.", "McNeil",
+      email = "alexanderjmcneil@gmail.com",
+      role = c("aut", "cre")
+    )
+  )
+Description: Rebuilt tools for the analysis of time series using copula
+    models, built on the udp package. Under development.
+License: GPL-3
+Imports:
+    graphics,
+    methods,
+    stats,
+    udp
+Suggests:
+    rvinecopulib,
+    testthat (>= 3.0.0),
+    tscopula
+Remotes:
+    ajmcneil/udp
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Config/roxygen2/version: 8.1.0
+Config/testthat/edition: 3
