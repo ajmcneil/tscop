@@ -18,3 +18,4 @@ importFrom(stats,
   qnorm
 )
 importFrom(udp,pcoincide)
+importFrom(utils,modifyList)

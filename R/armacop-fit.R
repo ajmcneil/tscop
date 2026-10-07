@@ -194,7 +194,7 @@ setMethod("tsfit", signature(U = "ANY", object = "armacop"),
     period <- object@period
     start <- armacop_start(object, init, x)
     z0 <- pars_to_free(start@pars)
-    ctrl <- utils::modifyList(
+    ctrl <- modifyList(
       list(maxit = 1000, reltol = 1e-12, ndeps = rep(1e-6, length(z0))), control
     )
     opt <- stats::optim(z0, armacop_negll, ord = ord, period = period, x = x,
