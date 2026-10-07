@@ -13,17 +13,25 @@ Description: Rebuilt tools for the analysis of time series using copula
     models, built on the udp package. Under development.
 License: GPL-3
 Imports:
-    graphics,
     methods,
     stats,
+    utils,
     udp
 Suggests:
     rvinecopulib,
     testthat (>= 3.0.0),
-    tscopula
+    tscopula,
+    zoo
 Remotes:
     ajmcneil/udp
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Config/roxygen2/version: 8.1.0
 Config/testthat/edition: 3
+Collate:
+    'arma-polynomials.R'
+    'arma-filter.R'
+    'generics.R'
+    'armacop.R'
+    'armacop-fit.R'
+    'tscop-package.R'
