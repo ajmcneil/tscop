@@ -15,6 +15,7 @@ License: GPL-3
 Imports:
     methods,
     stats,
+    utils,
     udp
 Suggests:
     rvinecopulib,
@@ -26,3 +27,10 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Config/roxygen2/version: 8.1.0
 Config/testthat/edition: 3
+Collate:
+    'arma-polynomials.R'
+    'arma-filter.R'
+    'generics.R'
+    'armacop.R'
+    'armacop-fit.R'
+    'tscop-package.R'
