@@ -19,17 +19,20 @@
 #' @slot convergence convergence code of the optimiser (0 is success).
 #' @slot message optimiser message.
 #' @slot start the [armacop-class] model used as starting values.
+#' @slot template the original input if it was a `ts`, `zoo` or `xts` object
+#'   (used to restore the time index on residuals), otherwise `NULL`.
 #'
 #' @exportClass armacopfit
 setClass("armacopfit", slots = c(
   model = "armacop", data = "numeric", pseudo = "logical",
   estimate = "numeric", se = "numeric", vcov = "matrix", se_method = "character",
   boot = "matrix", loglik = "numeric", nobs = "integer", npar = "integer",
-  convergence = "integer", message = "character", start = "armacop"
+  convergence = "integer", message = "character", start = "armacop",
+  template = "ANY"
 ))
 
 # Validate copula data: numeric, in (0, 1), NA allowed.
-check_copula_data <- function(U) {
+check_copula_data <- function(U, min_n = 20L) {
   if (!is.numeric(U)) stop("'U' must be numeric")
   u <- as.numeric(U)
   ok <- !is.na(u)
@@ -37,7 +40,10 @@ check_copula_data <- function(U) {
   if (any(u[ok] <= 0 | u[ok] >= 1)) {
     stop("'U' must lie strictly inside (0, 1); see udp::boundaryadjust() for data on the boundary")
   }
-  if (sum(ok) < 20L) stop("at least 20 non-missing observations are required")
+  if (sum(ok) < min_n) {
+    stop(sprintf("at least %d non-missing observation%s required", min_n,
+                 if (min_n == 1L) " is" else "s are"))
+  }
   u
 }
 
@@ -338,7 +344,8 @@ setMethod("tsfit", signature(U = "ANY", object = "armacop"),
       nobs = as.integer(sum(!is.na(u))), npar = npar,
       convergence = as.integer(fit$opt$convergence),
       message = if (is.null(fit$opt$message)) "" else fit$opt$message,
-      start = fit$start
+      start = fit$start,
+      template = if (inherits(U, c("ts", "zoo", "xts"))) U else NULL
     )
   }
 )
@@ -389,4 +396,37 @@ setMethod("show", "armacopfit", function(object) {
 setMethod("tssim", "armacopfit", function(object, n, ...) {
   if (missing(n)) n <- length(object@data)
   tssim(object@model, n)
+})
+
+#' @describeIn ktau Kendall's tau of the pair copulas of the fitted model.
+#' @export
+setMethod("ktau", "armacopfit", function(object, lagmax, ...) {
+  if (missing(lagmax)) lagmax <- 20
+  ktau(object@model, lagmax)
+})
+
+#' @rdname resid-armacop
+#' @export
+setMethod("resid", "armacopfit", function(object, data, scale = "uniform", ...) {
+  if (missing(data)) {
+    data <- if (is.null(object@template)) object@data else object@template
+  }
+  armacop_resid(object@model, data, scale)
+})
+
+#' @rdname resid-armacop
+#' @export
+setMethod("residuals", "armacopfit", function(object, data, scale = "uniform", ...) {
+  if (missing(data)) {
+    data <- if (is.null(object@template)) object@data else object@template
+  }
+  armacop_resid(object@model, data, scale)
+})
+
+#' @rdname predict-armacop
+#' @export
+setMethod("predict", "armacopfit", function(object, data, h = 1, type = "moments",
+                                            x = NULL, ...) {
+  if (missing(data)) data <- object@data
+  armacop_predict(object@model, data, h, type, x)
 })

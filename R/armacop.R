@@ -213,3 +213,157 @@ setMethod("tssim", "armacop", function(object, n, ...) {
   e <- arma_coef_expanded(object)
   stats::pnorm(arma_simulate(n, e$ar, e$ma))
 })
+
+# Partial autocorrelations at lags 1, ..., lag.max of the ARMA process, by the
+# Durbin-Levinson recursion on its autocorrelations.
+arma_pacf <- function(ar, ma, lag.max) {
+  if (lag.max < 1L) return(numeric(0))
+  g <- arma_acvf(ar, ma, lag.max)
+  rho <- g[-1L] / g[1L]
+  pacf <- numeric(lag.max)
+  phi <- numeric(0)
+  for (k in seq_len(lag.max)) {
+    if (k == 1L) {
+      pk <- rho[1L]
+    } else {
+      pk <- (rho[k] - sum(phi * rho[(k - 1L):1L])) / (1 - sum(phi * rho[1:(k - 1L)]))
+    }
+    pacf[k] <- pk
+    phi <- c(phi - pk * rev(phi), pk)
+  }
+  pacf
+}
+
+#' @describeIn ktau Kendall's tau of the Gaussian pair copulas of an
+#'   [armacop-class] model (`lagmax` defaults to 20).
+#' @export
+setMethod("ktau", "armacop", function(object, lagmax, ...) {
+  if (missing(lagmax)) lagmax <- 20
+  if (!is.numeric(lagmax) || length(lagmax) != 1L || lagmax < 1 ||
+      lagmax != round(lagmax)) {
+    stop("'lagmax' must be a positive whole number")
+  }
+  e <- arma_coef_expanded(object)
+  (2 / pi) * asin(arma_pacf(e$ar, e$ma, lagmax))
+})
+
+# Restore ts/zoo/xts attributes of a template on a result of the same length.
+restore_attrs <- function(out, template) {
+  if (!is.null(template) && inherits(template, c("ts", "zoo", "xts")) &&
+      length(out) == length(template)) {
+    attributes(out) <- attributes(template)
+  }
+  out
+}
+
+# Standardised one-step prediction errors of the normal scores.
+armacop_resid <- function(model, data, scale) {
+  scale <- match.arg(scale, c("uniform", "normal"))
+  u <- check_copula_data(data, min_n = 1L)
+  e <- arma_coef_expanded(model)
+  f <- arma_filter(stats::qnorm(u), e$ar, e$ma)
+  r <- f$v / sqrt(f$F)
+  out <- if (scale == "uniform") stats::pnorm(r) else r
+  restore_attrs(out, data)
+}
+
+#' Residuals of ARMA copula models
+#'
+#' The residuals are the standardised one-step prediction errors of the normal
+#' scores \eqn{\Phi^{-1}(u_t)}. If the model is correct they are independent
+#' standard normal, so on the default `"uniform"` scale (their `pnorm`) they
+#' are iid uniform. Missing observations give `NA`. If the data are a `ts`,
+#' `zoo` or `xts` object the time index is restored.
+#'
+#' @param object an [armacop-class] model with known coefficients, or an
+#'   [armacopfit-class] object.
+#' @param data copula data in (0, 1) for a known model; for a fitted object it
+#'   defaults to the data to which the model was fitted.
+#' @param scale `"uniform"` (default) or `"normal"`.
+#' @param ... not used.
+#'
+#' @return A numeric vector the length of the data.
+#' @name resid-armacop
+#' @aliases resid,armacop-method residuals,armacop-method
+NULL
+
+#' @rdname resid-armacop
+#' @export
+setMethod("resid", "armacop", function(object, data, scale = "uniform", ...) {
+  armacop_resid(object, data, scale)
+})
+
+#' @rdname resid-armacop
+#' @export
+setMethod("residuals", "armacop", function(object, data, scale = "uniform", ...) {
+  armacop_resid(object, data, scale)
+})
+
+#' Prediction for ARMA copula models
+#'
+#' Conditional distribution of the copula variable `h` steps ahead given the
+#' past data. On the normal scale, \eqn{x_{n+h} = \Phi^{-1}(u_{n+h})} given
+#' the past is normal with the mean and standard deviation returned by
+#' `type = "moments"`. The other types transform this to the uniform scale.
+#'
+#' @param object an [armacop-class] model with known coefficients, or an
+#'   [armacopfit-class] object.
+#' @param data past copula data in (0, 1); for a fitted object it defaults to
+#'   the data to which the model was fitted.
+#' @param h horizon (number of steps ahead). For `type = "moments"` a vector
+#'   of horizons is allowed; for the other types a single value.
+#' @param type `"moments"` (default) for a data frame with columns `h`,
+#'   `mean` and `sd`; `"df"` for the conditional distribution function of
+#'   \eqn{u_{n+h}} at `x`; `"qf"` for its quantile function at probabilities
+#'   `x`; `"dens"` for its density at `x`.
+#' @param x points in (0, 1) at which to evaluate `"df"`, `"qf"` or `"dens"`.
+#' @param ... not used.
+#'
+#' @return A data frame (`type = "moments"`) or a numeric vector the length of
+#'   `x`.
+#' @name predict-armacop
+#' @aliases predict,armacop-method
+NULL
+
+armacop_predict <- function(model, data, h, type, x) {
+  type <- match.arg(type, c("moments", "df", "qf", "dens"))
+  if (!is.numeric(h) || length(h) < 1L || anyNA(h) || any(h < 1) || any(h != round(h))) {
+    stop("'h' must be positive whole numbers")
+  }
+  if (type != "moments") {
+    if (length(h) != 1L) stop("a single horizon 'h' is required unless type = \"moments\"")
+    if (is.null(x) || !is.numeric(x) || anyNA(x) || any(x <= 0 | x >= 1)) {
+      stop("'x' must be numeric values strictly inside (0, 1)")
+    }
+  }
+  u <- check_copula_data(data, min_n = 1L)
+  e <- arma_coef_expanded(model)
+  ss <- arma_state_space(e$ar, e$ma)
+  f <- arma_filter(stats::qnorm(u), e$ar, e$ma)
+  a <- f$a
+  P <- f$P
+  hmax <- max(h)
+  mu <- numeric(hmax)
+  v <- numeric(hmax)
+  for (k in seq_len(hmax)) {
+    mu[k] <- a[1L]
+    v[k] <- P[1L, 1L]
+    a <- ss$phi * a[1L] + c(a[-1L], 0)
+    P <- ss$Tm %*% P %*% t(ss$Tm) + ss$RR
+  }
+  m <- mu[h]
+  s <- sqrt(v[h])
+  switch(type,
+    moments = data.frame(h = h, mean = m, sd = s),
+    df = stats::pnorm((stats::qnorm(x) - m) / s),
+    qf = stats::pnorm(m + s * stats::qnorm(x)),
+    dens = stats::dnorm(stats::qnorm(x), m, s) / stats::dnorm(stats::qnorm(x))
+  )
+}
+
+#' @rdname predict-armacop
+#' @export
+setMethod("predict", "armacop", function(object, data, h = 1, type = "moments",
+                                         x = NULL, ...) {
+  armacop_predict(object, data, h, type, x)
+})

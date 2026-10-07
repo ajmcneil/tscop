@@ -69,5 +69,8 @@ unless standard errors were requested).
 \item{\code{message}}{optimiser message.}
 
 \item{\code{start}}{the \link[=armacop-class]{armacop} model used as starting values.}
+
+\item{\code{template}}{the original input if it was a \code{ts}, \code{zoo} or \code{xts} object
+(used to restore the time index on residuals), otherwise \code{NULL}.}
 }}
 

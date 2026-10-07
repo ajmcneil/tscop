@@ -20,7 +20,8 @@ Imports:
 Suggests:
     rvinecopulib,
     testthat (>= 3.0.0),
-    tscopula
+    tscopula,
+    zoo
 Remotes:
     ajmcneil/udp
 Encoding: UTF-8

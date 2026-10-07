@@ -28,3 +28,21 @@ setGeneric("tsfit", function(U, object, ...) standardGeneric("tsfit"))
 #' @export
 setGeneric("tssim", function(object, n, ...) standardGeneric("tssim"),
            signature = "object")
+
+#' Kendall's tau of the pair copulas of a time series copula model
+#'
+#' Generic returning Kendall's tau of the pair copulas at lags
+#' `1, ..., lagmax` in the D-vine representation of the process. For an
+#' [armacop-class] model the pair copulas are Gaussian with parameters equal
+#' to the partial autocorrelations of the ARMA process, so
+#' \eqn{	au_k = (2/\pi)\arcsin(\alpha_k)} with \eqn{\alpha_k} the lag-`k`
+#' partial autocorrelation.
+#'
+#' @param object a model object.
+#' @param lagmax maximum lag.
+#' @param ... further arguments passed to methods.
+#'
+#' @return A numeric vector of length `lagmax`.
+#' @export
+setGeneric("ktau", function(object, lagmax = 20, ...) standardGeneric("ktau"),
+           signature = "object")
