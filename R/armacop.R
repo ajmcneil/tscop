@@ -26,15 +26,15 @@
 #'   (each possibly of length zero); `NA` entries mark a structure that has not
 #'   been fitted.
 #'
-#' @exportClass armacopula
-setClass("armacopula", slots = c(
+#' @exportClass armacop
+setClass("armacop", slots = c(
   name = "character",
   order = "integer",
   period = "numeric",
   pars = "list"
 ))
 
-setValidity("armacopula", function(object) {
+setValidity("armacop", function(object) {
   ord <- object@order
   if (length(ord) != 4L || anyNA(ord) || any(ord < 0L)) {
     return("'order' must be four non-negative integers (p, q, P, Q)")
@@ -78,7 +78,7 @@ setValidity("armacopula", function(object) {
 
 #' Constructor for ARMA copula processes
 #'
-#' Creates an [armacopula-class] object, either as a known model by giving
+#' Creates an [armacop-class] object, either as a known model by giving
 #' the coefficients, or as a structure to be fitted by giving the orders.
 #'
 #' @param ar,ma numeric vectors of AR and MA coefficients (known model).
@@ -97,15 +97,15 @@ setValidity("armacopula", function(object) {
 #'   describes a model to be passed to a fitting function, which supplies
 #'   starting values. The ARMA(0,0) model, independence, is not allowed.
 #'
-#' @return An object of class [armacopula-class].
+#' @return An object of class [armacop-class].
 #' @export
 #'
 #' @examples
-#' armacopula(ar = 0.5, ma = 0.4)
-#' armacopula(ar = 0.5, sar = 0.3, sma = 0.2, period = 12)
-#' armacopula(order = c(1, 1))
-#' armacopula(order = c(1, 1), seasonal = c(0, 1), period = 12)
-armacopula <- function(ar = numeric(0), ma = numeric(0),
+#' armacop(ar = 0.5, ma = 0.4)
+#' armacop(ar = 0.5, sar = 0.3, sma = 0.2, period = 12)
+#' armacop(order = c(1, 1))
+#' armacop(order = c(1, 1), seasonal = c(0, 1), period = 12)
+armacop <- function(ar = numeric(0), ma = numeric(0),
                        sar = numeric(0), sma = numeric(0),
                        order = NULL, seasonal = NULL, period = NA) {
   coefs <- list(ar = ar, ma = ma, sar = sar, sma = sma)
@@ -158,7 +158,7 @@ armacopula <- function(ar = numeric(0), ma = numeric(0),
   } else {
     sprintf("ARMA(%d,%d)", ord[1L], ord[2L])
   }
-  new("armacopula", name = name, order = ord, period = period, pars = coefs)
+  new("armacop", name = name, order = ord, period = period, pars = coefs)
 }
 
 # TRUE if all coefficients are specified (a known model, or a fitted one).
@@ -175,19 +175,19 @@ arma_coef_expanded <- function(object) {
   arma_expand(p$ar, p$ma, p$sar, p$sma, object@period)
 }
 
-#' @describeIn armacopula-class Coefficients, in the order `ar`, `ma`, `sar`,
+#' @describeIn armacop-class Coefficients, in the order `ar`, `ma`, `sar`,
 #'   `sma`; `NA` for a structure that has not been fitted.
-#' @param object an object of class [armacopula-class].
+#' @param object an object of class [armacop-class].
 #' @export
-setMethod("coef", "armacopula", function(object) {
+setMethod("coef", "armacop", function(object) {
   out <- unlist(unname(object@pars))
   if (is.null(out)) numeric(0) else out
 })
 
-#' @describeIn armacopula-class Show method.
+#' @describeIn armacop-class Show method.
 #' @export
-setMethod("show", "armacopula", function(object) {
-  cat("object class: armacopula\n")
+setMethod("show", "armacop", function(object) {
+  cat("object class: armacop\n")
   cat("name: ", object@name, "\n", sep = "")
   if (!is.na(object@period)) cat("period: ", object@period, "\n", sep = "")
   if (arma_is_specified(object)) {
