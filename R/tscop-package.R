@@ -2,6 +2,6 @@
 "_PACKAGE"
 
 #' @import methods
-#' @importFrom stats pnorm qnorm dnorm optim
+#' @importFrom stats coef pnorm qnorm dnorm optim
 #' @importFrom udp pcoincide
 NULL
