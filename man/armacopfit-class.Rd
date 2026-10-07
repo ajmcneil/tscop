@@ -5,6 +5,7 @@
 \alias{armacopfit-class}
 \alias{coef,armacopfit-method}
 \alias{logLik,armacopfit-method}
+\alias{vcov,armacopfit-method}
 \alias{show,armacopfit-method}
 \title{Fitted ARMA copula processes}
 \usage{
@@ -12,10 +13,14 @@
 
 \S4method{logLik}{armacopfit}(object)
 
+\S4method{vcov}{armacopfit}(object, ...)
+
 \S4method{show}{armacopfit}(object)
 }
 \arguments{
 \item{object}{an object of class \link[=armacopfit-class]{armacopfit}.}
+
+\item{...}{not used.}
 }
 \description{
 Class of objects returned by \code{\link[=tsfit]{tsfit()}} for \link[=armacop-class]{armacop} models.
@@ -26,6 +31,9 @@ Class of objects returned by \code{\link[=tsfit]{tsfit()}} for \link[=armacop-cl
 
 \item \code{logLik(armacopfit)}: Log-likelihood, with \code{df} and \code{nobs}
 attributes so that \code{\link[stats:AIC]{stats::AIC()}} and \code{\link[stats:BIC]{stats::BIC()}} work.
+
+\item \code{vcov(armacopfit)}: Covariance matrix of the estimates (\code{NA}
+unless standard errors were requested).
 
 \item \code{show(armacopfit)}: Show method.
 

@@ -198,3 +198,18 @@ setMethod("show", "armacop", function(object) {
   print(coef(object))
   invisible(object)
 })
+
+#' @describeIn tssim Exact simulation from a known [armacop-class] model
+#'   (`n` defaults to 1000). The
+#'   first state is drawn from the stationary distribution, so no burn-in is
+#'   needed. Returns `pnorm` of the simulated zero-mean, unit-variance ARMA
+#'   process.
+#' @export
+setMethod("tssim", "armacop", function(object, n, ...) {
+  if (missing(n)) n <- 1000
+  if (!is.numeric(n) || length(n) != 1L || n < 1 || n != round(n)) {
+    stop("'n' must be a positive whole number")
+  }
+  e <- arma_coef_expanded(object)
+  stats::pnorm(arma_simulate(n, e$ar, e$ma))
+})

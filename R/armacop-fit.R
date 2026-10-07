@@ -152,13 +152,95 @@ armacop_start <- function(object, init, x) {
           period = object@period)
 }
 
+# Natural coefficients (ar, ma, sar, sma order) from the unconstrained vector.
+free_to_coef <- function(z, ord) {
+  b <- split_blocks(z, ord)
+  c(free_to_ar(b$ar), free_to_ma(b$ma), free_to_ar(b$sar), free_to_ma(b$sma))
+}
+
+# Central-difference Hessian of f at z.
+num_hessian <- function(f, z, h = 1e-3) {
+  k <- length(z)
+  H <- matrix(0, k, k)
+  f0 <- f(z)
+  e <- function(i) { v <- numeric(k); v[i] <- h; v }
+  for (i in seq_len(k)) {
+    H[i, i] <- (f(z + e(i)) - 2 * f0 + f(z - e(i))) / h^2
+    for (j in seq_len(i - 1L)) {
+      H[i, j] <- H[j, i] <- (f(z + e(i) + e(j)) - f(z + e(i) - e(j)) -
+                               f(z - e(i) + e(j)) + f(z - e(i) - e(j))) / (4 * h^2)
+    }
+  }
+  H
+}
+
+# Central-difference Jacobian of the vector function g at z.
+num_jacobian <- function(g, z, h = 1e-6) {
+  k <- length(z)
+  J <- matrix(0, length(g(z)), k)
+  for (i in seq_len(k)) {
+    d <- numeric(k)
+    d[i] <- h
+    J[, i] <- (g(z + d) - g(z - d)) / (2 * h)
+  }
+  J
+}
+
+# Maximum likelihood on normal scores of copula data u. Returns the fitted
+# armacop model, the starting model, the optimiser output and the optimum on
+# the unconstrained scale.
+armacop_mle <- function(u, object, init, control) {
+  x <- stats::qnorm(u)
+  ord <- object@order
+  period <- object@period
+  start <- armacop_start(object, init, x)
+  z0 <- pars_to_free(start@pars)
+  ctrl <- modifyList(
+    list(maxit = 1000, reltol = 1e-12, ndeps = rep(1e-6, length(z0))), control
+  )
+  opt <- stats::optim(z0, armacop_negll, ord = ord, period = period, x = x,
+                      method = "BFGS", control = ctrl)
+  if (opt$convergence != 0L) {
+    alt <- stats::optim(opt$par, armacop_negll, ord = ord, period = period,
+                        x = x, method = "Nelder-Mead",
+                        control = list(maxit = 5000, reltol = 1e-12))
+    if (alt$value < opt$value) opt <- alt
+  }
+  b <- split_blocks(opt$par, ord)
+  model <- armacop(
+    ar = free_to_ar(b$ar), ma = free_to_ma(b$ma),
+    sar = free_to_ar(b$sar), sma = free_to_ma(b$sma), period = period
+  )
+  list(model = model, start = start, opt = opt, x = x)
+}
+
+# Hessian standard errors: inverse observed information on the unconstrained
+# scale, carried to the coefficients by the delta method. Returns a covariance
+# matrix, or NULL (with a warning) if the information matrix is not positive
+# definite.
+armacop_hessian_vcov <- function(fit, ord, period) {
+  z <- fit$opt$par
+  f <- function(v) armacop_negll(v, ord, period, fit$x)
+  H <- num_hessian(f, z)
+  V <- tryCatch(solve(H), error = function(e) NULL)
+  if (is.null(V) || any(!is.finite(V)) || any(diag(V) <= 0) ||
+      any(eigen(H, symmetric = TRUE, only.values = TRUE)$values <= 0)) {
+    warning("the information matrix is not positive definite; standard errors not available")
+    return(NULL)
+  }
+  J <- num_jacobian(function(v) free_to_coef(v, ord), z)
+  V <- J %*% V %*% t(J)
+  (V + t(V)) / 2
+}
+
 #' @describeIn tsfit Maximum likelihood fit of an [armacop-class] model.
 #'
 #' @param pseudo logical: `TRUE` (default) if `U` are pseudo-observations
 #'   (ranks), `FALSE` if they are probability integral transforms from fitted
-#'   marginal models. It matters for standard errors.
-#' @param se how to compute standard errors. Only `FALSE` (none) is
-#'   implemented so far.
+#'   marginal models. It matters for the bootstrap, which re-ranks simulated
+#'   data when `pseudo = TRUE`.
+#' @param se how to compute standard errors: `FALSE` (default, none),
+#'   `"hessian"` or `"bootstrap"` (`TRUE` means `"bootstrap"`).
 #' @param B number of bootstrap replicates (for `se = "bootstrap"`).
 #' @param init optional starting values: an [armacop-class] model with the
 #'   same orders and period as `object`, or a numeric vector of coefficients
@@ -174,6 +256,17 @@ armacop_start <- function(object, init, x) {
 #'   is stationary and invertible. If BFGS does not converge, Nelder-Mead is
 #'   tried from the BFGS value and the better result is kept.
 #'
+#'   `se = "hessian"` gives the inverse observed information, carried to the
+#'   coefficients by the delta method. It is quick but only approximate: for
+#'   pseudo-observations it ignores the variability of the ranks, and for PIT
+#'   data it ignores estimation of the margins. `se = "bootstrap"` is a
+#'   parametric bootstrap: `B` series are simulated from the fitted model
+#'   (exact stationary start, same missing-value pattern), ranked if
+#'   `pseudo = TRUE`, and refitted with the same starting rules as the
+#'   original fit (from `init` or `object` if given, otherwise from
+#'   Hannan-Rissanen values). The covariance is that of the replicates; a
+#'   replicate whose refit fails is recorded as `NA` and dropped.
+#'
 #' @return An object of class [armacopfit-class].
 #' @export
 #'
@@ -181,51 +274,78 @@ armacop_start <- function(object, init, x) {
 #' set.seed(1)
 #' x <- as.numeric(arima.sim(list(ar = 0.5, ma = 0.4), n = 500, sd = 0.7))
 #' U <- (rank(x) - 0.5) / length(x)
-#' tsfit(U, armacop(order = c(1, 1)))
+#' tsfit(U, armacop(order = c(1, 1)), se = "hessian")
 setMethod("tsfit", signature(U = "ANY", object = "armacop"),
   function(U, object, pseudo = TRUE, se = FALSE, B = 200, init = NULL,
            control = list(), ...) {
-    if (!identical(se, FALSE)) {
-      stop("standard errors are not implemented yet; use se = FALSE")
+    if (isTRUE(se)) se <- "bootstrap"
+    if (!identical(se, FALSE) && !(is.character(se) && length(se) == 1L &&
+                                   se %in% c("hessian", "bootstrap"))) {
+      stop("'se' must be FALSE, \"hessian\" or \"bootstrap\"")
+    }
+    if (identical(se, "bootstrap") &&
+        (!is.numeric(B) || length(B) != 1L || B < 10 || B != round(B))) {
+      stop("'B' must be a whole number of at least 10")
     }
     u <- check_copula_data(U)
-    x <- stats::qnorm(u)
     ord <- object@order
     period <- object@period
-    start <- armacop_start(object, init, x)
-    z0 <- pars_to_free(start@pars)
-    ctrl <- modifyList(
-      list(maxit = 1000, reltol = 1e-12, ndeps = rep(1e-6, length(z0))), control
-    )
-    opt <- stats::optim(z0, armacop_negll, ord = ord, period = period, x = x,
-                        method = "BFGS", control = ctrl)
-    if (opt$convergence != 0L) {
-      alt <- stats::optim(opt$par, armacop_negll, ord = ord, period = period,
-                          x = x, method = "Nelder-Mead",
-                          control = list(maxit = 5000, reltol = 1e-12))
-      if (alt$value < opt$value) opt <- alt
-    }
-    b <- split_blocks(opt$par, ord)
-    model <- armacop(
-      ar = free_to_ar(b$ar), ma = free_to_ma(b$ma),
-      sar = free_to_ar(b$sar), sma = free_to_ma(b$sma), period = period
-    )
     npar <- as.integer(sum(ord))
+    fit <- armacop_mle(u, object, init, control)
+    model <- fit$model
+    est <- coef(model)
+    cn <- names(est)
+    V <- matrix(NA_real_, npar, npar, dimnames = list(cn, cn))
+    boot <- matrix(NA_real_, 0L, npar, dimnames = list(NULL, cn))
+    se_method <- "none"
+    if (identical(se, "hessian")) {
+      Vh <- armacop_hessian_vcov(fit, ord, period)
+      if (!is.null(Vh)) {
+        V[] <- Vh
+        se_method <- "hessian"
+      }
+    } else if (identical(se, "bootstrap")) {
+      n <- length(u)
+      missing <- is.na(u)
+      boot <- matrix(NA_real_, B, npar, dimnames = list(NULL, cn))
+      for (b in seq_len(B)) {
+        ub <- tssim(model, n)
+        ub[missing] <- NA
+        if (pseudo) {
+          ub <- rank(ub, na.last = "keep", ties.method = "random") / (sum(!missing) + 1)
+        }
+        fb <- tryCatch(armacop_mle(ub, object, init, control)$model,
+                       error = function(e) NULL)
+        if (!is.null(fb)) boot[b, ] <- coef(fb)
+      }
+      good <- stats::complete.cases(boot)
+      if (sum(good) >= 2L) {
+        V[] <- stats::cov(boot[good, , drop = FALSE])
+        se_method <- "bootstrap"
+        if (sum(good) < B) {
+          warning(sprintf("%d of %d bootstrap refits failed", B - sum(good), B))
+        }
+      } else {
+        warning("too few successful bootstrap refits; standard errors not available")
+      }
+    }
+    se_vec <- if (se_method == "none") rep(NA_real_, npar) else sqrt(diag(V))
+    names(se_vec) <- cn
     new("armacopfit",
-      model = model, data = u, pseudo = pseudo, estimate = coef(model),
-      se = rep(NA_real_, npar), vcov = matrix(NA_real_, npar, npar),
-      se_method = "none", boot = matrix(NA_real_, 0L, npar),
-      loglik = -opt$value - sum(stats::dnorm(x, log = TRUE), na.rm = TRUE),
+      model = model, data = u, pseudo = pseudo, estimate = est,
+      se = se_vec, vcov = V, se_method = se_method, boot = boot,
+      loglik = -fit$opt$value - sum(stats::dnorm(fit$x, log = TRUE), na.rm = TRUE),
       nobs = as.integer(sum(!is.na(u))), npar = npar,
-      convergence = as.integer(opt$convergence),
-      message = if (is.null(opt$message)) "" else opt$message,
-      start = start
+      convergence = as.integer(fit$opt$convergence),
+      message = if (is.null(fit$opt$message)) "" else fit$opt$message,
+      start = fit$start
     )
   }
 )
 
 #' @describeIn armacopfit-class Coefficient estimates.
 #' @param object an object of class [armacopfit-class].
+#' @param ... not used.
 #' @export
 setMethod("coef", "armacopfit", function(object) object@estimate)
 
@@ -236,6 +356,11 @@ setMethod("logLik", "armacopfit", function(object) {
   structure(object@loglik, df = object@npar, nobs = object@nobs, class = "logLik")
 })
 
+#' @describeIn armacopfit-class Covariance matrix of the estimates (`NA`
+#'   unless standard errors were requested).
+#' @export
+setMethod("vcov", "armacopfit", function(object, ...) object@vcov)
+
 #' @describeIn armacopfit-class Show method.
 #' @export
 setMethod("show", "armacopfit", function(object) {
@@ -243,11 +368,25 @@ setMethod("show", "armacopfit", function(object) {
   cat("name: ", object@model@name, "\n", sep = "")
   if (!is.na(object@model@period)) cat("period: ", object@model@period, "\n", sep = "")
   cat("estimates:\n")
-  print(object@estimate)
+  if (object@se_method == "none") {
+    print(object@estimate)
+  } else {
+    tab <- cbind(estimate = object@estimate, se = object@se)
+    print(tab)
+    cat("standard errors: ", object@se_method, "\n", sep = "")
+  }
   cat("loglik: ", format(object@loglik, digits = 7), "  npar: ", object@npar,
       "  nobs: ", object@nobs, "\n", sep = "")
   if (object@convergence != 0L) {
     cat("warning: optimiser did not converge (code ", object@convergence, ")\n", sep = "")
   }
   invisible(object)
+})
+
+#' @describeIn tssim Simulation from the fitted model; `n` defaults to the
+#'   length of the data.
+#' @export
+setMethod("tssim", "armacopfit", function(object, n, ...) {
+  if (missing(n)) n <- length(object@data)
+  tssim(object@model, n)
 })

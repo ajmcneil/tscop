@@ -59,6 +59,42 @@ arma_stationary_cov <- function(Tm, RR, maxit = 200L) {
   P
 }
 
+# State-space form (Harvey) of the zero-mean, unit-variance Gaussian ARMA
+# process: alpha_t = Tm alpha_{t-1} + R e_t with e_t ~ N(0, 1), x_t = alpha_t[1].
+# R carries the factor 1 / sqrt(gamma_0) that fixes Var(x_t) = 1. P0 is the
+# stationary state covariance.
+arma_state_space <- function(ar, ma) {
+  p <- length(ar)
+  q <- length(ma)
+  m <- max(p, q + 1L)
+  phi <- c(ar, numeric(m - p))
+  theta <- c(1, ma, numeric(m - 1L - q))
+  g0 <- arma_acvf(ar, ma, 0L)
+  R <- theta / sqrt(g0)
+  Tm <- matrix(0, m, m)
+  Tm[, 1L] <- phi
+  if (m > 1L) Tm[cbind(seq_len(m - 1L), seq_len(m - 1L) + 1L)] <- 1
+  RR <- tcrossprod(R)
+  list(m = m, phi = phi, Tm = Tm, R = R, RR = RR,
+       P0 = arma_stationary_cov(Tm, RR))
+}
+
+# Exact simulation of n values of the process: the first state is drawn from
+# its stationary distribution, so no burn-in is needed.
+arma_simulate <- function(n, ar = numeric(0), ma = numeric(0)) {
+  ss <- arma_state_space(ar, ma)
+  ev <- eigen(ss$P0, symmetric = TRUE)
+  a <- as.numeric(ev$vectors %*% (sqrt(pmax(ev$values, 0)) * stats::rnorm(ss$m)))
+  e <- stats::rnorm(n)
+  x <- numeric(n)
+  x[1L] <- a[1L]
+  for (t in seq_len(n - 1L) + 1L) {
+    a <- ss$phi * a[1L] + c(a[-1L], 0) + ss$R * e[t]
+    x[t] <- a[1L]
+  }
+  x
+}
+
 # Kalman filter for the zero-mean, unit-variance Gaussian ARMA process, in
 # Harvey's state-space form. The innovation variance is 1 / gamma_0, so the
 # stationary variance of x_t is exactly one: this is the constraint that makes
@@ -72,21 +108,15 @@ arma_stationary_cov <- function(Tm, RR, maxit = 200L) {
 # 'P' for time n + 1.
 arma_filter <- function(x, ar = numeric(0), ma = numeric(0), tol = 1e-12) {
   n <- length(x)
-  p <- length(ar)
-  q <- length(ma)
-  m <- max(p, q + 1L)
-  phi <- c(ar, numeric(m - p))
-  theta <- c(1, ma, numeric(m - 1L - q))
-  g0 <- arma_acvf(ar, ma, 0L)
-  R <- theta / sqrt(g0)
-  Tm <- matrix(0, m, m)
-  Tm[, 1L] <- phi
-  if (m > 1L) Tm[cbind(seq_len(m - 1L), seq_len(m - 1L) + 1L)] <- 1
-  RR <- tcrossprod(R)
+  ss <- arma_state_space(ar, ma)
+  m <- ss$m
+  phi <- ss$phi
+  Tm <- ss$Tm
+  RR <- ss$RR
   Tstep <- function(a) phi * a[1L] + c(a[-1L], 0)
 
   a <- numeric(m)
-  P <- arma_stationary_cov(Tm, RR)
+  P <- ss$P0
   mu <- numeric(n)
   Fv <- numeric(n)
   v <- rep(NA_real_, n)

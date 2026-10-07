@@ -31,10 +31,11 @@ coefficients are used as starting values.}
 
 \item{pseudo}{logical: \code{TRUE} (default) if \code{U} are pseudo-observations
 (ranks), \code{FALSE} if they are probability integral transforms from fitted
-marginal models. It matters for standard errors.}
+marginal models. It matters for the bootstrap, which re-ranks simulated
+data when \code{pseudo = TRUE}.}
 
-\item{se}{how to compute standard errors. Only \code{FALSE} (none) is
-implemented so far.}
+\item{se}{how to compute standard errors: \code{FALSE} (default, none),
+\code{"hessian"} or \code{"bootstrap"} (\code{TRUE} means \code{"bootstrap"}).}
 
 \item{B}{number of bootstrap replicates (for \code{se = "bootstrap"}).}
 
@@ -62,6 +63,17 @@ estimated. Estimation is by BFGS on an unconstrained scale (hyperbolic
 tangent of the partial autocorrelations), on which every parameter value
 is stationary and invertible. If BFGS does not converge, Nelder-Mead is
 tried from the BFGS value and the better result is kept.
+
+\code{se = "hessian"} gives the inverse observed information, carried to the
+coefficients by the delta method. It is quick but only approximate: for
+pseudo-observations it ignores the variability of the ranks, and for PIT
+data it ignores estimation of the margins. \code{se = "bootstrap"} is a
+parametric bootstrap: \code{B} series are simulated from the fitted model
+(exact stationary start, same missing-value pattern), ranked if
+\code{pseudo = TRUE}, and refitted with the same starting rules as the
+original fit (from \code{init} or \code{object} if given, otherwise from
+Hannan-Rissanen values). The covariance is that of the replicates; a
+replicate whose refit fails is recorded as \code{NA} and dropped.
 }
 \section{Methods (by class)}{
 \itemize{
@@ -72,5 +84,5 @@ tried from the BFGS value and the better result is kept.
 set.seed(1)
 x <- as.numeric(arima.sim(list(ar = 0.5, ma = 0.4), n = 500, sd = 0.7))
 U <- (rank(x) - 0.5) / length(x)
-tsfit(U, armacop(order = c(1, 1)))
+tsfit(U, armacop(order = c(1, 1)), se = "hessian")
 }

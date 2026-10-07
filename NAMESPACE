@@ -2,12 +2,15 @@
 
 export(armacop)
 export(tsfit)
+export(tssim)
 exportClasses(armacop)
 exportClasses(armacopfit)
 exportMethods(coef)
 exportMethods(logLik)
 exportMethods(show)
 exportMethods(tsfit)
+exportMethods(tssim)
+exportMethods(vcov)
 import(methods)
 importFrom(stats,
   coef,
@@ -15,7 +18,8 @@ importFrom(stats,
   logLik,
   optim,
   pnorm,
-  qnorm
+  qnorm,
+  vcov
 )
 importFrom(udp,pcoincide)
 importFrom(utils,modifyList)
