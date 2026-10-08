@@ -37,4 +37,5 @@ Collate:
     'pc.R'
     'dvine-engine.R'
     'dvinecop.R'
+    'dvinecop-fit.R'
     'tscop-package.R'

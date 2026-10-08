@@ -165,12 +165,12 @@ dv_resolve <- function(object) {
   pairs <- vector("list", K)
   if (object@mode == "tied") {
     tau <- dv_arma_tau(object@arma, K)
-    for (j in seq_len(K)) {
-      spec <- if (j <= K0) object@pairs[[j]] else object@tail
-      pr <- dv_resolve_pair(spec, tau[j])
+    for (j in seq_len(min(K0, K))) {
+      pr <- dv_resolve_pair(object@pairs[[j]], tau[j])
       if (is.null(pr)) return(NULL)
       pairs[[j]] <- pr
     }
+    if (K > K0) pairs[(K0 + 1L):K] <- dv_resolve_tail(object@tail, tau[(K0 + 1L):K])
   } else {
     for (j in seq_len(min(K0, K))) pairs[[j]] <- dv_from_bicop(object@pairs[[j]])
     if (K > K0) {

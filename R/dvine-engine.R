@@ -75,32 +75,54 @@ dv_ktau_to_par <- function(family, tau) {
   )
 }
 
-# Resolve a pc specification at Kendall's tau 'tau' to a pair copula, or NULL
-# if the specification is infeasible at that tau (BB1 only).
-dv_resolve_pair <- function(spec, tau) {
-  fam <- spec@family
-  if (fam %in% .pc_aux_families && is.na(spec@aux)) {
+# Resolve a pair copula (family, rotations for positive and negative
+# dependence, auxiliary parameter) at Kendall's tau 'tau' to a resolved pair
+# copula, or NULL if infeasible at that tau (BB1 only).
+dv_resolve_vals <- function(fam, pos, neg, aux, tau) {
+  if (fam %in% .pc_aux_families && is.na(aux)) {
     stop("the auxiliary parameter of the '", fam, "' specification is missing")
   }
   if (fam == "gauss") {
     return(list(family = "gauss", rotation = 0, parameters = sin(pi * tau / 2)))
   }
   if (fam == "t") {
-    return(list(family = "t", rotation = 0, parameters = c(sin(pi * tau / 2), spec@aux)))
+    return(list(family = "t", rotation = 0, parameters = c(sin(pi * tau / 2), aux)))
   }
   if (fam == "frank") {
     return(list(family = "frank", rotation = 0,
                 parameters = if (tau == 0) 1e-10 else dv_ktau_to_par("frank", tau)))
   }
-  rot <- if (tau >= 0) spec@pos else spec@neg
+  rot <- if (tau >= 0) pos else neg
   at <- abs(tau)
   if (fam == "bb1") {
     theta_c <- dv_ktau_to_par("clayton", at)
-    th <- (theta_c + 2) / spec@aux - 2
+    th <- (theta_c + 2) / aux - 2
     if (!(th > 1e-10)) return(NULL)
-    return(list(family = "bb1", rotation = rot, parameters = c(th, spec@aux)))
+    return(list(family = "bb1", rotation = rot, parameters = c(th, aux)))
   }
   list(family = fam, rotation = rot, parameters = dv_ktau_to_par(fam, at))
+}
+
+# Resolve a pc specification at Kendall's tau 'tau' (see dv_resolve_vals).
+dv_resolve_pair <- function(spec, tau, aux = spec@aux) {
+  dv_resolve_vals(spec@family, spec@pos, spec@neg, aux, tau)
+}
+
+# Resolve the tail family at a vector of Kendall's tau values; the tail
+# families have no auxiliary parameter and are always feasible.
+dv_resolve_tail <- function(spec, tau) {
+  fam <- spec@family
+  if (fam == "gauss") {
+    rho <- sin(pi * tau / 2)
+    return(lapply(rho, function(r) list(family = "gauss", rotation = 0, parameters = r)))
+  }
+  if (fam == "frank") {
+    par <- vapply(tau, function(t) if (t == 0) 1e-10 else dv_ktau_to_par("frank", t), numeric(1))
+    return(lapply(par, function(p) list(family = "frank", rotation = 0, parameters = p)))
+  }
+  par <- dv_ktau_to_par(fam, abs(tau))
+  rot <- ifelse(tau >= 0, spec@pos, spec@neg)
+  Map(function(p, r) list(family = fam, rotation = r, parameters = p), par, rot)
 }
 
 # Convert a bicop_dist object to a resolved pair copula.
