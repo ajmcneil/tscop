@@ -265,3 +265,129 @@ setMethod("show", "dvinecop", function(object) {
   }
   invisible(object)
 })
+
+# Complete copula data: strictly inside (0, 1), no missing values.
+check_complete_copula_data <- function(U, min_n = 1L) {
+  u <- check_copula_data(U, min_n = min_n)
+  if (anyNA(u)) stop("d-vine models require complete data (no missing values)")
+  u
+}
+
+# Resolved pair copulas of a model that must be fully specified and feasible.
+dv_pairs_or_stop <- function(object) {
+  pairs <- dv_resolve(object)
+  if (is.null(pairs)) stop("the model is infeasible at its current parameter values")
+  pairs
+}
+
+#' @describeIn tssim Exact stationary simulation from a known
+#'   [dvinecop-class] model, by the inverse Rosenblatt transform with the
+#'   backward variables carried from step to step (cost O(nK)). `n` defaults
+#'   to 1000.
+#' @export
+setMethod("tssim", "dvinecop", function(object, n, ...) {
+  if (missing(n)) n <- 1000
+  if (!is.numeric(n) || length(n) != 1L || n < 1 || n != round(n)) {
+    stop("'n' must be a positive whole number")
+  }
+  pairs <- dv_pairs_or_stop(object)
+  as.numeric(dv_simulate(pairs, matrix(stats::runif(n), n, 1L)))
+})
+
+#' @describeIn ktau Kendall's tau of the pair copulas of a [dvinecop-class]
+#'   model at lags `1, ..., lagmax` (default 20); zero beyond the effective
+#'   lag `K`. In tied mode the values are the ARMA kpacf.
+#' @export
+setMethod("ktau", "dvinecop", function(object, lagmax, ...) {
+  if (missing(lagmax)) lagmax <- 20
+  if (!is.numeric(lagmax) || length(lagmax) != 1L || lagmax < 1 || lagmax != round(lagmax)) {
+    stop("'lagmax' must be a positive whole number")
+  }
+  if (is.na(object@K)) stop("the model has unspecified ARMA coefficients; fit it to data first")
+  K <- object@K
+  tau <- numeric(lagmax)
+  m <- min(K, lagmax)
+  if (object@mode == "tied") {
+    tau[seq_len(m)] <- dv_arma_tau(object@arma, K)[seq_len(m)]
+  } else {
+    pairs <- dv_pairs_or_stop(object)
+    tau[seq_len(m)] <- vapply(pairs[seq_len(m)], dv_pair_ktau, numeric(1))
+  }
+  tau
+})
+
+dv_resid <- function(model, data, scale) {
+  scale <- match.arg(scale, c("uniform", "normal"))
+  u <- check_complete_copula_data(data)
+  r <- dv_rosenblatt(dv_pairs_or_stop(model), u)
+  out <- if (scale == "uniform") r else stats::qnorm(r)
+  restore_attrs(out, data)
+}
+
+#' Residuals of d-vine copula models
+#'
+#' The residuals are the forward Rosenblatt transforms
+#' \eqn{R_{\min(t-1,K)}(u_t; u_{t-1}, \ldots)} of the series: under the model
+#' they are iid uniform from the first observation (lower-order Rosenblatt
+#' functions are used for the first \eqn{K} values). The data must be
+#' complete. If the data are a `ts`, `zoo` or `xts` object the time index is
+#' restored.
+#'
+#' @param object a [dvinecop-class] model with known coefficients.
+#' @param data copula data in (0, 1).
+#' @param scale `"uniform"` (default) or `"normal"` (the `qnorm` of the
+#'   uniform residuals).
+#' @param ... not used.
+#'
+#' @return A numeric vector the length of the data.
+#' @name resid-dvinecop
+#' @aliases resid,dvinecop-method residuals,dvinecop-method
+NULL
+
+#' @rdname resid-dvinecop
+#' @export
+setMethod("resid", "dvinecop", function(object, data, scale = "uniform", ...) {
+  dv_resid(object, data, scale)
+})
+
+#' @rdname resid-dvinecop
+#' @export
+setMethod("residuals", "dvinecop", function(object, data, scale = "uniform", ...) {
+  dv_resid(object, data, scale)
+})
+
+#' Prediction for d-vine copula models
+#'
+#' One-step-ahead predictive distribution of \eqn{u_{n+1}} given the last
+#' \eqn{K} values of the data: the distribution function (`type = "df"`),
+#' quantile function (`type = "qf"`) or density (`type = "dens"`) evaluated at
+#' `x`, from the forward Rosenblatt functions and their inverses.
+#'
+#' @param object a [dvinecop-class] model with known coefficients.
+#' @param data past copula data in (0, 1), complete.
+#' @param h horizon; only `h = 1` is implemented.
+#' @param type `"df"`, `"qf"` or `"dens"`.
+#' @param x points in (0, 1) at which to evaluate the function (for `"qf"`,
+#'   probabilities).
+#' @param ... not used.
+#'
+#' @return A numeric vector the length of `x`.
+#' @name predict-dvinecop
+#' @aliases predict,dvinecop-method
+NULL
+
+dv_predict <- function(model, data, h, type, x) {
+  type <- match.arg(type, c("df", "qf", "dens"))
+  if (!identical(as.numeric(h), 1)) stop("only h = 1 is implemented for d-vine models")
+  if (is.null(x) || !is.numeric(x) || anyNA(x) || any(x <= 0 | x >= 1)) {
+    stop("'x' must be numeric values strictly inside (0, 1)")
+  }
+  u <- check_complete_copula_data(data)
+  dv_predictive(dv_pairs_or_stop(model), u, as.numeric(x), type)
+}
+
+#' @rdname predict-dvinecop
+#' @export
+setMethod("predict", "dvinecop", function(object, data, h = 1, type = "df", x = NULL, ...) {
+  dv_predict(object, data, h, type, x)
+})

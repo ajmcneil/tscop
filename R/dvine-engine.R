@@ -168,3 +168,186 @@ dv_loglik <- function(u, pairs) {
   }
   if (is.finite(ll)) ll else -Inf
 }
+
+# ---- pair-level building blocks (uniform scale, vectorised) -------------
+#
+# For a pair (a, b) = (earlier variable, later variable):
+#   dv_h(pr, a, b, 1) = h(b | a),   dv_h(pr, a, b, 2) = h(a | b),
+#   dv_hinv(pr, a, p) = b such that h(b | a) = p.
+# Gaussian pairs use closed forms. Results are clamped to the open unit
+# interval so that they can be fed to later trees.
+
+dv_clamp <- function(x, eps = 1e-12) pmin(pmax(x, eps), 1 - eps)
+
+dv_h <- function(pr, a, b, cond_var) {
+  if (dv_is_gauss(pr)) {
+    rho <- pr$parameters[1L]
+    s <- sqrt(1 - rho * rho)
+    out <- if (cond_var == 1L) {
+      stats::pnorm((stats::qnorm(b) - rho * stats::qnorm(a)) / s)
+    } else {
+      stats::pnorm((stats::qnorm(a) - rho * stats::qnorm(b)) / s)
+    }
+  } else {
+    out <- as.numeric(rvinecopulib::hbicop(cbind(a, b), cond_var, pr$family,
+                                           pr$rotation, pr$parameters))
+  }
+  dv_clamp(out)
+}
+
+dv_hinv <- function(pr, a, p) {
+  if (dv_is_gauss(pr)) {
+    rho <- pr$parameters[1L]
+    s <- sqrt(1 - rho * rho)
+    out <- stats::pnorm(rho * stats::qnorm(a) + s * stats::qnorm(p))
+  } else {
+    out <- as.numeric(rvinecopulib::hbicop(cbind(a, p), 1L, pr$family, pr$rotation,
+                                           pr$parameters, inverse = TRUE))
+  }
+  dv_clamp(out)
+}
+
+dv_dens <- function(pr, a, b) {
+  if (dv_is_gauss(pr)) {
+    rho <- pr$parameters[1L]
+    x <- stats::qnorm(a)
+    y <- stats::qnorm(b)
+    r2 <- rho * rho
+    exp(-0.5 * log1p(-r2) - (r2 * (x * x + y * y) - 2 * rho * x * y) / (2 * (1 - r2)))
+  } else {
+    as.numeric(rvinecopulib::dbicop(cbind(a, b), pr$family, pr$rotation, pr$parameters))
+  }
+}
+
+# ---- forward Rosenblatt transform ---------------------------------------
+
+# Forward Rosenblatt transform of a series: r_t = P(U_t <= u_t | previous
+# min(t - 1, K) values), iid U(0, 1) under the model. Uses the same level
+# recursion as dv_loglik; the first row of each level supplies the values at
+# t = 2, ..., K + 1 that the density recursion discards.
+dv_rosenblatt <- function(pairs, u) {
+  n <- length(u)
+  K <- min(length(pairs), n - 1L)
+  r <- u
+  if (K < 1L) return(r)
+  A <- u[-n]
+  Bv <- u[-1L]
+  Bfinal <- numeric(0)
+  for (j in seq_len(K)) {
+    pr <- pairs[[j]]
+    m <- length(A)
+    r[j + 1L] <- dv_h(pr, A[1L], Bv[1L], 1L)
+    if (j < K) {
+      Anew <- dv_h(pr, A[-m], Bv[-m], 2L)
+      Bnew <- dv_h(pr, A[-1L], Bv[-1L], 1L)
+      A <- Anew
+      Bv <- Bnew
+    } else if (m > 1L) {
+      Bfinal <- dv_h(pr, A[-1L], Bv[-1L], 1L)
+    }
+  }
+  if (length(Bfinal) > 0L) r[(K + 2L):n] <- Bfinal
+  r
+}
+
+# ---- simulation ----------------------------------------------------------
+
+# Exact stationary simulation from independent U(0,1) innovations w (an n x
+# nrep matrix, one column per replicate): u_t = R^{-1}_{min(t-1,K)}(w_t; past).
+# Backward variables B_i(t - i), needed to invert the forward chain, are
+# carried from step to step, so the cost is O(nK) pair-copula calls
+# vectorised over replicates. dv_rosenblatt applied to a column of the result
+# returns the corresponding column of w.
+dv_simulate <- function(pairs, w) {
+  n <- nrow(w)
+  nrep <- ncol(w)
+  K <- length(pairs)
+  u <- matrix(0, n, nrep)
+  Bprev <- matrix(0, 0L, nrep) # row i + 1 holds B_i(t - 1 - i)
+  for (t in seq_len(n)) {
+    k <- min(t - 1L, K)
+    x <- w[t, ]
+    Fm <- matrix(0, max(k, 1L), nrep) # row i holds F_{i-1}(t)
+    if (k > 0L) {
+      for (j in k:1L) {
+        x <- dv_hinv(pairs[[j]], Bprev[j, ], x)
+        Fm[j, ] <- x
+      }
+    }
+    u[t, ] <- x
+    nb <- min(k, K - 1L)
+    Bnew <- matrix(0, nb + 1L, nrep)
+    Bnew[1L, ] <- x
+    if (nb >= 1L) {
+      for (i in seq_len(nb)) {
+        Bnew[i + 1L, ] <- dv_h(pairs[[i]], Bprev[i, ], Fm[i, ], 2L)
+      }
+    }
+    Bprev <- Bnew
+  }
+  u
+}
+
+# ---- one-step predictive distribution ----------------------------------
+
+# Backward variables B_i(n - i), i = 0, ..., k - 1, of the last k values of
+# the data (k = min(K, n)): B_i(n - i) = P(U_{n-i} <= u_{n-i} | u_{n-i+1},
+# ..., u_n). Level recursion on the window of the last k values; the last row
+# of each level (dropped by the density recursion) supplies B_i(n - i).
+dv_backward_tail <- function(pairs, u, k) {
+  n <- length(u)
+  w <- u[(n - k + 1L):n]
+  out <- numeric(k)
+  out[1L] <- w[k]
+  if (k >= 2L) {
+    A <- w[-k]
+    Bv <- w[-1L]
+    for (i in seq_len(k - 1L)) {
+      pr <- pairs[[i]]
+      m <- length(A)
+      out[i + 1L] <- dv_h(pr, A[m], Bv[m], 2L)
+      if (i < k - 1L) {
+        Anew <- dv_h(pr, A[-m], Bv[-m], 2L)
+        Bnew <- dv_h(pr, A[-1L], Bv[-1L], 1L)
+        A <- Anew
+        Bv <- Bnew
+      }
+    }
+  }
+  out
+}
+
+# Predictive distribution of the next value given the data: type "df"
+# (distribution function), "qf" (quantile function) or "dens" (density),
+# evaluated at x.
+dv_predictive <- function(pairs, u, x, type) {
+  n <- length(u)
+  K <- length(pairs)
+  k <- min(K, n)
+  if (k < 1L) {
+    return(switch(type, df = x, qf = x, dens = rep(1, length(x))))
+  }
+  Bt <- dv_backward_tail(pairs, u, k)
+  switch(type,
+    df = {
+      f <- x
+      for (j in seq_len(k)) f <- dv_h(pairs[[j]], rep(Bt[j], length(f)), f, 1L)
+      f
+    },
+    qf = {
+      f <- x
+      for (j in k:1L) f <- dv_hinv(pairs[[j]], rep(Bt[j], length(f)), f)
+      f
+    },
+    dens = {
+      f <- x
+      d <- rep(1, length(x))
+      for (j in seq_len(k)) {
+        a <- rep(Bt[j], length(f))
+        d <- d * dv_dens(pairs[[j]], a, f)
+        f <- dv_h(pairs[[j]], a, f, 1L)
+      }
+      d
+    }
+  )
+}
