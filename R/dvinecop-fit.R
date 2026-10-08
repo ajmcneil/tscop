@@ -28,6 +28,8 @@
 #'   the effective lag was updated at the end of the fit.
 #' @slot template the original input if it was a `ts`, `zoo` or `xts` object,
 #'   otherwise `NULL`.
+#' @slot path for a model selected by [autodvinecop()], a data frame with one
+#'   row per lag examined; an empty data frame otherwise.
 #'
 #' @exportClass dvinecopfit
 setClass("dvinecopfit", slots = c(
@@ -35,7 +37,8 @@ setClass("dvinecopfit", slots = c(
   estimate = "numeric", se = "numeric", vcov = "matrix", se_method = "character",
   boot = "matrix", loglik = "numeric", nobs = "integer", npar = "integer",
   convergence = "integer", message = "character", start = "dvinecop",
-  Kstart = "integer", nrefit = "integer", dloglik = "numeric", template = "ANY"
+  Kstart = "integer", nrefit = "integer", dloglik = "numeric", template = "ANY",
+  path = "data.frame"
 ))
 
 # ---- parameter layout ----------------------------------------------------
@@ -364,7 +367,8 @@ setMethod("tsfit", signature(U = "ANY", object = "dvinecop"),
       convergence = as.integer(fit$fit$convergence), message = fit$fit$message,
       start = start_model, Kstart = as.integer(fit$Kstart), nrefit = as.integer(fit$nrefit),
       dloglik = fit$dloglik,
-      template = if (inherits(U, c("ts", "zoo", "xts"))) U else NULL
+      template = if (inherits(U, c("ts", "zoo", "xts"))) U else NULL,
+      path = data.frame()
     )
   }
 )
@@ -412,6 +416,11 @@ setMethod("show", "dvinecopfit", function(object) {
       "  nobs: ", object@nobs, "\n", sep = "")
   if (object@convergence != 0L) {
     cat("warning: optimiser did not converge (code ", object@convergence, ")\n", sep = "")
+  }
+  if (nrow(object@path) > 0L) {
+    cat("selection path (see object@path):\n")
+    print(object@path[, c("lag", "choice", "tau", "criterion", "improvement", "accepted")],
+          row.names = FALSE, digits = 4)
   }
   invisible(object)
 })

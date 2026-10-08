@@ -82,5 +82,8 @@ the effective lag was updated at the end of the fit.}
 
 \item{\code{template}}{the original input if it was a \code{ts}, \code{zoo} or \code{xts} object,
 otherwise \code{NULL}.}
+
+\item{\code{path}}{for a model selected by \code{\link[=autodvinecop]{autodvinecop()}}, a data frame with one
+row per lag examined; an empty data frame otherwise.}
 }}
 
