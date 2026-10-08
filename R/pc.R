@@ -1,0 +1,116 @@
+# Pair copula specifications for tied d-vine models.
+
+.pc_families <- c("gauss", "t", "gumbel", "clayton", "joe", "frank", "bb1")
+.pc_radial <- c("gauss", "t", "frank")
+.pc_aux_families <- c("t", "bb1")
+# families that tend to independence as Kendall's tau -> 0 with auxiliary
+# parameters fixed, hence admissible as the tail family
+.pc_tail_families <- c("gauss", "frank", "clayton", "gumbel", "joe")
+
+#' Pair copula specifications
+#'
+#' Specification of the pair copula used at a lag of a tied [dvinecop-class]
+#' model. The copula is calibrated at each lag to the Kendall's tau value of
+#' the model's Kendall partial autocorrelation function, so the specification
+#' needs only the family, the rotations to use under positive and negative
+#' dependence, and (for two-parameter families) the auxiliary parameter.
+#'
+#' @slot family one of `"gauss"`, `"t"`, `"gumbel"`, `"clayton"`, `"joe"`,
+#'   `"frank"` and `"bb1"`.
+#' @slot pos rotation (0 or 180) used when Kendall's tau is non-negative.
+#' @slot neg rotation (90 or 270) used when Kendall's tau is negative.
+#' @slot aux auxiliary parameter: degrees of freedom for `"t"` (at least 2)
+#'   or `delta` for `"bb1"` (at least 1); `NA` for other families, and `NA`
+#'   for `"t"`/`"bb1"` if it has not been given yet (a starting value is then
+#'   chosen when the model is fitted).
+#'
+#' @exportClass pc
+setClass("pc", slots = c(family = "character", pos = "numeric",
+                         neg = "numeric", aux = "numeric"))
+
+setValidity("pc", function(object) {
+  if (length(object@family) != 1L || !(object@family %in% .pc_families)) {
+    return(paste0("'family' must be one of ", paste(.pc_families, collapse = ", ")))
+  }
+  if (length(object@pos) != 1L || length(object@neg) != 1L || length(object@aux) != 1L) {
+    return("'pos', 'neg' and 'aux' must be single numbers")
+  }
+  if (object@family %in% .pc_radial) {
+    if (object@pos != 0 || object@neg != 0) return("radially symmetric families have pos = neg = 0")
+  } else {
+    if (!(object@pos %in% c(0, 180))) return("'pos' must be 0 or 180")
+    if (!(object@neg %in% c(90, 270))) return("'neg' must be 90 or 270")
+  }
+  if (object@family %in% .pc_aux_families) {
+    if (!is.na(object@aux)) {
+      if (object@family == "t" && object@aux < 2) return("degrees of freedom must be at least 2")
+      if (object@family == "bb1" && object@aux < 1) return("'delta' must be at least 1")
+    }
+  } else if (!is.na(object@aux)) {
+    return(paste0("family '", object@family, "' has no auxiliary parameter"))
+  }
+  TRUE
+})
+
+#' Constructor for pair copula specifications
+#'
+#' @param family family name (case-insensitive): `"gauss"`, `"t"`,
+#'   `"gumbel"`, `"clayton"`, `"joe"`, `"frank"` or `"bb1"`.
+#' @param pos rotation (0 or 180) used when Kendall's tau at the lag is
+#'   non-negative. Ignored for radially symmetric families (Gauss, t, Frank).
+#' @param neg rotation (90 or 270) used when Kendall's tau at the lag is
+#'   negative. Ignored for radially symmetric families.
+#' @param aux auxiliary parameter: degrees of freedom for `"t"`, `delta` for
+#'   `"bb1"`; `NULL` for the other families.
+#'
+#' @details Both rotations are always stored. Which one is used at a lag is
+#'   decided by the sign of Kendall's tau at the current parameter values, so
+#'   the user does not need to know the sign in advance. The rotation
+#'   convention is that of [rvinecopulib::bicop_dist()] applied to the pair
+#'   (earlier variable, later variable).
+#'
+#' @return An object of class [pc-class].
+#' @export
+#'
+#' @examples
+#' pc("gumbel")
+#' pc("clayton", pos = 180, neg = 270)
+#' pc("t", aux = 6)
+pc <- function(family, pos = 0, neg = 90, aux = NULL) {
+  if (!is.character(family) || length(family) != 1L) stop("'family' must be a single name")
+  family <- tolower(family)
+  family <- switch(family, gaussian = "gauss", normal = "gauss", student = "t",
+                   student_t = "t", family)
+  if (!(family %in% .pc_families)) {
+    stop("'family' must be one of ", paste(.pc_families, collapse = ", "))
+  }
+  if (family %in% .pc_radial) {
+    pos <- 0
+    neg <- 0
+  }
+  if (is.null(aux)) aux <- NA_real_
+  if (!is.numeric(pos) || !is.numeric(neg) || !is.numeric(aux)) stop("'pos', 'neg' and 'aux' must be numeric")
+  new("pc", family = family, pos = as.numeric(pos), neg = as.numeric(neg),
+      aux = as.numeric(aux))
+}
+
+# Coerce a family name or pc object to a pc object.
+as_pc <- function(x) {
+  if (is(x, "pc")) return(x)
+  if (is.character(x) && length(x) == 1L) return(pc(x))
+  stop("expected a pc() specification or a family name")
+}
+
+setClassUnion("pcOrNULL", c("pc", "NULL"))
+setClassUnion("armacopOrNULL", c("armacop", "NULL"))
+
+#' @describeIn pc-class Show method.
+#' @param object a [pc-class] object.
+#' @export
+setMethod("show", "pc", function(object) {
+  rot <- if (object@family %in% .pc_radial) "" else
+    sprintf(" (positive: %g, negative: %g)", object@pos, object@neg)
+  aux <- if (is.na(object@aux)) "" else sprintf(", aux = %g", object@aux)
+  cat("pair copula specification: ", object@family, rot, aux, "\n", sep = "")
+  invisible(object)
+})

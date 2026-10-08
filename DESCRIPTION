@@ -14,11 +14,11 @@ Description: Rebuilt tools for the analysis of time series using copula
 License: GPL-3
 Imports:
     methods,
+    rvinecopulib,
     stats,
     utils,
     udp
 Suggests:
-    rvinecopulib,
     testthat (>= 3.0.0),
     tscopula,
     zoo
@@ -34,4 +34,7 @@ Collate:
     'generics.R'
     'armacop.R'
     'armacop-fit.R'
+    'pc.R'
+    'dvine-engine.R'
+    'dvinecop.R'
     'tscop-package.R'
