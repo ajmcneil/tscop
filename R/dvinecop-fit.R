@@ -53,9 +53,27 @@ dv_layout <- function(object) {
     ops = ops, nk = ops$nfree,
     K0 = length(object@pairs), aux_lags = aux_lags,
     aux_fam = vapply(object@pairs[aux_lags], function(sp) sp@family, character(1)),
-    explicit = lapply(object@pairs, function(sp) list(family = sp@family, pos = sp@pos, neg = sp@neg)),
-    tail = object@tail
+    explicit = lapply(object@pairs, function(sp) list(family = sp@family, pos = sp@pos, neg = sp@neg,
+                                                      base = sp@base)),
+    tail = object@tail,
+    has_ivt = dv_has_ivt(object), vtpar = object@vtpar, vt_fixed = object@vt,
+    nvt = if (!dv_has_ivt(object)) 0L else switch(object@vtpar, both = 2L, common = 1L, none = 0L)
   )
+}
+
+# Index of the v-transform parameters in the free vector (after the kpacf and
+# auxiliary parameters), their values, and the free-scale image of fulcrums.
+dv_vt_index <- function(lay) lay$nk + length(lay$aux_lags) + seq_len(lay$nvt)
+
+dv_vt_from_free <- function(z, lay) {
+  if (!lay$has_ivt) return(NULL)
+  zv <- z[dv_vt_index(lay)]
+  switch(lay$vtpar, both = stats::plogis(zv), common = rep(stats::plogis(zv), 2L), none = unname(lay$vt_fixed))
+}
+
+dv_vt_to_free <- function(vt, vtpar) {
+  clamp <- function(x) pmin(pmax(x, 1e-3), 1 - 1e-3)
+  switch(vtpar, both = stats::qlogis(clamp(vt)), common = stats::qlogis(clamp(vt[1L])), none = numeric(0))
 }
 
 dv_aux_from_free <- function(z, fam) ifelse(fam == "t", 2 + exp(z), 1 + exp(z))
@@ -66,7 +84,8 @@ dv_aux_to_free <- function(aux, fam) log(pmax(aux - ifelse(fam == "t", 2, 1), 1e
 dv_free_to_coef <- function(z, lay) {
   na <- lay$nk
   c(lay$ops$coef(z[seq_len(na)]),
-    dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam))
+    dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam),
+    if (lay$nvt > 0L) stats::plogis(z[dv_vt_index(lay)]))
 }
 
 # Resolved pair copulas of length K at the free vector z; NULL if infeasible.
@@ -74,6 +93,7 @@ dv_make_pairs <- function(z, lay, K) {
   na <- lay$nk
   tau <- (2 / pi) * asin(lay$ops$pacf(z[seq_len(na)], K))
   aux <- dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam)
+  vt <- dv_vt_from_free(z, lay)
   K0 <- lay$K0
   pairs <- vector("list", K)
   for (j in seq_len(min(K0, K))) {
@@ -81,11 +101,15 @@ dv_make_pairs <- function(z, lay, K) {
     a <- NA_real_
     ia <- match(j, lay$aux_lags)
     if (!is.na(ia)) a <- aux[ia]
-    pr <- dv_resolve_vals(ex$family, ex$pos, ex$neg, a, tau[j])
+    pr <- dv_resolve_vals(ex$family, ex$pos, ex$neg, a, tau[j], ex$base, vt)
     if (is.null(pr)) return(NULL)
     pairs[[j]] <- pr
   }
-  if (K > K0) pairs[(K0 + 1L):K] <- dv_resolve_tail(lay$tail, tau[(K0 + 1L):K])
+  if (K > K0) {
+    tl <- dv_resolve_tail(lay$tail, tau[(K0 + 1L):K], vt)
+    if (is.null(tl)) return(NULL)
+    pairs[(K0 + 1L):K] <- tl
+  }
   pairs
 }
 
@@ -94,7 +118,8 @@ dv_make_pairs <- function(z, lay, K) {
 dv_negll <- function(z, lay, K, u) {
   na <- lay$nk
   if (any(!is.finite(z)) || (na > 0L && any(abs(z[seq_len(na)]) > lay$ops$zbound)) ||
-      any(abs(z[na + seq_along(lay$aux_lags)]) > 12)) {
+      any(abs(z[na + seq_along(lay$aux_lags)]) > 12) ||
+      (lay$nvt > 0L && any(abs(z[dv_vt_index(lay)]) > 6))) {
     return(1e10)
   }
   pairs <- tryCatch(dv_make_pairs(z, lay, K), error = function(e) NULL)
@@ -172,6 +197,7 @@ dv_start <- function(object, init, u, control) {
   na <- lay$nk
   kp <- object@kpacf
   specaux <- vapply(object@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
+  vt <- if (lay$has_ivt) object@vt else numeric(0)
   if (!is.null(init)) {
     if (is(init, "dvinecop")) {
       ok <- !is.null(init@kpacf) && identical(gc_structure(init@kpacf), gc_structure(kp)) &&
@@ -181,18 +207,25 @@ dv_start <- function(object, init, u, control) {
       if (!gc_is_specified(init@kpacf)) stop("'init' has unspecified kpacf coefficients")
       kp <- init@kpacf
       specaux <- vapply(init@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
-    } else if (is.numeric(init) && length(init) == na + length(lay$aux_lags)) {
+      if (lay$has_ivt) vt <- init@vt
+    } else if (is.numeric(init) && length(init) == na + length(lay$aux_lags) + lay$nvt) {
       kp <- gc_from_coef(kp, as.numeric(init[seq_len(na)]))
       specaux <- as.numeric(init[na + seq_along(lay$aux_lags)])
+      if (lay$nvt > 0L) vt <- rep(as.numeric(init[na + length(lay$aux_lags) + seq_len(lay$nvt)]), length.out = 2L)
     } else {
       stop("'init' must be a dvinecop model or a numeric vector of coefficients")
     }
   } else if (!gc_is_specified(kp)) {
-    kp <- gc_prefit(kp, u, control)
+    # Inverse-v-transformed pair copulas have cross-shaped dependence with no
+    # rank correlation: the Gaussian kpacf is fitted to the v-transformed data
+    # (one common fulcrum, the mean of the starting fulcrums), as in the vt-D-vine.
+    up <- if (lay$has_ivt) pmin(pmax(dv_vlin(u, mean(vt)), 1e-6), 1 - 1e-6) else u
+    kp <- gc_prefit(kp, up, control)
   }
   tau <- gc_tau(kp, max(lay$K0, 1L))
   aux <- dv_default_aux(specaux, lay$aux_fam, tau[lay$aux_lags])
-  z0 <- c(lay$ops$to_free(kp), dv_aux_to_free(aux, lay$aux_fam))
+  z0 <- c(lay$ops$to_free(kp), dv_aux_to_free(aux, lay$aux_fam),
+          if (lay$has_ivt) dv_vt_to_free(vt, lay$vtpar))
   list(z0 = z0, lay = lay, kpacf = kp, aux = aux)
 }
 
@@ -206,8 +239,10 @@ dv_build_model <- function(object, z, lay, K, limit) {
     sp <- pairs[[lay$aux_lags[i]]]
     pairs[[lay$aux_lags[i]]] <- pc(sp@family, sp@pos, sp@neg, aux[i])
   }
+  vt <- dv_vt_from_free(z, lay)
+  if (!is.null(vt)) names(vt) <- c("fulcrum1", "fulcrum2")
   m <- dvinecop(kp, pairs = pairs, tail = object@tail, tautol = object@tautol,
-                maxlag = object@maxlag)
+                maxlag = object@maxlag, vt = vt, vtpar = object@vtpar)
   m@K <- as.integer(K)
   m@Klimit <- limit
   m

@@ -1,3 +1,4 @@
 armacop    Gaussian ARMA / seasonal ARMA copula processes: specification, simulation, fitting, diagnostics and prediction
 dvinecop   Stationary d-vine copula processes with an ARMA kpacf: pair copula specification, simulation, fitting, diagnostics, prediction and automatic selection
 arfactcop  Gaussian copula processes made of independent AR(1) factors plus noise: kpacf, simulation, exact likelihood, fitting, diagnostics, use in d-vines
+ivt        Inverse-v-transformed pair copulas in d-vines for stochastic volatility (the Dias-Han-McNeil models): simulation, fitting, fulcrums, diagnostics, prediction

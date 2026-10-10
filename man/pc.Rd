@@ -4,7 +4,7 @@
 \alias{pc}
 \title{Constructor for pair copula specifications}
 \usage{
-pc(family, pos = 0, neg = 90, aux = NULL)
+pc(family, pos = 0, neg = 90, aux = NULL, base = NULL)
 }
 \arguments{
 \item{family}{family name (case-insensitive): \code{"gauss"}, \code{"t"},
@@ -18,6 +18,10 @@ negative. Ignored for radially symmetric families.}
 
 \item{aux}{auxiliary parameter: degrees of freedom for \code{"t"}, \code{delta} for
 \code{"bb1"}; \code{NULL} for the other families.}
+
+\item{base}{for \code{family = "ivt"} the base copula: \code{"ast"}, \code{"joe"},
+\code{"gumbel"} or \code{"clayton180"} (the survival Clayton copula); \code{NULL} for
+the other families.}
 }
 \value{
 An object of class \link[=pc-class]{pc}.
@@ -36,4 +40,5 @@ convention is that of \code{\link[rvinecopulib:bicop_dist]{rvinecopulib::bicop_d
 pc("gumbel")
 pc("clayton", pos = 180, neg = 270)
 pc("t", aux = 6)
+pc("ivt", base = "ast")
 }

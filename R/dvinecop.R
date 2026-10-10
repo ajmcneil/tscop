@@ -35,6 +35,12 @@
 #'   or `bicop_dist` objects (free mode).
 #' @slot tail the tail family: a [pc-class] object (tied mode), or `NULL`.
 #' @slot tautol,maxlag the tolerance and cap defining the effective lag.
+#' @slot vt the fulcrums `c(fulcrum1, fulcrum2)` of the linear v-transforms
+#'   of the inverse-v-transformed (`"ivt"`) pair copulas, shared by all of them
+#'   (`fulcrum1` applies to the earlier and `fulcrum2` to the later variable of
+#'   a pair); empty if the model has no such pair copula.
+#' @slot vtpar which fulcrums are parameters: `"both"`, `"common"` (one
+#'   parameter, equal fulcrums) or `"none"` (fixed).
 #' @slot K the effective lag (`NA` for a model structure whose ARMA
 #'   coefficients are not yet specified).
 #' @slot Klimit what determined `K`: `"ar"` (pure AR order), `"tol"`,
@@ -46,8 +52,14 @@
 setClass("dvinecop", slots = c(
   name = "character", mode = "character", kpacf = "gausscopOrNULL",
   pairs = "list", tail = "pcOrNULL", tautol = "numeric", maxlag = "numeric",
-  K = "integer", Klimit = "character"
+  K = "integer", Klimit = "character", vt = "numeric", vtpar = "character"
 ))
+
+# Does the model contain an inverse-v-transformed pair copula?
+dv_has_ivt <- function(object) {
+  any(vapply(object@pairs, function(sp) is(sp, "pc") && sp@family == "ivt", logical(1))) ||
+    (!is.null(object@tail) && object@tail@family == "ivt")
+}
 
 setValidity("dvinecop", function(object) {
   if (!(object@mode %in% c("tied", "free"))) return("'mode' must be \"tied\" or \"free\"")
@@ -71,6 +83,19 @@ setValidity("dvinecop", function(object) {
     if (K0 == 0L && is.null(object@kpacf)) return("specify 'pairs' or 'kpacf'")
   }
   if (!is.na(object@K) && object@K < max(K0, 1L)) return("'K' must be at least the number of explicit pairs")
+  if (length(object@vtpar) != 1L || !(object@vtpar %in% c("both", "common", "none"))) {
+    return("'vtpar' must be \"both\", \"common\" or \"none\"")
+  }
+  if (dv_has_ivt(object)) {
+    if (length(object@vt) != 2L || anyNA(object@vt) || any(object@vt <= 0 | object@vt >= 1)) {
+      return("the v-transform fulcrums 'vt' must be two numbers in (0, 1)")
+    }
+    if (object@vtpar == "common" && object@vt[1L] != object@vt[2L]) {
+      return("with vtpar = \"common\" the two fulcrums must be equal")
+    }
+  } else if (length(object@vt) > 0L) {
+    return("'vt' is only used with inverse-v-transformed pair copulas")
+  }
   TRUE
 })
 
@@ -93,6 +118,13 @@ setValidity("dvinecop", function(object) {
 #'   [pc()] specification of one of these. Families whose Kendall's tau cannot
 #'   tend to zero with their auxiliary parameters fixed (`"t"`, `"bb1"`) are
 #'   rejected. Free mode has a Gaussian tail.
+#' @param vt the fulcrums of the linear v-transforms of the `"ivt"` pair
+#'   copulas, two numbers in (0, 1) (default `c(0.5, 0.5)` when the model has an
+#'   `"ivt"` pair copula; an error otherwise). They are starting values when
+#'   the model is fitted, unless `vtpar = "none"`.
+#' @param vtpar `"both"` (default): both fulcrums are estimated; `"common"`:
+#'   one fulcrum for both (the vt-D-vine of Bladt and McNeil, with `vt` equal in
+#'   its two components); `"none"`: the fulcrums are fixed at `vt`.
 #' @param tautol tolerance on the absolute Kendall's tau defining the
 #'   effective lag.
 #' @param maxlag cap on the effective lag (`Inf` for none).
@@ -106,7 +138,7 @@ setValidity("dvinecop", function(object) {
 #' # AR(2) with a t copula at lag 1: a finite-order d-vine
 #' dvinecop(armacop(ar = c(0.5, 0.2)), pairs = list(pc("t", aux = 6)))
 dvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
-                     tautol = 1e-4, maxlag = Inf) {
+                     tautol = 1e-4, maxlag = Inf, vt = NULL, vtpar = "both") {
   if (!is.null(kpacf) && !is(kpacf, "gausscop")) {
     stop("'kpacf' must be a Gaussian copula process (an armacop or arfactcop object)")
   }
@@ -147,9 +179,21 @@ dvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
   } else {
     sprintf("d-vine(free, %d explicit%s)", K0, if (is.null(kpacf)) "" else paste0(", ", kpacf@name, " tail"))
   }
+  vtpar <- match.arg(vtpar, c("both", "common", "none"))
+  has_ivt <- any(vapply(pairs, function(sp) is(sp, "pc") && sp@family == "ivt", logical(1))) ||
+    (!is.null(tailspec) && tailspec@family == "ivt")
+  if (has_ivt) {
+    if (is.null(vt)) vt <- c(0.5, 0.5)
+    if (!is.numeric(vt) || length(vt) != 2L) stop("'vt' must be two fulcrums in (0, 1)")
+    vt <- as.numeric(vt)
+    names(vt) <- c("fulcrum1", "fulcrum2")
+  } else {
+    if (!is.null(vt)) stop("'vt' is only used with inverse-v-transformed pair copulas (pc(\"ivt\", ...))")
+    vt <- numeric(0)
+  }
   new("dvinecop", name = name, mode = mode, kpacf = kpacf, pairs = pairs, tail = tailspec,
       tautol = as.numeric(tautol), maxlag = as.numeric(maxlag), K = as.integer(K),
-      Klimit = limit)
+      Klimit = limit, vt = vt, vtpar = vtpar)
 }
 
 # Kendall's tau of the kpacf at lags 1..K for a specified Gaussian copula
@@ -165,12 +209,17 @@ dv_resolve <- function(object) {
   pairs <- vector("list", K)
   if (object@mode == "tied") {
     tau <- dv_kpacf_tau(object@kpacf, K)
+    vt <- if (length(object@vt)) object@vt else NULL
     for (j in seq_len(min(K0, K))) {
-      pr <- dv_resolve_pair(object@pairs[[j]], tau[j])
+      pr <- dv_resolve_pair(object@pairs[[j]], tau[j], vt = vt)
       if (is.null(pr)) return(NULL)
       pairs[[j]] <- pr
     }
-    if (K > K0) pairs[(K0 + 1L):K] <- dv_resolve_tail(object@tail, tau[(K0 + 1L):K])
+    if (K > K0) {
+      tl <- dv_resolve_tail(object@tail, tau[(K0 + 1L):K], vt)
+      if (is.null(tl)) return(NULL)
+      pairs[(K0 + 1L):K] <- tl
+    }
   } else {
     for (j in seq_len(min(K0, K))) pairs[[j]] <- dv_from_bicop(object@pairs[[j]])
     if (K > K0) {
@@ -207,6 +256,9 @@ setMethod("coef", "dvinecop", function(object) {
         out <- c(out, aux)
       }
     }
+    if (length(object@vt) > 0L && object@vtpar != "none") {
+      out <- c(out, if (object@vtpar == "common") c(fulcrum = object@vt[[1L]]) else object@vt)
+    }
   }
   out
 })
@@ -225,6 +277,7 @@ dv_explicit_labels <- function(object) {
   tau <- if (!is.null(object@kpacf) && gc_is_specified(object@kpacf)) dv_kpacf_tau(object@kpacf, K0) else rep(NA_real_, K0)
   vapply(seq_len(K0), function(j) {
     sp <- object@pairs[[j]]
+    if (sp@family == "ivt") return(paste0("ivt(", sp@base, ")"))
     if (sp@family %in% .pc_radial) return(sp@family)
     if (is.na(tau[j])) return(paste0(sp@family, "(", sp@pos, "/", sp@neg, ")"))
     paste0(sp@family, if (tau[j] >= 0) sp@pos else sp@neg)
@@ -239,6 +292,7 @@ setMethod("show", "dvinecop", function(object) {
   lab <- dv_explicit_labels(object)
   if (length(lab) > 0L) cat(length(lab), " explicit pair copulas: ", paste(lab, collapse = ", "), "\n", sep = "")
   if (!is.null(object@tail)) cat("tail family: ", object@tail@family,
+                                 if (object@tail@family == "ivt") paste0(" with base ", object@tail@base),
                                  if (!(object@tail@family %in% .pc_radial))
                                    sprintf(" (positive: %g, negative: %g)", object@tail@pos, object@tail@neg),
                                  "\n", sep = "")
@@ -253,6 +307,10 @@ setMethod("show", "dvinecop", function(object) {
       cap = "internal limit reached (kpacf still above tautol)",
       none = "")
     cat("effective lag K = ", object@K, " (", basis, ")\n", sep = "")
+  }
+  if (length(object@vt) > 0L) {
+    cat("v-transform fulcrums: ", paste(format(object@vt, digits = 4), collapse = ", "),
+        switch(object@vtpar, both = "", common = " (common)", none = " (fixed)"), "\n", sep = "")
   }
   cf <- coef(object)
   if (length(cf) > 0L) {

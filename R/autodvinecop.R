@@ -19,7 +19,8 @@ dv_fit_ic <- function(fit, criterion) dv_ic(fit@loglik, fit@npar, fit@nobs, crit
 dv_model_z <- function(model) {
   lay <- dv_layout(model)
   aux <- vapply(model@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
-  c(lay$ops$to_free(model@kpacf), dv_aux_to_free(aux, lay$aux_fam))
+  c(lay$ops$to_free(model@kpacf), dv_aux_to_free(aux, lay$aux_fam),
+    if (lay$has_ivt) dv_vt_to_free(model@vt, lay$vtpar))
 }
 
 # Candidate pair copula specifications at a lag where Kendall's tau is
@@ -246,7 +247,8 @@ autodvinecop <- function(U, start, nreplace = 10, choices = .auto_choices, aux =
     base_pairs <- c(cur@pairs, rep(list(pc("gauss")), pad))
     fit_with <- function(sp) {
       m <- dvinecop(cur@kpacf, pairs = c(base_pairs, list(sp)), tail = cur@tail,
-                    tautol = cur@tautol, maxlag = cur@maxlag)
+                    tautol = cur@tautol, maxlag = cur@maxlag,
+                    vt = if (length(cur@vt)) cur@vt else NULL, vtpar = cur@vtpar)
       tryCatch(suppressWarnings(tsfit(u, m, pseudo = pseudo, control = control)),
                error = function(err) NULL)
     }

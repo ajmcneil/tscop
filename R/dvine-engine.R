@@ -77,6 +77,13 @@ dv_effective_lag <- function(ar, ma, K0 = 0L, tautol = 1e-4, maxlag = Inf,
 
 dv_is_gauss <- function(pair) pair$family %in% c("gauss", "gaussian")
 dv_is_ast <- function(pair) identical(pair$family, "ast")
+dv_is_ivt <- function(pair) identical(pair$family, "ivt")
+
+# Linear v-transform with fulcrum d and the signed scale factor a(x) (d for
+# x <= d, d - 1 otherwise) of the IVT formulas (supplement to Dias, Han and
+# McNeil, Proposition S3).
+dv_vlin <- function(x, d) ifelse(x <= d, (d - x) / d, (x - d) / (1 - d))
+dv_alin <- function(x, d) ifelse(x <= d, d, d - 1)
 
 # Rotations (rvinecopulib convention, applied to the pair (earlier, later)) of
 # a copula given by closures: d(a, b) the density, h(a, b, cond_var) the
@@ -134,7 +141,12 @@ dv_ktau_to_par <- function(family, tau) {
 # Resolve a pair copula (family, rotations for positive and negative
 # dependence, auxiliary parameter) at Kendall's tau 'tau' to a resolved pair
 # copula, or NULL if infeasible at that tau (BB1 only).
-dv_resolve_vals <- function(fam, pos, neg, aux, tau) {
+dv_resolve_vals <- function(fam, pos, neg, aux, tau, base = NA_character_, vt = NULL) {
+  if (fam == "ivt") {
+    if (is.null(vt)) stop("inverse-v-transformed pair copulas need the v-transform parameters")
+    if (tau < -1e-10) return(NULL) # the base copula has positive dependence only
+    return(dv_ivt_pair(base, max(tau, 0), vt))
+  }
   if (fam %in% .pc_aux_families && is.na(aux)) {
     stop("the auxiliary parameter of the '", fam, "' specification is missing")
   }
@@ -165,14 +177,38 @@ dv_resolve_vals <- function(fam, pos, neg, aux, tau) {
 }
 
 # Resolve a pc specification at Kendall's tau 'tau' (see dv_resolve_vals).
-dv_resolve_pair <- function(spec, tau, aux = spec@aux) {
-  dv_resolve_vals(spec@family, spec@pos, spec@neg, aux, tau)
+dv_resolve_pair <- function(spec, tau, aux = spec@aux, vt = NULL) {
+  dv_resolve_vals(spec@family, spec@pos, spec@neg, aux, tau, spec@base, vt)
+}
+
+# Resolved base copula of an IVT pair copula at Kendall's tau (>= 0); the
+# independence copula for a negligible tau.
+dv_ivt_base_pair <- function(base, tau) {
+  if (tau < 1e-9) return(list(family = "indep", rotation = 0, parameters = numeric(0)))
+  switch(base,
+    ast = list(family = "ast", rotation = 0, parameters = udp::astcopula_nu(min(tau, 0.999999))),
+    joe = list(family = "joe", rotation = 0, parameters = dv_ktau_to_par("joe", tau)),
+    gumbel = list(family = "gumbel", rotation = 0, parameters = dv_ktau_to_par("gumbel", tau)),
+    clayton180 = list(family = "clayton", rotation = 180, parameters = dv_ktau_to_par("clayton", tau)),
+    stop("unknown base copula '", base, "'")
+  )
+}
+
+# Resolved IVT pair copula: the base pair copula and the two fulcrums.
+dv_ivt_pair <- function(base, tau, vt) {
+  list(family = "ivt", rotation = 0, parameters = numeric(0),
+       base = dv_ivt_base_pair(base, tau), delta = as.numeric(vt))
 }
 
 # Resolve the tail family at a vector of Kendall's tau values; the tail
 # families have no auxiliary parameter and are always feasible.
-dv_resolve_tail <- function(spec, tau) {
+dv_resolve_tail <- function(spec, tau, vt = NULL) {
   fam <- spec@family
+  if (fam == "ivt") {
+    if (is.null(vt)) stop("inverse-v-transformed pair copulas need the v-transform parameters")
+    if (any(tau < -1e-10)) return(NULL)
+    return(lapply(pmax(tau, 0), function(t) dv_ivt_pair(spec@base, t, vt)))
+  }
   if (fam == "gauss") {
     rho <- sin(pi * tau / 2)
     return(lapply(rho, function(r) list(family = "gauss", rotation = 0, parameters = r)))
@@ -203,6 +239,7 @@ dv_from_bicop <- function(b) {
 
 # Kendall's tau of a resolved pair copula.
 dv_pair_ktau <- function(pair) {
+  if (dv_is_ivt(pair)) return(dv_pair_ktau(pair$base)) # the base copula's tau
   if (dv_is_ast(pair)) {
     tau0 <- udp::astcopula_tau(pair$parameters[1L])
     return(if (pair$rotation %in% c(90, 270)) -tau0 else tau0)
@@ -245,7 +282,7 @@ dv_loglik <- function(u, pairs) {
         A <- Anew
         B <- Bnew
       }
-    } else if (dv_is_ast(pr)) {
+    } else if (dv_is_ast(pr) || dv_is_ivt(pr)) {
       if (zscale) {
         A <- stats::pnorm(A)
         B <- stats::pnorm(B)
@@ -291,7 +328,14 @@ dv_loglik <- function(u, pairs) {
 dv_clamp <- function(x, eps = 1e-12) pmin(pmax(x, eps), 1 - eps)
 
 dv_h <- function(pr, a, b, cond_var) {
-  if (dv_is_ast(pr)) {
+  if (dv_is_ivt(pr)) {
+    d1 <- pr$delta[1L]
+    d2 <- pr$delta[2L]
+    x <- dv_vlin(a, d1)
+    y <- dv_vlin(b, d2)
+    out <- if (cond_var == 1L) d2 - dv_alin(b, d2) * dv_h(pr$base, x, y, 1L)
+           else d1 - dv_alin(a, d1) * dv_h(pr$base, x, y, 2L)
+  } else if (dv_is_ast(pr)) {
     out <- dv_ast_closures(pr)$h(a, b, cond_var)
   } else if (dv_is_gauss(pr)) {
     rho <- pr$parameters[1L]
@@ -309,7 +353,11 @@ dv_h <- function(pr, a, b, cond_var) {
 }
 
 dv_hinv <- function(pr, a, p) {
-  if (dv_is_ast(pr)) {
+  if (dv_is_ivt(pr)) {
+    d1 <- pr$delta[1L]
+    d2 <- pr$delta[2L]
+    out <- d2 - dv_alin(p, d2) * dv_hinv(pr$base, dv_vlin(a, d1), dv_vlin(p, d2))
+  } else if (dv_is_ast(pr)) {
     out <- dv_ast_closures(pr)$hinv(a, p)
   } else if (dv_is_gauss(pr)) {
     rho <- pr$parameters[1L]
@@ -323,7 +371,9 @@ dv_hinv <- function(pr, a, p) {
 }
 
 dv_dens <- function(pr, a, b) {
-  if (dv_is_ast(pr)) {
+  if (dv_is_ivt(pr)) {
+    dv_dens(pr$base, dv_vlin(a, pr$delta[1L]), dv_vlin(b, pr$delta[2L]))
+  } else if (dv_is_ast(pr)) {
     as.numeric(dv_ast_closures(pr)$d(a, b))
   } else if (dv_is_gauss(pr)) {
     rho <- pr$parameters[1L]
