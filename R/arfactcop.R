@@ -383,3 +383,70 @@ arfactcop_mle <- function(u, object, init, control) {
 }
 
 setMethod("gc_prefit", "arfactcop", function(G, U, control) arfactcop_mle(U, G, NULL, control)$model)
+
+# ---- conversion to an equivalent ARMA copula ---------------------------------
+
+#' Convert an AR-factor copula to the equivalent ARMA copula
+#'
+#' The Gaussian copula of independent AR(1) factors plus noise has the
+#' autocorrelations of a Gaussian ARMA(m, m) process (ARMA(m, m - 1) without
+#' noise): the AR polynomial is \eqn{\prod_i (1 - \lambda_i B)} and the MA
+#' polynomial follows from the spectral factorisation (Fejér–Riesz) of the
+#' sum of the factors' spectral densities, choosing the invertible root. This
+#' function returns that [armacop-class] model, so the implied ARMA
+#' coefficients can be inspected, or the model passed to ARMA software. The two
+#' models have identical autocorrelations, partial autocorrelations and
+#' Gaussian copula likelihoods. See `docs/factor-kpacf-theory.Rmd`.
+#'
+#' @param object an [arfactcop-class] model with specified coefficients, or
+#'   an [arfactcopfit-class] object (its fitted model is converted; the
+#'   standard errors are not carried over).
+#'
+#' @return An [armacop-class] object with `ar` coefficients
+#'   \eqn{\prod_i (1 - \lambda_i B)} and `ma` coefficients from the
+#'   factorisation (in the [stats::arima()] sign convention).
+#' @export
+#'
+#' @examples
+#' g <- arfactcop(lambda = c(0.98, 0.7), w = c(0.3, 0.4))
+#' a <- arfact2arma(g)
+#' a
+#' # identical partial autocorrelations
+#' max(abs(ktau(g, 20) - ktau(a, 20)))
+arfact2arma <- function(object) {
+  if (is(object, "arfactcopfit")) object <- object@model
+  if (!is(object, "arfactcop")) stop("'object' must be an arfactcop model or fit")
+  if (!gc_is_specified(object)) stop("the model has unspecified coefficients; fit it to data first")
+  lam <- object@lambda
+  w <- object@w
+  m <- object@m
+  w0 <- if (object@noise) max(1 - sum(w), 0) else 0
+  # AR polynomial prod (1 - lambda_i B)
+  arpoly <- 1
+  for (l in lam) arpoly <- poly_mult(arpoly, c(1, -l))
+  ar <- -arpoly[-1L]
+  q <- if (w0 > 1e-12) m else m - 1L
+  if (q == 0L) return(armacop(ar = ar))
+  # autocovariances of the MA(q) process y = phi(B) x
+  rho <- c(1, afc_acf(lam, w, m + q))
+  gx <- function(h) rho[abs(h) + 1L]
+  phi <- arpoly # phi_0 = 1, phi_i
+  gam <- vapply(0:q, function(k) {
+    s <- 0
+    for (i in 0:m) for (j in 0:m) s <- s + phi[i + 1L] * phi[j + 1L] * gx(k + j - i)
+    s
+  }, numeric(1))
+  # roots of P(z) = sum_{k=-q}^{q} gam_|k| z^{q+k}; keep the q roots outside the unit circle
+  cf <- c(rev(gam[-1L]), gam[1L], gam[-1L]) # ascending powers z^0 ... z^{2q}
+  rts <- polyroot(cf)
+  out <- rts[Mod(rts) > 1]
+  if (length(out) != q) {
+    stop("spectral factorisation failed: the moving-average polynomial has roots on the unit circle")
+  }
+  theta <- 1
+  for (r in out) theta <- poly_mult(theta, c(1, -1 / r))
+  ma <- Re(theta[-1L])
+  armacop(ar = ar, ma = ma)
+}
+
+setAs("arfactcop", "armacop", function(from) arfact2arma(from))

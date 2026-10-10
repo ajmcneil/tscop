@@ -253,3 +253,59 @@ test_that("tsfit and autodvinecop work with an arfactcop kpacf", {
   expect_length(ktau(f, 5), 5)
   expect_length(predict(f, type = "df", x = c(0.2, 0.7)), 2)
 })
+
+# ---- conversion to ARMA -----------------------------------------------------
+
+test_that("arfact2arma reproduces the autocorrelations, PACF and likelihood", {
+  set.seed(11)
+  for (i in 1:25) {
+    m <- sample(1:3, 1)
+    noise <- runif(1) < 0.6
+    lam <- sort(runif(m, 0.1, 0.99), decreasing = TRUE)
+    w <- rexp(m)
+    w <- w / sum(w) * (if (noise) runif(1, 0.3, 0.9) else 1)
+    g <- arfactcop(lambda = lam, w = w, noise = noise)
+    a <- arfact2arma(g)
+    expect_s4_class(a, "armacop")
+    e <- arma_coef_expanded(a)
+    expect_equal(length(e$ar), m)
+    expect_equal(length(e$ma), if (noise) m else m - 1L)
+    expect_equal(as.numeric(ARMAacf(e$ar, e$ma, 30))[-1], afc_acf(lam, w, 30), tolerance = 1e-7)
+    expect_equal(gc_pacf(a, 15), gc_pacf(g, 15), tolerance = 1e-7)
+  }
+  g <- arfactcop(lambda = c(0.9, 0.5), w = c(0.3, 0.4))
+  u <- tssim(g, 100)
+  expect_equal(arma_copula_loglik(u, arma_coef_expanded(arfact2arma(g))$ar, arma_coef_expanded(arfact2arma(g))$ma),
+               afc_copula_loglik(u, g@lambda, g@w, 1 - sum(g@w)), tolerance = 1e-6)
+})
+
+test_that("arfact2arma matches the closed forms and the worked examples", {
+  # one factor plus noise: ARMA(1,1) with the closed-form MA coefficient
+  lam <- 0.9
+  w <- 0.6
+  b <- (2 * w * lam^2 - 1 - lam^2) / (lam * (w - 1))
+  r <- Re(polyroot(c(1, b, 1)))
+  theta <- r[abs(r) < 1]
+  a <- arfact2arma(arfactcop(lambda = lam, w = w))
+  expect_equal(unname(coef(a)), c(lam, theta), tolerance = 1e-8)
+  # a GARCH(1,1)-type model: alpha1 = 0.1, beta1 = 0.85
+  al <- 0.1
+  be <- 0.85
+  lam2 <- al + be
+  w2 <- al * (1 - be * lam2) / (lam2 * (1 - 2 * be * lam2 + be^2))
+  a2 <- arfact2arma(arfactcop(lambda = lam2, w = w2))
+  expect_equal(unname(coef(a2)), c(lam2, -be), tolerance = 1e-7)
+  # the two-factor example of the theory note
+  a3 <- arfact2arma(arfactcop(lambda = c(0.98, 0.7), w = c(0.3, 0.4)))
+  expect_equal(unname(coef(a3)), c(1.68, -0.686, -1.29224, 0.33577), tolerance = 1e-3)
+  # no noise, one factor: an AR(1)
+  a4 <- arfact2arma(arfactcop(lambda = 0.8, w = 1, noise = FALSE))
+  expect_equal(unname(coef(a4)), 0.8)
+  # coercion and fitted objects
+  g <- arfactcop(lambda = c(0.98, 0.7), w = c(0.3, 0.4))
+  expect_equal(coef(as(g, "armacop")), coef(arfact2arma(g)))
+  f <- tsfit(tssim(g, 600), arfactcop(order = 2), pseudo = FALSE)
+  expect_equal(coef(arfact2arma(f)), coef(arfact2arma(f@model)))
+  expect_error(arfact2arma(arfactcop(order = 2)), "unspecified")
+  expect_error(arfact2arma(1), "arfactcop")
+})

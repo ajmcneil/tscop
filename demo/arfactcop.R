@@ -19,6 +19,16 @@ g
 coef(g)
 # The autocorrelations are rho_k = 0.3 * 0.98^k + 0.4 * 0.70^k (k >= 1):
 round(0.3 * 0.98^(1:6) + 0.4 * 0.70^(1:6), 3)
+# The same Gaussian copula as an ARMA(2,2) model: the AR polynomial is
+# (1 - 0.98 B)(1 - 0.70 B) and the MA part comes from a spectral factorisation.
+a <- arfact2arma(g)
+a
+# identical partial autocorrelations (and therefore kpacf and likelihood)
+max(abs(ktau(g, 30) - ktau(a, 30)))
+# A single factor plus noise is the ARMA(1,1) of GARCH(1,1) squares: with
+# alpha1 = 0.1 and beta1 = 0.85 the persistence is 0.95 and the signal share 0.1885,
+# and the implied ARMA(1,1) has ar = 0.95 and ma = -beta1 = -0.85:
+arfact2arma(arfactcop(lambda = 0.95, w = 0.1884945))
 # Structures to be fitted, and a model without a noise component (weights sum to one):
 arfactcop(order = 2)
 arfactcop(lambda = c(0.9, 0.5), w = c(0.6, 0.4), noise = FALSE)
@@ -50,6 +60,7 @@ section("4. Fitting (tsfit)")
 # of the normal scores; the likelihood is exact (Kalman filter) and handles NA.
 fit2 <- tsfit(u, arfactcop(order = 2), pseudo = FALSE)
 fit2
+arfact2arma(fit2)     # the implied ARMA(2,2) coefficients of the fit
 fit1 <- tsfit(u, arfactcop(order = 1), pseudo = FALSE)
 c(one_factor = AIC(fit1), two_factors = AIC(fit2))
 # the best ARMA(1,1) for comparison (one factor plus noise is a special ARMA(1,1))
