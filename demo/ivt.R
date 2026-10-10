@@ -64,7 +64,11 @@ tau <- ktau(fit, 2)
 round(rbind(tau = tau, nu = udp::astcopula_nu(tau)), 3)   # ast degrees of freedom at lags 1 and 2
 
 # ---------------------------------------------------------------------------
-section("4. Gaussian and plain-copula alternatives, and fulcrum options")
+section("4. Gaussian alternative and fulcrum options")
+# A Gaussian d-vine sees no rank correlation in volatility clustering (large
+# moves of either sign follow large moves), so its log-likelihood is about zero
+# and its AIC about 4; the IVT d-vine captures the dependence. Fixed (0.5) or
+# common fulcrums need fewer parameters when the data are (nearly) symmetric.
 gfit <- tsfit(pobs, dvinecop(arfactcop(order = 1), maxlag = 20, tautol = 1e-3), pseudo = TRUE)
 cfit <- tsfit(pobs, dvinecop(arfactcop(order = 1), vtpar = "common", maxlag = 20, tautol = 1e-3,
                              tail = pc("ivt", base = "ast")), pseudo = TRUE)       # one common fulcrum
