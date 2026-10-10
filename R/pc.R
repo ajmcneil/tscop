@@ -1,11 +1,11 @@
 # Pair copula specifications for tied d-vine models.
 
-.pc_families <- c("gauss", "t", "gumbel", "clayton", "joe", "frank", "bb1")
+.pc_families <- c("gauss", "t", "gumbel", "clayton", "joe", "frank", "bb1", "ast")
 .pc_radial <- c("gauss", "t", "frank")
 .pc_aux_families <- c("t", "bb1")
 # families that tend to independence as Kendall's tau -> 0 with auxiliary
 # parameters fixed, hence admissible as the tail family
-.pc_tail_families <- c("gauss", "frank", "clayton", "gumbel", "joe")
+.pc_tail_families <- c("gauss", "frank", "clayton", "gumbel", "joe", "ast")
 
 #' Pair copula specifications
 #'
@@ -16,7 +16,11 @@
 #' dependence, and (for two-parameter families) the auxiliary parameter.
 #'
 #' @slot family one of `"gauss"`, `"t"`, `"gumbel"`, `"clayton"`, `"joe"`,
-#'   `"frank"` and `"bb1"`.
+#'   `"frank"`, `"bb1"` and `"ast"` (the absolute spherical t copula of Dias,
+#'   Han and McNeil, from the udp package: one parameter, positive dependence
+#'   and upper tail dependence, like Gumbel and Joe; calibrated to Kendall's
+#'   tau through its degrees-of-freedom parameter; roughly ten times slower to
+#'   evaluate than the `rvinecopulib` families).
 #' @slot pos rotation (0 or 180) used when Kendall's tau is non-negative.
 #' @slot neg rotation (90 or 270) used when Kendall's tau is negative.
 #' @slot aux auxiliary parameter: degrees of freedom for `"t"` (at least 2)
@@ -55,7 +59,7 @@ setValidity("pc", function(object) {
 #' Constructor for pair copula specifications
 #'
 #' @param family family name (case-insensitive): `"gauss"`, `"t"`,
-#'   `"gumbel"`, `"clayton"`, `"joe"`, `"frank"` or `"bb1"`.
+#'   `"gumbel"`, `"clayton"`, `"joe"`, `"frank"`, `"bb1"` or `"ast"`.
 #' @param pos rotation (0 or 180) used when Kendall's tau at the lag is
 #'   non-negative. Ignored for radially symmetric families (Gauss, t, Frank).
 #' @param neg rotation (90 or 270) used when Kendall's tau at the lag is

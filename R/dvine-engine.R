@@ -63,6 +63,49 @@ dv_effective_lag <- function(ar, ma, K0 = 0L, tautol = 1e-4, maxlag = Inf,
 # ---- resolution of pair copula specifications --------------------------
 
 dv_is_gauss <- function(pair) pair$family %in% c("gauss", "gaussian")
+dv_is_ast <- function(pair) identical(pair$family, "ast")
+
+# Rotations (rvinecopulib convention, applied to the pair (earlier, later)) of
+# a copula given by closures: d(a, b) the density, h(a, b, cond_var) the
+# h-function (cond_var 1: P(U2 <= b | U1 = a); 2: P(U1 <= a | U2 = b)) and
+# hinv(a, p) the inverse of h(a, ., 1) in its second argument. Used for copulas
+# that rvinecopulib does not implement (ast); validated against rvinecopulib's
+# own rotated families.
+dv_rotate <- function(base, rotation) {
+  d <- base$d
+  h <- base$h
+  hinv <- base$hinv
+  switch(as.character(rotation),
+    "0" = base,
+    "180" = list(
+      d = function(a, b) d(1 - a, 1 - b),
+      h = function(a, b, cv) 1 - h(1 - a, 1 - b, cv),
+      hinv = function(a, p) 1 - hinv(1 - a, 1 - p)
+    ),
+    "90" = list(
+      d = function(a, b) d(1 - a, b),
+      h = function(a, b, cv) if (cv == 1L) h(1 - a, b, 1L) else 1 - h(1 - a, b, 2L),
+      hinv = function(a, p) hinv(1 - a, p)
+    ),
+    "270" = list(
+      d = function(a, b) d(a, 1 - b),
+      h = function(a, b, cv) if (cv == 1L) 1 - h(a, 1 - b, 1L) else h(a, 1 - b, 2L),
+      hinv = function(a, p) 1 - hinv(a, 1 - p)
+    ),
+    stop("rotation must be 0, 90, 180 or 270")
+  )
+}
+
+# Closures of an ast pair copula with its rotation.
+dv_ast_closures <- function(pr) {
+  ac <- udp::astcopula(pr$parameters[1L])
+  base <- list(
+    d = function(a, b) udp::dastcopula(a, b, ac),
+    h = function(a, b, cv) udp::hastcopula(a, b, ac, cond_var = cv),
+    hinv = function(a, p) udp::hastcopula(a, p, ac, cond_var = 1L, inverse = TRUE)
+  )
+  dv_rotate(base, pr$rotation)
+}
 
 # Copula parameter of a one-parameter family at Kendall's tau (>= 0 for the
 # families without negative dependence). rvinecopulib::ktau_to_par is not
@@ -94,6 +137,11 @@ dv_resolve_vals <- function(fam, pos, neg, aux, tau) {
   }
   rot <- if (tau >= 0) pos else neg
   at <- abs(tau)
+  if (fam == "ast") {
+    if (at < 1e-9) return(list(family = "indep", rotation = 0, parameters = numeric(0)))
+    return(list(family = "ast", rotation = rot,
+                parameters = udp::astcopula_nu(min(at, 0.999999))))
+  }
   if (fam == "bb1") {
     theta_c <- dv_ktau_to_par("clayton", at)
     th <- (theta_c + 2) / aux - 2
@@ -120,8 +168,18 @@ dv_resolve_tail <- function(spec, tau) {
     par <- vapply(tau, function(t) if (t == 0) 1e-10 else dv_ktau_to_par("frank", t), numeric(1))
     return(lapply(par, function(p) list(family = "frank", rotation = 0, parameters = p)))
   }
-  par <- dv_ktau_to_par(fam, abs(tau))
   rot <- ifelse(tau >= 0, spec@pos, spec@neg)
+  if (fam == "ast") {
+    at <- abs(tau)
+    nu <- rep(NA_real_, length(at))
+    big <- at >= 1e-9
+    if (any(big)) nu[big] <- udp::astcopula_nu(pmin(at[big], 0.999999))
+    return(Map(function(n, r) {
+      if (is.na(n)) list(family = "indep", rotation = 0, parameters = numeric(0))
+      else list(family = "ast", rotation = r, parameters = n)
+    }, nu, rot))
+  }
+  par <- dv_ktau_to_par(fam, abs(tau))
   Map(function(p, r) list(family = fam, rotation = r, parameters = p), par, rot)
 }
 
@@ -132,6 +190,10 @@ dv_from_bicop <- function(b) {
 
 # Kendall's tau of a resolved pair copula.
 dv_pair_ktau <- function(pair) {
+  if (dv_is_ast(pair)) {
+    tau0 <- udp::astcopula_tau(pair$parameters[1L])
+    return(if (pair$rotation %in% c(90, 270)) -tau0 else tau0)
+  }
   rvinecopulib::par_to_ktau(pair$family, pair$rotation, pair$parameters)
 }
 
@@ -170,6 +232,20 @@ dv_loglik <- function(u, pairs) {
         A <- Anew
         B <- Bnew
       }
+    } else if (dv_is_ast(pr)) {
+      if (zscale) {
+        A <- stats::pnorm(A)
+        B <- stats::pnorm(B)
+        zscale <- FALSE
+      }
+      ll <- ll + sum(log(dv_dens(pr, A, B)))
+      if (j < K) {
+        m <- length(A)
+        Anew <- dv_h(pr, A[-m], B[-m], 2L)
+        Bnew <- dv_h(pr, A[-1L], B[-1L], 1L)
+        A <- Anew
+        B <- Bnew
+      }
     } else {
       if (zscale) {
         A <- stats::pnorm(A)
@@ -202,7 +278,9 @@ dv_loglik <- function(u, pairs) {
 dv_clamp <- function(x, eps = 1e-12) pmin(pmax(x, eps), 1 - eps)
 
 dv_h <- function(pr, a, b, cond_var) {
-  if (dv_is_gauss(pr)) {
+  if (dv_is_ast(pr)) {
+    out <- dv_ast_closures(pr)$h(a, b, cond_var)
+  } else if (dv_is_gauss(pr)) {
     rho <- pr$parameters[1L]
     s <- sqrt(1 - rho * rho)
     out <- if (cond_var == 1L) {
@@ -218,7 +296,9 @@ dv_h <- function(pr, a, b, cond_var) {
 }
 
 dv_hinv <- function(pr, a, p) {
-  if (dv_is_gauss(pr)) {
+  if (dv_is_ast(pr)) {
+    out <- dv_ast_closures(pr)$hinv(a, p)
+  } else if (dv_is_gauss(pr)) {
     rho <- pr$parameters[1L]
     s <- sqrt(1 - rho * rho)
     out <- stats::pnorm(rho * stats::qnorm(a) + s * stats::qnorm(p))
@@ -230,7 +310,9 @@ dv_hinv <- function(pr, a, p) {
 }
 
 dv_dens <- function(pr, a, b) {
-  if (dv_is_gauss(pr)) {
+  if (dv_is_ast(pr)) {
+    as.numeric(dv_ast_closures(pr)$d(a, b))
+  } else if (dv_is_gauss(pr)) {
     rho <- pr$parameters[1L]
     x <- stats::qnorm(a)
     y <- stats::qnorm(b)

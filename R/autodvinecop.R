@@ -1,6 +1,7 @@
 # Automatic selection of non-Gaussian pair copulas for d-vine models.
 
 .auto_choices <- c("gumbel", "clayton", "frank", "joe")
+.auto_allowed <- c(.auto_choices, "ast")
 
 # Information criterion of a fit.
 dv_ic <- function(loglik, npar, nobs, criterion) {
@@ -138,7 +139,9 @@ dv_auto_start <- function(U, start, tautol, maxlag, pseudo, control) {
 #'   search examines lags after any explicit pair copulas already present, up
 #'   to `nreplace`).
 #' @param choices one-parameter families to try: any of `"gumbel"`,
-#'   `"clayton"`, `"frank"`, `"joe"`.
+#'   `"clayton"`, `"frank"`, `"joe"` (the default) and `"ast"` (the absolute
+#'   spherical t copula, not in the default because it is about ten times
+#'   slower to evaluate).
 #' @param aux two-parameter families to add to the candidates: `"t"` and/or
 #'   `"bb1"`; `NULL` for none.
 #' @param criterion `"AIC"`, `"BIC"` or `"AICc"`; the number of parameters
@@ -176,8 +179,8 @@ autodvinecop <- function(U, start, nreplace = 10, choices = .auto_choices, aux =
                          control = list(), verbose = TRUE) {
   criterion <- match.arg(criterion, c("AIC", "BIC", "AICc"))
   choices <- tolower(choices)
-  if (!all(choices %in% .auto_choices)) {
-    stop("'choices' must be among ", paste(.auto_choices, collapse = ", "))
+  if (!all(choices %in% .auto_allowed)) {
+    stop("'choices' must be among ", paste(.auto_allowed, collapse = ", "))
   }
   if (!is.null(aux)) {
     aux <- tolower(aux)

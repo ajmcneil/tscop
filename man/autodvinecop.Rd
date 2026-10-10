@@ -35,7 +35,9 @@ search examines lags after any explicit pair copulas already present, up
 to \code{nreplace}).}
 
 \item{choices}{one-parameter families to try: any of \code{"gumbel"},
-\code{"clayton"}, \code{"frank"}, \code{"joe"}.}
+\code{"clayton"}, \code{"frank"}, \code{"joe"} (the default) and \code{"ast"} (the absolute
+spherical t copula, not in the default because it is about ten times
+slower to evaluate).}
 
 \item{aux}{two-parameter families to add to the candidates: \code{"t"} and/or
 \code{"bb1"}; \code{NULL} for none.}

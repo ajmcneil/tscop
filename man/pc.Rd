@@ -8,7 +8,7 @@ pc(family, pos = 0, neg = 90, aux = NULL)
 }
 \arguments{
 \item{family}{family name (case-insensitive): \code{"gauss"}, \code{"t"},
-\code{"gumbel"}, \code{"clayton"}, \code{"joe"}, \code{"frank"} or \code{"bb1"}.}
+\code{"gumbel"}, \code{"clayton"}, \code{"joe"}, \code{"frank"}, \code{"bb1"} or \code{"ast"}.}
 
 \item{pos}{rotation (0 or 180) used when Kendall's tau at the lag is
 non-negative. Ignored for radially symmetric families (Gauss, t, Frank).}

@@ -27,7 +27,11 @@ dependence, and (for two-parameter families) the auxiliary parameter.
 
 \describe{
 \item{\code{family}}{one of \code{"gauss"}, \code{"t"}, \code{"gumbel"}, \code{"clayton"}, \code{"joe"},
-\code{"frank"} and \code{"bb1"}.}
+\code{"frank"}, \code{"bb1"} and \code{"ast"} (the absolute spherical t copula of Dias,
+Han and McNeil, from the udp package: one parameter, positive dependence
+and upper tail dependence, like Gumbel and Joe; calibrated to Kendall's
+tau through its degrees-of-freedom parameter; roughly ten times slower to
+evaluate than the \code{rvinecopulib} families).}
 
 \item{\code{pos}}{rotation (0 or 180) used when Kendall's tau is non-negative.}
 
