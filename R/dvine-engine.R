@@ -8,47 +8,9 @@
 
 # ---- effective lag -----------------------------------------------------
 
-# Effective maximum lag of the truncated sequence of pair copulas: the last
-# lag at which the ARMA Kendall partial autocorrelation exceeds 'tautol' in
-# absolute value, capped at 'maxlag' and floored at max(K0, 1), where K0 is
-# the number of explicit pair copulas. For a pure AR tail (no MA part) the
-# PACF vanishes beyond the AR order, so the lag is the AR order exactly.
-# 'period' (NA if none) sets the safety margin for seasonal bumps. Returns
-# list(K, limit) with limit one of "ar", "tol", "maxlag", "cap", "floor".
-dv_effective_lag <- function(ar, ma, K0 = 0L, tautol = 1e-4, maxlag = Inf,
-                             period = NA, cap = 5000L) {
+# Apply the cap 'maxlag' and the floor max(K0, 1) to an effective lag K.
+dv_finish_lag <- function(K, limit, K0, maxlag) {
   floorK <- max(as.integer(K0), 1L)
-  if (length(ma) == 0L) {
-    K <- length(ar)
-    limit <- "ar"
-  } else {
-    margin <- max(10L, 2L * (if (is.na(period)) 0L else as.integer(period)))
-    Lmax <- cap
-    if (is.finite(maxlag)) Lmax <- min(cap, max(50L, as.integer(maxlag) + margin))
-    L <- min(50L, Lmax)
-    repeat {
-      tau <- (2 / pi) * asin(arma_pacf(ar, ma, L))
-      ex <- which(abs(tau) > tautol)
-      last <- if (length(ex)) max(ex) else 0L
-      if (L - last >= margin) {
-        K <- last
-        limit <- "tol"
-        break
-      }
-      if (L >= Lmax) {
-        K <- last
-        limit <- "tol"
-        if (!is.finite(maxlag) || last < maxlag) {
-          warning(sprintf(
-            "the Kendall partial autocorrelations are still above 'tautol' at lag %d; truncating there (increase 'tautol' or set 'maxlag')",
-            L), call. = FALSE)
-          limit <- "cap"
-        }
-        break
-      }
-      L <- min(2L * L, Lmax)
-    }
-  }
   if (is.finite(maxlag) && K > maxlag) {
     K <- as.integer(maxlag)
     limit <- "maxlag"
@@ -58,6 +20,57 @@ dv_effective_lag <- function(ar, ma, K0 = 0L, tautol = 1e-4, maxlag = Inf,
     limit <- "floor"
   }
   list(K = as.integer(K), limit = limit)
+}
+
+# Effective lag from a function pacf_fn(L) returning the partial
+# autocorrelations at lags 1..L: the last lag at which the Kendall partial
+# autocorrelation exceeds 'tautol' in absolute value. The PACF is computed in
+# doubling blocks of lags (50, 100, ...) and the search stops when the last
+# exceedance lies at least 'margin' lags inside the computed range; a hard cap
+# on the number of lags gives a warning if reached.
+dv_effective_lag_blocks <- function(pacf_fn, K0 = 0L, tautol = 1e-4, maxlag = Inf,
+                                    margin = 10L, cap = 5000L) {
+  Lmax <- cap
+  if (is.finite(maxlag)) Lmax <- min(cap, max(50L, as.integer(maxlag) + margin))
+  L <- min(50L, Lmax)
+  repeat {
+    tau <- (2 / pi) * asin(pacf_fn(L))
+    ex <- which(abs(tau) > tautol)
+    last <- if (length(ex)) max(ex) else 0L
+    if (L - last >= margin) {
+      K <- last
+      limit <- "tol"
+      break
+    }
+    if (L >= Lmax) {
+      K <- last
+      limit <- "tol"
+      if (!is.finite(maxlag) || last < maxlag) {
+        warning(sprintf(
+          "the Kendall partial autocorrelations are still above 'tautol' at lag %d; truncating there (increase 'tautol' or set 'maxlag')",
+          L), call. = FALSE)
+        limit <- "cap"
+      }
+      break
+    }
+    L <- min(2L * L, Lmax)
+  }
+  dv_finish_lag(K, limit, K0, maxlag)
+}
+
+# Effective maximum lag of the truncated sequence of pair copulas of an ARMA
+# kpacf: the last lag at which the Kendall partial autocorrelation exceeds
+# 'tautol' in absolute value, capped at 'maxlag' and floored at max(K0, 1),
+# where K0 is the number of explicit pair copulas. For a pure AR kpacf (no MA
+# part) the PACF vanishes beyond the AR order, so the lag is the AR order
+# exactly. 'period' (NA if none) sets the safety margin for seasonal bumps.
+# Returns list(K, limit) with limit one of "ar", "tol", "maxlag", "cap",
+# "floor".
+dv_effective_lag <- function(ar, ma, K0 = 0L, tautol = 1e-4, maxlag = Inf,
+                             period = NA, cap = 5000L) {
+  if (length(ma) == 0L) return(dv_finish_lag(length(ar), "ar", K0, maxlag))
+  margin <- max(10L, 2L * (if (is.na(period)) 0L else as.integer(period)))
+  dv_effective_lag_blocks(function(L) arma_pacf(ar, ma, L), K0, tautol, maxlag, margin, cap)
 }
 
 # ---- resolution of pair copula specifications --------------------------
