@@ -44,7 +44,7 @@
 #'
 #' @exportClass dvinecop
 setClass("dvinecop", slots = c(
-  name = "character", mode = "character", arma = "armacopOrNULL",
+  name = "character", mode = "character", kpacf = "gausscopOrNULL",
   pairs = "list", tail = "pcOrNULL", tautol = "numeric", maxlag = "numeric",
   K = "integer", Klimit = "character"
 ))
@@ -57,7 +57,7 @@ setValidity("dvinecop", function(object) {
   }
   K0 <- length(object@pairs)
   if (object@mode == "tied") {
-    if (is.null(object@arma)) return("a tied model needs an 'arma' component")
+    if (is.null(object@kpacf)) return("a tied model needs a 'kpacf' component")
     if (!all(vapply(object@pairs, is, logical(1), "pc"))) return("tied 'pairs' must be pc() specifications")
     if (is.null(object@tail)) return("a tied model needs a tail family")
     if (!(object@tail@family %in% .pc_tail_families)) {
@@ -68,7 +68,7 @@ setValidity("dvinecop", function(object) {
     if (!all(vapply(object@pairs, is, logical(1), "bicop_dist"))) {
       return("free 'pairs' must be bicop_dist objects")
     }
-    if (K0 == 0L && is.null(object@arma)) return("specify 'pairs' or 'arma'")
+    if (K0 == 0L && is.null(object@kpacf)) return("specify 'pairs' or 'kpacf'")
   }
   if (!is.na(object@K) && object@K < max(K0, 1L)) return("'K' must be at least the number of explicit pairs")
   TRUE
@@ -80,7 +80,8 @@ setValidity("dvinecop", function(object) {
 #' [pc()] specifications) or free mode (`pairs` are
 #' [rvinecopulib::bicop_dist()] objects).
 #'
-#' @param arma an [armacop-class] object. In tied mode its Kendall partial
+#' @param kpacf a Gaussian copula process ([armacop-class] or
+#'   `arfactcop`). In tied mode its Kendall partial
 #'   autocorrelations calibrate every pair copula; it may be a model structure
 #'   (`armacop(order = ...)`) if the model is only to be passed to a fitting
 #'   function. In free mode it is optional and supplies a Gaussian tail.
@@ -104,9 +105,11 @@ setValidity("dvinecop", function(object) {
 #' dvinecop(armacop(ar = 0.7, ma = 0.3), pairs = list(pc("gumbel"), pc("clayton")))
 #' # AR(2) with a t copula at lag 1: a finite-order d-vine
 #' dvinecop(armacop(ar = c(0.5, 0.2)), pairs = list(pc("t", aux = 6)))
-dvinecop <- function(arma = NULL, pairs = list(), tail = "gauss",
+dvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
                      tautol = 1e-4, maxlag = Inf) {
-  if (!is.null(arma) && !is(arma, "armacop")) stop("'arma' must be an armacop object")
+  if (!is.null(kpacf) && !is(kpacf, "gausscop")) {
+    stop("'kpacf' must be a Gaussian copula process (an armacop or arfactcop object)")
+  }
   if (!is.list(pairs)) stop("'pairs' must be a list")
   if (is(pairs, "bicop_dist")) pairs <- list(pairs)
   isbic <- vapply(pairs, is, logical(1), "bicop_dist")
@@ -124,47 +127,44 @@ dvinecop <- function(arma = NULL, pairs = list(), tail = "gauss",
     tailspec <- NULL
   } else {
     mode <- "tied"
-    if (is.null(arma)) stop("a tied model needs 'arma'")
+    if (is.null(kpacf)) stop("a tied model needs 'kpacf'")
     tailspec <- as_pc(tail)
   }
   K0 <- length(pairs)
   K <- NA_integer_
   limit <- "none"
-  if (!is.null(arma) && arma_is_specified(arma)) {
-    e <- arma_coef_expanded(arma)
-    eff <- dv_effective_lag(e$ar, e$ma, K0, tautol, maxlag, arma@period)
+  if (!is.null(kpacf) && gc_is_specified(kpacf)) {
+    eff <- gc_effective_lag(kpacf, K0, tautol, maxlag)
     K <- eff$K
     limit <- eff$limit
-  } else if (is.null(arma)) {
+  } else if (is.null(kpacf)) {
     K <- max(K0, 1L)
     limit <- "floor"
   }
   name <- if (mode == "tied") {
-    sprintf("d-vine(%s, %d explicit, %s tail)", if (is.null(arma)) "" else arma@name,
+    sprintf("d-vine(%s, %d explicit, %s tail)", if (is.null(kpacf)) "" else kpacf@name,
             K0, tailspec@family)
   } else {
-    sprintf("d-vine(free, %d explicit%s)", K0, if (is.null(arma)) "" else paste0(", ", arma@name, " tail"))
+    sprintf("d-vine(free, %d explicit%s)", K0, if (is.null(kpacf)) "" else paste0(", ", kpacf@name, " tail"))
   }
-  new("dvinecop", name = name, mode = mode, arma = arma, pairs = pairs, tail = tailspec,
+  new("dvinecop", name = name, mode = mode, kpacf = kpacf, pairs = pairs, tail = tailspec,
       tautol = as.numeric(tautol), maxlag = as.numeric(maxlag), K = as.integer(K),
       Klimit = limit)
 }
 
-# Kendall's tau of the ARMA kpacf at lags 1..K for a specified armacop.
-dv_arma_tau <- function(arma, K) {
-  e <- arma_coef_expanded(arma)
-  (2 / pi) * asin(arma_pacf(e$ar, e$ma, K))
-}
+# Kendall's tau of the kpacf at lags 1..K for a specified Gaussian copula
+# process.
+dv_kpacf_tau <- function(G, K) gc_tau(G, K)
 
 # Resolve a model to the list of K resolved pair copulas. Returns NULL if a
 # pair copula specification is infeasible at the current parameters.
 dv_resolve <- function(object) {
   K <- object@K
-  if (is.na(K)) stop("the model has unspecified ARMA coefficients; fit it to data first")
+  if (is.na(K)) stop("the model has unspecified kpacf coefficients; fit it to data first")
   K0 <- length(object@pairs)
   pairs <- vector("list", K)
   if (object@mode == "tied") {
-    tau <- dv_arma_tau(object@arma, K)
+    tau <- dv_kpacf_tau(object@kpacf, K)
     for (j in seq_len(min(K0, K))) {
       pr <- dv_resolve_pair(object@pairs[[j]], tau[j])
       if (is.null(pr)) return(NULL)
@@ -174,8 +174,7 @@ dv_resolve <- function(object) {
   } else {
     for (j in seq_len(min(K0, K))) pairs[[j]] <- dv_from_bicop(object@pairs[[j]])
     if (K > K0) {
-      e <- arma_coef_expanded(object@arma)
-      alpha <- arma_pacf(e$ar, e$ma, K)
+      alpha <- gc_pacf(object@kpacf, K)
       for (j in (K0 + 1L):K) {
         pairs[[j]] <- list(family = "gauss", rotation = 0, parameters = alpha[j])
       }
@@ -198,7 +197,7 @@ dv_model_loglik <- function(object, u) {
 #' @param object a [dvinecop-class] object.
 #' @export
 setMethod("coef", "dvinecop", function(object) {
-  out <- if (is.null(object@arma)) numeric(0) else coef(object@arma)
+  out <- if (is.null(object@kpacf)) numeric(0) else coef(object@kpacf)
   if (object@mode == "tied") {
     for (j in seq_along(object@pairs)) {
       sp <- object@pairs[[j]]
@@ -223,7 +222,7 @@ dv_explicit_labels <- function(object) {
       paste0(b$family, rot)
     }, character(1)))
   }
-  tau <- if (!is.null(object@arma) && arma_is_specified(object@arma)) dv_arma_tau(object@arma, K0) else rep(NA_real_, K0)
+  tau <- if (!is.null(object@kpacf) && gc_is_specified(object@kpacf)) dv_kpacf_tau(object@kpacf, K0) else rep(NA_real_, K0)
   vapply(seq_len(K0), function(j) {
     sp <- object@pairs[[j]]
     if (sp@family %in% .pc_radial) return(sp@family)
@@ -236,10 +235,7 @@ dv_explicit_labels <- function(object) {
 #' @export
 setMethod("show", "dvinecop", function(object) {
   cat("object class: dvinecop (", object@mode, " mode)\n", sep = "")
-  if (!is.null(object@arma)) {
-    cat("ARMA kpacf: ", object@arma@name,
-        if (!is.na(object@arma@period)) paste0(" with period ", object@arma@period), "\n", sep = "")
-  }
+  if (!is.null(object@kpacf)) cat("kpacf: ", gc_describe(object@kpacf), "\n", sep = "")
   lab <- dv_explicit_labels(object)
   if (length(lab) > 0L) cat(length(lab), " explicit pair copulas: ", paste(lab, collapse = ", "), "\n", sep = "")
   if (!is.null(object@tail)) cat("tail family: ", object@tail@family,
@@ -247,7 +243,7 @@ setMethod("show", "dvinecop", function(object) {
                                    sprintf(" (positive: %g, negative: %g)", object@tail@pos, object@tail@neg),
                                  "\n", sep = "")
   if (is.na(object@K)) {
-    cat("effective lag: not yet determined (unspecified ARMA coefficients)\n")
+    cat("effective lag: not yet determined (unspecified kpacf coefficients)\n")
   } else {
     basis <- switch(object@Klimit,
       ar = "pure AR order",
@@ -303,12 +299,12 @@ setMethod("ktau", "dvinecop", function(object, lagmax, ...) {
   if (!is.numeric(lagmax) || length(lagmax) != 1L || lagmax < 1 || lagmax != round(lagmax)) {
     stop("'lagmax' must be a positive whole number")
   }
-  if (is.na(object@K)) stop("the model has unspecified ARMA coefficients; fit it to data first")
+  if (is.na(object@K)) stop("the model has unspecified kpacf coefficients; fit it to data first")
   K <- object@K
   tau <- numeric(lagmax)
   m <- min(K, lagmax)
   if (object@mode == "tied") {
-    tau[seq_len(m)] <- dv_arma_tau(object@arma, K)[seq_len(m)]
+    tau[seq_len(m)] <- dv_kpacf_tau(object@kpacf, K)[seq_len(m)]
   } else {
     pairs <- dv_pairs_or_stop(object)
     tau[seq_len(m)] <- vapply(pairs[seq_len(m)], dv_pair_ktau, numeric(1))

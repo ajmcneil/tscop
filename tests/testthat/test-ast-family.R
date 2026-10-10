@@ -139,7 +139,7 @@ test_that("ast is a valid pair copula family and tail", {
   expect_output(show(m), "tail family: ast")
   pr <- dv_resolve(m)
   expect_equal(pr[[1]]$family, "ast")
-  tau <- dv_arma_tau(m@arma, m@K)
+  tau <- dv_kpacf_tau(m@kpacf, m@K)
   for (j in seq_len(m@K)) expect_lt(abs(dv_pair_ktau(pr[[j]]) - tau[j]), 1e-6)
 })
 

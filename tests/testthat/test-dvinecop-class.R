@@ -19,7 +19,7 @@ test_that("tied models are constructed and the effective lag is stored", {
   expect_s4_class(m, "dvinecop")
   expect_equal(m@mode, "tied")
   expect_equal(m@tail@family, "gauss")
-  e <- arma_coef_expanded(m@arma)
+  e <- arma_coef_expanded(m@kpacf)
   expect_equal(m@K, dv_effective_lag(e$ar, e$ma, 2L)$K)
   expect_equal(m@Klimit, "tol")
   # pure ARMA copula
@@ -49,9 +49,9 @@ test_that("tails are restricted to families that tend to independence", {
 })
 
 test_that("construction errors are informative", {
-  expect_error(dvinecop(), "needs 'arma'")
-  expect_error(dvinecop(pairs = list(pc("gumbel"))), "needs 'arma'")
-  expect_error(dvinecop(arma = 1), "armacop")
+  expect_error(dvinecop(), "needs 'kpacf'")
+  expect_error(dvinecop(pairs = list(pc("gumbel"))), "needs 'kpacf'")
+  expect_error(dvinecop(kpacf = 1), "Gaussian copula process")
   expect_error(dvinecop(armacop(ar = 0.5), pairs = list(pc("gumbel"), rvinecopulib::bicop_dist("gauss", 0, 0.3))), "mix")
   expect_error(dvinecop(armacop(ar = 0.5), pairs = list(1)), "pc\\(\\)")
   expect_error(dvinecop(armacop(ar = 0.5), tautol = 0), "tautol")
@@ -90,7 +90,7 @@ test_that("tied resolution calibrates every lag to the ARMA kpacf", {
                 tail = "frank")
   pr <- dv_resolve(m)
   expect_length(pr, m@K)
-  tau <- dv_arma_tau(m@arma, m@K)
+  tau <- dv_kpacf_tau(m@kpacf, m@K)
   for (j in seq_len(m@K)) expect_lt(abs(dv_pair_ktau(pr[[j]]) - tau[j]), 1e-7)
   expect_equal(pr[[3]]$parameters[2], 6)
   expect_equal(pr[[5]]$family, "frank")

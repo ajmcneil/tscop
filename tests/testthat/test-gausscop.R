@@ -1,0 +1,46 @@
+test_that("armacop implements the gausscop interface", {
+  g <- armacop(ar = c(0.5, 0.2), ma = 0.4, sar = 0.3, period = 4)
+  expect_s4_class(g, "gausscop")
+  expect_true(gc_is_specified(g))
+  expect_false(gc_is_specified(armacop(order = c(1, 1))))
+  expect_match(gc_describe(g), "period 4")
+  e <- arma_coef_expanded(g)
+  expect_equal(gc_pacf(g, 12), arma_pacf(e$ar, e$ma, 12))
+  expect_equal(gc_tau(g, 5), (2 / pi) * asin(arma_pacf(e$ar, e$ma, 5)))
+  eff <- gc_effective_lag(g, 2L, 1e-4, Inf)
+  expect_equal(eff, dv_effective_lag(e$ar, e$ma, 2L, 1e-4, Inf, 4))
+  expect_identical(gc_structure(g), gc_structure(armacop(order = c(2, 1), seasonal = c(1, 0), period = 4)))
+  expect_false(identical(gc_structure(g), gc_structure(armacop(order = c(1, 1)))))
+  g2 <- gc_from_coef(g, c(0.1, 0.2, 0.3, 0.4))
+  expect_equal(unname(coef(g2)), c(0.1, 0.2, 0.3, 0.4))
+  expect_equal(g2@period, 4)
+})
+
+test_that("gc_free_ops maps between the free and natural scales consistently", {
+  g <- armacop(ar = c(0.5, 0.2), ma = 0.4, sar = 0.3, period = 4)
+  ops <- gc_free_ops(g)
+  expect_equal(ops$nfree, 4L)
+  z <- ops$to_free(g)
+  expect_length(z, 4)
+  expect_equal(ops$coef(z), coef(g), tolerance = 1e-10)
+  expect_equal(unname(coef(ops$build(z))), unname(coef(g)), tolerance = 1e-10)
+  expect_equal(ops$pacf(z, 10), gc_pacf(g, 10), tolerance = 1e-10)
+  expect_equal(ops$effective_lag(z, 1L, 1e-4, Inf), gc_effective_lag(g, 1L, 1e-4, Inf))
+  # a structure has the same layout
+  expect_equal(gc_free_ops(armacop(order = c(2, 1), seasonal = c(1, 0), period = 4))$nfree, 4L)
+})
+
+test_that("a prefit returns a specified model", {
+  set.seed(1)
+  u <- tssim(armacop(ar = 0.6), 300)
+  g <- gc_prefit(armacop(order = c(1, 0)), u, list())
+  expect_true(gc_is_specified(g))
+  expect_equal(unname(coef(g)), 0.6, tolerance = 0.15)
+})
+
+test_that("dvinecop accepts any gausscop and rejects other objects", {
+  expect_error(dvinecop(kpacf = "ar"), "Gaussian copula process")
+  m <- dvinecop(armacop(ar = 0.5))
+  expect_s4_class(m@kpacf, "gausscop")
+  expect_output(show(m), "kpacf: ARMA\\(1,0\\)")
+})

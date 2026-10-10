@@ -43,14 +43,14 @@ setClass("dvinecopfit", slots = c(
 
 # ---- parameter layout ----------------------------------------------------
 
-# Free-scale layout: the unconstrained ARMA vector (as for armacop) followed by
-# one value per auxiliary parameter (t: nu = 2 + exp(z); BB1: delta = 1 +
-# exp(z)).
+# Free-scale layout: the unconstrained vector of the kpacf source (a Gaussian
+# copula process, through its gc_free_ops closures) followed by one value per
+# auxiliary parameter (t: nu = 2 + exp(z); BB1: delta = 1 + exp(z)).
 dv_layout <- function(object) {
-  arma <- object@arma
+  ops <- gc_free_ops(object@kpacf)
   aux_lags <- which(vapply(object@pairs, function(sp) sp@family %in% .pc_aux_families, logical(1)))
   list(
-    ord = arma@order, period = arma@period, narma = sum(arma@order),
+    ops = ops, nk = ops$nfree,
     K0 = length(object@pairs), aux_lags = aux_lags,
     aux_fam = vapply(object@pairs[aux_lags], function(sp) sp@family, character(1)),
     explicit = lapply(object@pairs, function(sp) list(family = sp@family, pos = sp@pos, neg = sp@neg)),
@@ -61,19 +61,18 @@ dv_layout <- function(object) {
 dv_aux_from_free <- function(z, fam) ifelse(fam == "t", 2 + exp(z), 1 + exp(z))
 dv_aux_to_free <- function(aux, fam) log(pmax(aux - ifelse(fam == "t", 2, 1), 1e-3))
 
-# Natural coefficient vector (ARMA coefficients, then auxiliary parameters)
+# Natural coefficient vector (kpacf coefficients, then auxiliary parameters)
 # from the free vector.
 dv_free_to_coef <- function(z, lay) {
-  na <- lay$narma
-  c(free_to_coef(z[seq_len(na)], lay$ord),
+  na <- lay$nk
+  c(lay$ops$coef(z[seq_len(na)]),
     dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam))
 }
 
 # Resolved pair copulas of length K at the free vector z; NULL if infeasible.
 dv_make_pairs <- function(z, lay, K) {
-  na <- lay$narma
-  e <- free_to_expanded(z[seq_len(na)], lay$ord, lay$period)
-  tau <- (2 / pi) * asin(arma_pacf(e$ar, e$ma, K))
+  na <- lay$nk
+  tau <- (2 / pi) * asin(lay$ops$pacf(z[seq_len(na)], K))
   aux <- dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam)
   K0 <- lay$K0
   pairs <- vector("list", K)
@@ -93,8 +92,8 @@ dv_make_pairs <- function(z, lay, K) {
 # Negative copula log-likelihood on the free scale at fixed effective lag K;
 # a large finite value outside the feasible region or on numerical failure.
 dv_negll <- function(z, lay, K, u) {
-  na <- lay$narma
-  if (any(!is.finite(z)) || (na > 0L && any(abs(z[seq_len(na)]) > 6)) ||
+  na <- lay$nk
+  if (any(!is.finite(z)) || (na > 0L && any(abs(z[seq_len(na)]) > lay$ops$zbound)) ||
       any(abs(z[na + seq_along(lay$aux_lags)]) > 12)) {
     return(1e10)
   }
@@ -106,8 +105,7 @@ dv_negll <- function(z, lay, K, u) {
 
 # Effective lag at the free vector z.
 dv_K_at <- function(z, lay, tautol, maxlag) {
-  e <- free_to_expanded(z[seq_len(lay$narma)], lay$ord, lay$period)
-  dv_effective_lag(e$ar, e$ma, lay$K0, tautol, maxlag, lay$period)
+  lay$ops$effective_lag(z[seq_len(lay$nk)], lay$K0, tautol, maxlag)
 }
 
 # ---- effective-lag rule ----------------------------------------------------
@@ -168,52 +166,47 @@ dv_default_aux <- function(spec_aux, fam, tau) {
 }
 
 # Starting free vector, from init, from the model itself if it is fully
-# specified, or from a Gaussian armacop fit.
+# specified, or from a Gaussian copula fit of the kpacf source.
 dv_start <- function(object, init, u, control) {
   lay <- dv_layout(object)
-  na <- lay$narma
-  arma <- object@arma
+  na <- lay$nk
+  kp <- object@kpacf
   specaux <- vapply(object@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
   if (!is.null(init)) {
     if (is(init, "dvinecop")) {
-      ok <- is(init@arma, "armacop") && identical(init@arma@order, arma@order) &&
-        identical(init@arma@period, arma@period) && length(init@pairs) == lay$K0 &&
-        identical(init@mode, "tied") &&
+      ok <- !is.null(init@kpacf) && identical(gc_structure(init@kpacf), gc_structure(kp)) &&
+        length(init@pairs) == lay$K0 && identical(init@mode, "tied") &&
         identical(lapply(init@pairs, function(sp) sp@family), lapply(object@pairs, function(sp) sp@family))
-      if (!ok) stop("'init' must be a tied dvinecop with the same ARMA orders, period and pair copula families as 'object'")
-      if (!arma_is_specified(init@arma)) stop("'init' has unspecified ARMA coefficients")
-      arma <- init@arma
+      if (!ok) stop("'init' must be a tied dvinecop with the same kpacf structure and pair copula families as 'object'")
+      if (!gc_is_specified(init@kpacf)) stop("'init' has unspecified kpacf coefficients")
+      kp <- init@kpacf
       specaux <- vapply(init@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
     } else if (is.numeric(init) && length(init) == na + length(lay$aux_lags)) {
-      pars <- split_blocks(as.numeric(init[seq_len(na)]), arma@order)
-      arma <- armacop(ar = pars$ar, ma = pars$ma, sar = pars$sar, sma = pars$sma, period = arma@period)
+      kp <- gc_from_coef(kp, as.numeric(init[seq_len(na)]))
       specaux <- as.numeric(init[na + seq_along(lay$aux_lags)])
     } else {
       stop("'init' must be a dvinecop model or a numeric vector of coefficients")
     }
-  } else if (!arma_is_specified(arma)) {
-    arma <- armacop_mle(u, arma, NULL, control)$model
+  } else if (!gc_is_specified(kp)) {
+    kp <- gc_prefit(kp, u, control)
   }
-  e <- arma_coef_expanded(arma)
-  tau <- (2 / pi) * asin(arma_pacf(e$ar, e$ma, max(lay$K0, 1L)))
+  tau <- gc_tau(kp, max(lay$K0, 1L))
   aux <- dv_default_aux(specaux, lay$aux_fam, tau[lay$aux_lags])
-  z0 <- c(pars_to_free(arma@pars), dv_aux_to_free(aux, lay$aux_fam))
-  list(z0 = z0, lay = lay, arma = arma, aux = aux)
+  z0 <- c(lay$ops$to_free(kp), dv_aux_to_free(aux, lay$aux_fam))
+  list(z0 = z0, lay = lay, kpacf = kp, aux = aux)
 }
 
-# The fitted model: ARMA coefficients and auxiliary parameters from z, with
+# The fitted model: kpacf coefficients and auxiliary parameters from z, with
 # the stored effective lag K.
 dv_build_model <- function(object, z, lay, K, limit) {
-  b <- split_blocks(z[seq_len(lay$narma)], lay$ord)
-  arma <- armacop(ar = free_to_ar(b$ar), ma = free_to_ma(b$ma), sar = free_to_ar(b$sar),
-                  sma = free_to_ma(b$sma), period = lay$period)
-  aux <- dv_aux_from_free(z[lay$narma + seq_along(lay$aux_lags)], lay$aux_fam)
+  kp <- lay$ops$build(z[seq_len(lay$nk)])
+  aux <- dv_aux_from_free(z[lay$nk + seq_along(lay$aux_lags)], lay$aux_fam)
   pairs <- object@pairs
   for (i in seq_along(lay$aux_lags)) {
     sp <- pairs[[lay$aux_lags[i]]]
     pairs[[lay$aux_lags[i]]] <- pc(sp@family, sp@pos, sp@neg, aux[i])
   }
-  m <- dvinecop(arma, pairs = pairs, tail = object@tail, tautol = object@tautol,
+  m <- dvinecop(kp, pairs = pairs, tail = object@tail, tautol = object@tautol,
                 maxlag = object@maxlag)
   m@K <- as.integer(K)
   m@Klimit <- limit
@@ -398,7 +391,7 @@ setMethod("vcov", "dvinecopfit", function(object, ...) object@vcov)
 setMethod("show", "dvinecopfit", function(object) {
   cat("object class: dvinecopfit\n")
   m <- object@model
-  cat("ARMA kpacf: ", m@arma@name, "\n", sep = "")
+  cat("kpacf: ", gc_describe(m@kpacf), "\n", sep = "")
   lab <- dv_explicit_labels(m)
   if (length(lab) > 0L) cat(length(lab), " explicit pair copulas: ", paste(lab, collapse = ", "), "\n", sep = "")
   cat("tail family: ", m@tail@family, "\n", sep = "")

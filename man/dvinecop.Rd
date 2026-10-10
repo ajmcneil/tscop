@@ -5,7 +5,7 @@
 \title{Constructor for stationary d-vine copula processes}
 \usage{
 dvinecop(
-  arma = NULL,
+  kpacf = NULL,
   pairs = list(),
   tail = "gauss",
   tautol = 1e-04,
@@ -13,7 +13,8 @@ dvinecop(
 )
 }
 \arguments{
-\item{arma}{an \link[=armacop-class]{armacop} object. In tied mode its Kendall partial
+\item{kpacf}{a Gaussian copula process (\link[=armacop-class]{armacop} or
+\code{arfactcop}). In tied mode its Kendall partial
 autocorrelations calibrate every pair copula; it may be a model structure
 (\code{armacop(order = ...)}) if the model is only to be passed to a fitting
 function. In free mode it is optional and supplies a Gaussian tail.}

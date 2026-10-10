@@ -27,7 +27,7 @@
 #'   been fitted.
 #'
 #' @exportClass armacop
-setClass("armacop", slots = c(
+setClass("armacop", contains = "gausscop", slots = c(
   name = "character",
   order = "integer",
   period = "numeric",

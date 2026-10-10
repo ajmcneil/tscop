@@ -19,7 +19,7 @@ dv_fit_ic <- function(fit, criterion) dv_ic(fit@loglik, fit@npar, fit@nobs, crit
 dv_model_z <- function(model) {
   lay <- dv_layout(model)
   aux <- vapply(model@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
-  c(pars_to_free(model@arma@pars), dv_aux_to_free(aux, lay$aux_fam))
+  c(lay$ops$to_free(model@kpacf), dv_aux_to_free(aux, lay$aux_fam))
 }
 
 # Candidate pair copula specifications at a lag where Kendall's tau is
@@ -49,8 +49,7 @@ dv_screen <- function(u, best_model, k, cands, criterion, npar_best) {
   lay <- dv_layout(best_model)
   K_use <- max(best_model@K, k)
   pairs_base <- dv_make_pairs(dv_model_z(best_model), lay, K_use)
-  e <- arma_coef_expanded(best_model@arma)
-  tk <- (2 / pi) * asin(arma_pacf(e$ar, e$ma, K_use)[k])
+  tk <- gc_tau(best_model@kpacf, K_use)[k]
   n <- length(u)
   ll_at <- function(sp, a) {
     pr <- dv_resolve_vals(sp@family, sp@pos, sp@neg, a, tk)
@@ -89,8 +88,7 @@ dv_screen <- function(u, best_model, k, cands, criterion, npar_best) {
 
 # Sign of Kendall's tau at lag k of a model's ARMA part (TRUE: non-negative).
 dv_tau_positive <- function(model, k) {
-  e <- arma_coef_expanded(model@arma)
-  (2 / pi) * asin(arma_pacf(e$ar, e$ma, k)[k]) >= 0
+  gc_tau(model@kpacf, k)[k] >= 0
 }
 
 # Starting model for the search: a fitted d-vine of the same data.
@@ -98,11 +96,11 @@ dv_auto_start <- function(U, start, tautol, maxlag, pseudo, control) {
   if (is(start, "dvinecopfit")) return(tsfit(U, start@model, pseudo = pseudo, control = control))
   if (is(start, "dvinecop")) return(tsfit(U, start, pseudo = pseudo, control = control))
   if (is(start, "armacopfit")) start <- start@model
-  if (is(start, "armacop")) {
+  if (is(start, "gausscop")) {
     return(tsfit(U, dvinecop(start, tautol = tautol, maxlag = maxlag), pseudo = pseudo,
                  control = control))
   }
-  stop("'start' must be an armacop, armacopfit, dvinecop or dvinecopfit object")
+  stop("'start' must be an armacop (or arfactcop) model or fit, or a dvinecop or dvinecopfit object")
 }
 
 #' Automatic selection of non-Gaussian pair copulas
@@ -212,8 +210,7 @@ autodvinecop <- function(U, start, nreplace = 10, choices = .auto_choices, aux =
     ic0 <- dv_fit_ic(best, criterion)
     positive <- dv_tau_positive(cur, k)
     tau_k <- {
-      e <- arma_coef_expanded(cur@arma)
-      (2 / pi) * asin(arma_pacf(e$ar, e$ma, k)[k])
+      gc_tau(cur@kpacf, k)[k]
     }
     if (abs(tau_k) <= cur@tautol) {
       # beyond the kpacf's effective range every family is the independence
@@ -248,7 +245,7 @@ autodvinecop <- function(U, start, nreplace = 10, choices = .auto_choices, aux =
     }
     base_pairs <- c(cur@pairs, rep(list(pc("gauss")), pad))
     fit_with <- function(sp) {
-      m <- dvinecop(cur@arma, pairs = c(base_pairs, list(sp)), tail = cur@tail,
+      m <- dvinecop(cur@kpacf, pairs = c(base_pairs, list(sp)), tail = cur@tail,
                     tautol = cur@tautol, maxlag = cur@maxlag)
       tryCatch(suppressWarnings(tsfit(u, m, pseudo = pseudo, control = control)),
                error = function(err) NULL)
