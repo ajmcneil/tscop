@@ -30,7 +30,7 @@
 #'
 #' @slot name short description.
 #' @slot mode `"tied"` or `"free"`.
-#' @slot arma an [armacop-class] object, or `NULL`.
+#' @slot kpacf a Gaussian copula process ([gausscop-class]), or `NULL`.
 #' @slot pairs list of explicit pair copulas: [pc-class] objects (tied mode)
 #'   or `bicop_dist` objects (free mode).
 #' @slot tail the tail family: a [pc-class] object (tied mode), or `NULL`.

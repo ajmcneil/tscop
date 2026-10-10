@@ -22,7 +22,7 @@ test_that("gc_free_ops maps between the free and natural scales consistently", {
   expect_equal(ops$nfree, 4L)
   z <- ops$to_free(g)
   expect_length(z, 4)
-  expect_equal(ops$coef(z), coef(g), tolerance = 1e-10)
+  expect_equal(ops$coef(z), coef(g), tolerance = 1e-10, ignore_attr = TRUE)
   expect_equal(unname(coef(ops$build(z))), unname(coef(g)), tolerance = 1e-10)
   expect_equal(ops$pacf(z, 10), gc_pacf(g, 10), tolerance = 1e-10)
   expect_equal(ops$effective_lag(z, 1L, 1e-4, Inf), gc_effective_lag(g, 1L, 1e-4, Inf))

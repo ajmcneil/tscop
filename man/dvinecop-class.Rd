@@ -60,7 +60,7 @@ copulas) of the explicit specifications (tied mode).
 
 \item{\code{mode}}{\code{"tied"} or \code{"free"}.}
 
-\item{\code{arma}}{an \link[=armacop-class]{armacop} object, or \code{NULL}.}
+\item{\code{kpacf}}{a Gaussian copula process (\link[=gausscop-class]{gausscop}), or \code{NULL}.}
 
 \item{\code{pairs}}{list of explicit pair copulas: \link[=pc-class]{pc} objects (tied mode)
 or \code{bicop_dist} objects (free mode).}
