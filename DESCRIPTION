@@ -45,4 +45,5 @@ Collate:
     'autodvinecop.R'
     'vtscop.R'
     'vtscop-fit.R'
+    'vtscop-predict.R'
     'tscop-package.R'
