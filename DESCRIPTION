@@ -43,4 +43,6 @@ Collate:
     'dvinecop.R'
     'dvinecop-fit.R'
     'autodvinecop.R'
+    'vtscop.R'
+    'vtscop-fit.R'
     'tscop-package.R'
