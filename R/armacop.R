@@ -325,7 +325,9 @@ setMethod("residuals", "armacop", function(object, data, scale = "uniform", ...)
 #' @aliases predict,armacop-method
 NULL
 
-armacop_predict <- function(model, data, h, type, x) {
+# Validate the arguments of a Gaussian-process predict method; returns the
+# matched type.
+gauss_predict_check <- function(h, type, x) {
   type <- match.arg(type, c("moments", "df", "qf", "dens"))
   if (!is.numeric(h) || length(h) < 1L || anyNA(h) || any(h < 1) || any(h != round(h))) {
     stop("'h' must be positive whole numbers")
@@ -336,6 +338,24 @@ armacop_predict <- function(model, data, h, type, x) {
       stop("'x' must be numeric values strictly inside (0, 1)")
     }
   }
+  type
+}
+
+# Predictive output from the conditional means mu[k] and variances v[k] of the
+# normal score k steps ahead.
+gauss_predict_result <- function(mu, v, h, type, x) {
+  m <- mu[h]
+  s <- sqrt(v[h])
+  switch(type,
+    moments = data.frame(h = h, mean = m, sd = s),
+    df = stats::pnorm((stats::qnorm(x) - m) / s),
+    qf = stats::pnorm(m + s * stats::qnorm(x)),
+    dens = stats::dnorm(stats::qnorm(x), m, s) / stats::dnorm(stats::qnorm(x))
+  )
+}
+
+armacop_predict <- function(model, data, h, type, x) {
+  type <- gauss_predict_check(h, type, x)
   u <- check_copula_data(data, min_n = 1L)
   e <- arma_coef_expanded(model)
   ss <- arma_state_space(e$ar, e$ma)
@@ -351,14 +371,7 @@ armacop_predict <- function(model, data, h, type, x) {
     a <- ss$phi * a[1L] + c(a[-1L], 0)
     P <- ss$Tm %*% P %*% t(ss$Tm) + ss$RR
   }
-  m <- mu[h]
-  s <- sqrt(v[h])
-  switch(type,
-    moments = data.frame(h = h, mean = m, sd = s),
-    df = stats::pnorm((stats::qnorm(x) - m) / s),
-    qf = stats::pnorm(m + s * stats::qnorm(x)),
-    dens = stats::dnorm(stats::qnorm(x), m, s) / stats::dnorm(stats::qnorm(x))
-  )
+  gauss_predict_result(mu, v, h, type, x)
 }
 
 #' @rdname predict-armacop

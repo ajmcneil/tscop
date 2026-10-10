@@ -95,7 +95,7 @@ dv_tau_positive <- function(model, k) {
 dv_auto_start <- function(U, start, tautol, maxlag, pseudo, control) {
   if (is(start, "dvinecopfit")) return(tsfit(U, start@model, pseudo = pseudo, control = control))
   if (is(start, "dvinecop")) return(tsfit(U, start, pseudo = pseudo, control = control))
-  if (is(start, "armacopfit")) start <- start@model
+  if (is(start, "armacopfit") || is(start, "arfactcopfit")) start <- start@model
   if (is(start, "gausscop")) {
     return(tsfit(U, dvinecop(start, tautol = tautol, maxlag = maxlag), pseudo = pseudo,
                  control = control))

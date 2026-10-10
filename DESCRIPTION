@@ -37,6 +37,7 @@ Collate:
     'armacop-fit.R'
     'gausscop-armacop.R'
     'arfactcop.R'
+    'arfactcop-fit.R'
     'pc.R'
     'dvine-engine.R'
     'dvinecop.R'

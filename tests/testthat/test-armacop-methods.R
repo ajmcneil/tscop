@@ -113,18 +113,6 @@ test_that("residuals agree with tscopula once the filter has settled", {
 
 # ---- predict ----------------------------------------------------------
 
-# Conditional mean and sd of x_{n+h} given the observed x by Gaussian
-# conditioning with the Toeplitz correlation matrix (NA positions skipped).
-cond_moments <- function(x, acf, h) {
-  n <- length(x)
-  obs <- which(!is.na(x))
-  Rfull <- toeplitz(acf)
-  S <- Rfull[obs, obs, drop = FALSE]
-  r <- acf[abs((n + h) - obs) + 1]
-  w <- solve(S, r)
-  c(mean = sum(w * x[obs]), sd = sqrt(1 - sum(w * r)))
-}
-
 test_that("moments match exact Gaussian conditioning, for several horizons", {
   set.seed(6)
   for (cs in list(list(ar = 0.5, ma = 0.4), list(ar = numeric(0), ma = c(0.5, 0.2)))) {
