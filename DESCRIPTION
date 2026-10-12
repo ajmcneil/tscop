@@ -67,4 +67,5 @@ Collate:
     'marg-fit.R'
     'emarg.R'
     'automarg.R'
+    'tsmod.R'
     'tscop-package.R'

@@ -36,6 +36,8 @@ quantile function of the Gaussian kernel density estimate.
 
 \item{\code{bw}}{the kernel bandwidth.}
 
+\item{\code{bwsel}}{the bandwidth selector that was used (\code{"numeric"} if a bandwidth was given).}
+
 \item{\code{qtype}}{the type of empirical quantile (1 to 9).}
 
 \item{\code{proper}}{logical; use the ordinary empirical distribution function

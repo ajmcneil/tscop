@@ -4,3 +4,4 @@ arfactcop  Gaussian copula processes made of independent AR(1) factors plus nois
 ivt        Inverse-v-transformed pair copulas in d-vines for stochastic volatility (the Dias-Han-McNeil models): simulation, fitting, fulcrums, diagnostics, prediction
 vtscop     Process-level v-transform copula processes: any udp v-transform on an arfactcop or d-vine base, simulation, fitting with standard errors, residuals, prediction
 marg       Parametric margins: gauss, laplace, slaplace, st, sst, jsu, nig, hyp, gh; simulation, fitting with standard errors, fixed parameters, residuals, automatic selection among the families (automarg), empirical margins (emarg)
+tsmod      Full time series models: a margin and a copula process; simulation, two-stage and semiparametric estimation, residuals, choosing the margin, volatile series with a v-transform copula

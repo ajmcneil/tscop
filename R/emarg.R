@@ -21,6 +21,7 @@
 #' @slot sorted the sorted observations.
 #' @slot type `"edf"` or `"kernel"`.
 #' @slot bw the kernel bandwidth.
+#' @slot bwsel the bandwidth selector that was used (`"numeric"` if a bandwidth was given).
 #' @slot qtype the type of empirical quantile (1 to 9).
 #' @slot proper logical; use the ordinary empirical distribution function
 #'   (`type = "edf"` only).
@@ -33,7 +34,7 @@
 #'   of Statistics*, 54(1), e70033. \doi{10.1002/cjs.70033}
 #'
 #' @exportClass emarg
-setClass("emarg", slots = c(data = "numeric", sorted = "numeric", type = "character", bw = "numeric", qtype = "numeric",
+setClass("emarg", slots = c(data = "numeric", sorted = "numeric", type = "character", bw = "numeric", bwsel = "character", qtype = "numeric",
                             proper = "logical", template = "ANY"))
 
 #' Constructor for empirical margins
@@ -66,6 +67,7 @@ emarg <- function(x, type = c("edf", "kernel"), bw = "SJ", qtype = 7, proper = F
   xs <- xs[is.finite(xs)]
   if (length(xs) < 5L) stop("at least 5 finite observations are needed", call. = FALSE)
   if (!(is.numeric(qtype) && length(qtype) == 1L && qtype %in% 1:9)) stop("'qtype' must be an integer from 1 to 9", call. = FALSE)
+  bwsel <- if (is.character(bw)) match.arg(bw, c("SJ", "nrd0", "nrd", "ucv", "bcv")) else "numeric"
   if (is.character(bw)) {
     bw <- match.arg(bw, c("SJ", "nrd0", "nrd", "ucv", "bcv"))
     h <- switch(bw, SJ = tryCatch(stats::bw.SJ(xs), error = function(e) stats::bw.nrd0(xs)),
@@ -75,7 +77,7 @@ emarg <- function(x, type = c("edf", "kernel"), bw = "SJ", qtype = 7, proper = F
   } else {
     stop("'bw' must be a positive number or the name of a bandwidth selector", call. = FALSE)
   }
-  new("emarg", data = xs, sorted = sort(xs), type = type, bw = h, qtype = qtype, proper = isTRUE(proper), template = template)
+  new("emarg", data = xs, sorted = sort(xs), type = type, bw = h, bwsel = bwsel, qtype = qtype, proper = isTRUE(proper), template = template)
 }
 
 # Kernel quantities by chunks of evaluation points (n x m matrices of at most

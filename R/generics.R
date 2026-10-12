@@ -70,6 +70,10 @@ setGeneric("ktau", function(object, lagmax = 20, ...) standardGeneric("ktau"),
 #'   \item [marg-class]: the probability integral transforms
 #'   \eqn{F(x_t)} of the observations (uniform if the margin is correct; the
 #'   `qnorm` of them on the `"normal"` scale).
+#'   \item [tsmod-class]: the residuals of the copula process applied to the
+#'   probability integral transforms of the data under the margin (iid uniform if
+#'   the model is correct), or with `type = "margin"` the probability integral
+#'   transforms themselves.
 #' }
 #'
 #' The residuals of [armacop-class], [arfactcop-class] and [sdvinecop-class]
@@ -142,9 +146,11 @@ NULL
 #' Methods for extracting coefficients, the covariance matrix and the
 #' log-likelihood of time series copula models and fitted model objects, and
 #' for printing them. They apply to [armacop-class], [arfactcop-class],
-#' [sdvinecop-class], [vtscop-class], [marg-class], [pc-class] and the
-#' corresponding fitted classes (`armacopfit`, `arfactcopfit`, `sdvinecopfit`,
-#' `vtscopfit`, `margfit`; see [tsfit()]).
+#' [sdvinecop-class], [vtscop-class], [marg-class], [emarg-class], [tsmod-class],
+#' [pc-class] and the corresponding fitted classes (`armacopfit`,
+#' `arfactcopfit`, `sdvinecopfit`, `vtscopfit`, `margfit`, `tsmodfit`; see
+#' [tsfit()]). For [tsmod-class] the coefficients carry the prefixes `margin.`
+#' and `copula.`.
 #'
 #' * `coef()` of a model returns its coefficients: for [armacop-class] the
 #'   order `ar`, `ma`, `sar`, `sma` (`NA` for a structure that has not been
