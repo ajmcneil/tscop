@@ -12,6 +12,8 @@ Authors@R: c(
 Description: Rebuilt tools for the analysis of time series using copula
     models, built on the udp package. Under development.
 License: GPL-3
+Depends:
+    R (>= 3.5.0)
 Imports:
     methods,
     rvinecopulib,
