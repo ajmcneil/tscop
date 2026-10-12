@@ -96,7 +96,7 @@ test_that("tssim returns copula data and is reproducible", {
 test_that("a Gaussian d-vine simulates the ARMA autocorrelation", {
   set.seed(7)
   m <- dvinecop(armacop(ar = 0.6, ma = 0.3), tautol = 1e-6)
-  e <- arma_coef_expanded(m@arma)
+  e <- arma_coef_expanded(m@kpacf)
   x <- qnorm(tssim(m, 1500))
   expect_equal(as.numeric(acf(x, lag.max = 3, plot = FALSE)$acf[-1]),
                acf_ref(e$ar, e$ma, 3)[-1], tolerance = 0.1)
@@ -212,7 +212,7 @@ test_that("ktau returns the ARMA kpacf up to K and zero beyond", {
   m <- mixed_model()
   k <- ktau(m, 30)
   expect_length(k, 30)
-  e <- arma_coef_expanded(m@arma)
+  e <- arma_coef_expanded(m@kpacf)
   ref <- (2 / pi) * asin(arma_pacf(e$ar, e$ma, m@K))
   expect_equal(k[seq_len(m@K)], ref)
   if (m@K < 30) expect_equal(k[(m@K + 1):30], rep(0, 30 - m@K))

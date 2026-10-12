@@ -98,7 +98,7 @@ test_that("an ARMA model with substitutions is recovered and K is stored", {
   expect_equal(unname(coef(f)), c(0.6, 0.4), tolerance = 0.15)
   expect_gte(f@model@K, 2L)
   expect_equal(f@model@K, dv_effective_lag(
-    arma_coef_expanded(f@model@arma)$ar, arma_coef_expanded(f@model@arma)$ma, 2L)$K,
+    arma_coef_expanded(f@model@kpacf)$ar, arma_coef_expanded(f@model@kpacf)$ma, 2L)$K,
     tolerance = 3)
   expect_equal(f@loglik, dv_model_loglik(f@model, u), tolerance = 1e-8)
   expect_equal(as.numeric(logLik(f)), f@loglik)

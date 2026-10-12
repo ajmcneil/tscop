@@ -60,7 +60,7 @@ copulas) of the explicit specifications (tied mode).
 
 \item{\code{mode}}{\code{"tied"} or \code{"free"}.}
 
-\item{\code{arma}}{an \link[=armacop-class]{armacop} object, or \code{NULL}.}
+\item{\code{kpacf}}{a Gaussian copula process (\link[=gausscop-class]{gausscop}), or \code{NULL}.}
 
 \item{\code{pairs}}{list of explicit pair copulas: \link[=pc-class]{pc} objects (tied mode)
 or \code{bicop_dist} objects (free mode).}
@@ -68,6 +68,14 @@ or \code{bicop_dist} objects (free mode).}
 \item{\code{tail}}{the tail family: a \link[=pc-class]{pc} object (tied mode), or \code{NULL}.}
 
 \item{\code{tautol,maxlag}}{the tolerance and cap defining the effective lag.}
+
+\item{\code{vt}}{the fulcrums \code{c(fulcrum1, fulcrum2)} of the linear v-transforms
+of the inverse-v-transformed (\code{"ivt"}) pair copulas, shared by all of them
+(\code{fulcrum1} applies to the earlier and \code{fulcrum2} to the later variable of
+a pair); empty if the model has no such pair copula.}
+
+\item{\code{vtpar}}{which fulcrums are parameters: \code{"both"}, \code{"common"} (one
+parameter, equal fulcrums) or \code{"none"} (fixed).}
 
 \item{\code{K}}{the effective lag (\code{NA} for a model structure whose ARMA
 coefficients are not yet specified).}

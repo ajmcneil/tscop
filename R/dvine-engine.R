@@ -8,47 +8,9 @@
 
 # ---- effective lag -----------------------------------------------------
 
-# Effective maximum lag of the truncated sequence of pair copulas: the last
-# lag at which the ARMA Kendall partial autocorrelation exceeds 'tautol' in
-# absolute value, capped at 'maxlag' and floored at max(K0, 1), where K0 is
-# the number of explicit pair copulas. For a pure AR tail (no MA part) the
-# PACF vanishes beyond the AR order, so the lag is the AR order exactly.
-# 'period' (NA if none) sets the safety margin for seasonal bumps. Returns
-# list(K, limit) with limit one of "ar", "tol", "maxlag", "cap", "floor".
-dv_effective_lag <- function(ar, ma, K0 = 0L, tautol = 1e-4, maxlag = Inf,
-                             period = NA, cap = 5000L) {
+# Apply the cap 'maxlag' and the floor max(K0, 1) to an effective lag K.
+dv_finish_lag <- function(K, limit, K0, maxlag) {
   floorK <- max(as.integer(K0), 1L)
-  if (length(ma) == 0L) {
-    K <- length(ar)
-    limit <- "ar"
-  } else {
-    margin <- max(10L, 2L * (if (is.na(period)) 0L else as.integer(period)))
-    Lmax <- cap
-    if (is.finite(maxlag)) Lmax <- min(cap, max(50L, as.integer(maxlag) + margin))
-    L <- min(50L, Lmax)
-    repeat {
-      tau <- (2 / pi) * asin(arma_pacf(ar, ma, L))
-      ex <- which(abs(tau) > tautol)
-      last <- if (length(ex)) max(ex) else 0L
-      if (L - last >= margin) {
-        K <- last
-        limit <- "tol"
-        break
-      }
-      if (L >= Lmax) {
-        K <- last
-        limit <- "tol"
-        if (!is.finite(maxlag) || last < maxlag) {
-          warning(sprintf(
-            "the Kendall partial autocorrelations are still above 'tautol' at lag %d; truncating there (increase 'tautol' or set 'maxlag')",
-            L), call. = FALSE)
-          limit <- "cap"
-        }
-        break
-      }
-      L <- min(2L * L, Lmax)
-    }
-  }
   if (is.finite(maxlag) && K > maxlag) {
     K <- as.integer(maxlag)
     limit <- "maxlag"
@@ -60,9 +22,110 @@ dv_effective_lag <- function(ar, ma, K0 = 0L, tautol = 1e-4, maxlag = Inf,
   list(K = as.integer(K), limit = limit)
 }
 
+# Effective lag from a function pacf_fn(L) returning the partial
+# autocorrelations at lags 1..L: the last lag at which the Kendall partial
+# autocorrelation exceeds 'tautol' in absolute value. The PACF is computed in
+# doubling blocks of lags (50, 100, ...) and the search stops when the last
+# exceedance lies at least 'margin' lags inside the computed range; a hard cap
+# on the number of lags gives a warning if reached.
+dv_effective_lag_blocks <- function(pacf_fn, K0 = 0L, tautol = 1e-4, maxlag = Inf,
+                                    margin = 10L, cap = 5000L) {
+  Lmax <- cap
+  if (is.finite(maxlag)) Lmax <- min(cap, max(50L, as.integer(maxlag) + margin))
+  L <- min(50L, Lmax)
+  repeat {
+    tau <- (2 / pi) * asin(pacf_fn(L))
+    ex <- which(abs(tau) > tautol)
+    last <- if (length(ex)) max(ex) else 0L
+    if (L - last >= margin) {
+      K <- last
+      limit <- "tol"
+      break
+    }
+    if (L >= Lmax) {
+      K <- last
+      limit <- "tol"
+      if (!is.finite(maxlag) || last < maxlag) {
+        warning(sprintf(
+          "the Kendall partial autocorrelations are still above 'tautol' at lag %d; truncating there (increase 'tautol' or set 'maxlag')",
+          L), call. = FALSE)
+        limit <- "cap"
+      }
+      break
+    }
+    L <- min(2L * L, Lmax)
+  }
+  dv_finish_lag(K, limit, K0, maxlag)
+}
+
+# Effective maximum lag of the truncated sequence of pair copulas of an ARMA
+# kpacf: the last lag at which the Kendall partial autocorrelation exceeds
+# 'tautol' in absolute value, capped at 'maxlag' and floored at max(K0, 1),
+# where K0 is the number of explicit pair copulas. For a pure AR kpacf (no MA
+# part) the PACF vanishes beyond the AR order, so the lag is the AR order
+# exactly. 'period' (NA if none) sets the safety margin for seasonal bumps.
+# Returns list(K, limit) with limit one of "ar", "tol", "maxlag", "cap",
+# "floor".
+dv_effective_lag <- function(ar, ma, K0 = 0L, tautol = 1e-4, maxlag = Inf,
+                             period = NA, cap = 5000L) {
+  if (length(ma) == 0L) return(dv_finish_lag(length(ar), "ar", K0, maxlag))
+  margin <- max(10L, 2L * (if (is.na(period)) 0L else as.integer(period)))
+  dv_effective_lag_blocks(function(L) arma_pacf(ar, ma, L), K0, tautol, maxlag, margin, cap)
+}
+
 # ---- resolution of pair copula specifications --------------------------
 
 dv_is_gauss <- function(pair) pair$family %in% c("gauss", "gaussian")
+dv_is_ast <- function(pair) identical(pair$family, "ast")
+dv_is_ivt <- function(pair) identical(pair$family, "ivt")
+
+# Linear v-transform with fulcrum d and the signed scale factor a(x) (d for
+# x <= d, d - 1 otherwise) of the IVT formulas (supplement to Dias, Han and
+# McNeil, Proposition S3).
+dv_vlin <- function(x, d) ifelse(x <= d, (d - x) / d, (x - d) / (1 - d))
+dv_alin <- function(x, d) ifelse(x <= d, d, d - 1)
+
+# Rotations (rvinecopulib convention, applied to the pair (earlier, later)) of
+# a copula given by closures: d(a, b) the density, h(a, b, cond_var) the
+# h-function (cond_var 1: P(U2 <= b | U1 = a); 2: P(U1 <= a | U2 = b)) and
+# hinv(a, p) the inverse of h(a, ., 1) in its second argument. Used for copulas
+# that rvinecopulib does not implement (ast); validated against rvinecopulib's
+# own rotated families.
+dv_rotate <- function(base, rotation) {
+  d <- base$d
+  h <- base$h
+  hinv <- base$hinv
+  switch(as.character(rotation),
+    "0" = base,
+    "180" = list(
+      d = function(a, b) d(1 - a, 1 - b),
+      h = function(a, b, cv) 1 - h(1 - a, 1 - b, cv),
+      hinv = function(a, p) 1 - hinv(1 - a, 1 - p)
+    ),
+    "90" = list(
+      d = function(a, b) d(1 - a, b),
+      h = function(a, b, cv) if (cv == 1L) h(1 - a, b, 1L) else 1 - h(1 - a, b, 2L),
+      hinv = function(a, p) hinv(1 - a, p)
+    ),
+    "270" = list(
+      d = function(a, b) d(a, 1 - b),
+      h = function(a, b, cv) if (cv == 1L) 1 - h(a, 1 - b, 1L) else h(a, 1 - b, 2L),
+      hinv = function(a, p) 1 - hinv(a, 1 - p)
+    ),
+    stop("rotation must be 0, 90, 180 or 270")
+  )
+}
+
+# Closures of an ast pair copula with its rotation.
+dv_ast_closures <- function(pr) {
+  ac <- udp::astcopula(pr$parameters[1L])
+  base <- list(
+    d = function(a, b) udp::dastcopula(a, b, ac),
+    h = function(a, b, cv) udp::hastcopula(a, b, ac, cond_var = cv),
+    hinv = function(a, p) udp::hastcopula(a, p, ac, cond_var = 1L, inverse = TRUE)
+  )
+  dv_rotate(base, pr$rotation)
+}
 
 # Copula parameter of a one-parameter family at Kendall's tau (>= 0 for the
 # families without negative dependence). rvinecopulib::ktau_to_par is not
@@ -78,7 +141,12 @@ dv_ktau_to_par <- function(family, tau) {
 # Resolve a pair copula (family, rotations for positive and negative
 # dependence, auxiliary parameter) at Kendall's tau 'tau' to a resolved pair
 # copula, or NULL if infeasible at that tau (BB1 only).
-dv_resolve_vals <- function(fam, pos, neg, aux, tau) {
+dv_resolve_vals <- function(fam, pos, neg, aux, tau, base = NA_character_, vt = NULL) {
+  if (fam == "ivt") {
+    if (is.null(vt)) stop("inverse-v-transformed pair copulas need the v-transform parameters")
+    if (tau < -1e-10) return(NULL) # the base copula has positive dependence only
+    return(dv_ivt_pair(base, max(tau, 0), vt))
+  }
   if (fam %in% .pc_aux_families && is.na(aux)) {
     stop("the auxiliary parameter of the '", fam, "' specification is missing")
   }
@@ -94,6 +162,11 @@ dv_resolve_vals <- function(fam, pos, neg, aux, tau) {
   }
   rot <- if (tau >= 0) pos else neg
   at <- abs(tau)
+  if (fam == "ast") {
+    if (at < 1e-9) return(list(family = "indep", rotation = 0, parameters = numeric(0)))
+    return(list(family = "ast", rotation = rot,
+                parameters = udp::astcopula_nu(min(at, 0.999999))))
+  }
   if (fam == "bb1") {
     theta_c <- dv_ktau_to_par("clayton", at)
     th <- (theta_c + 2) / aux - 2
@@ -104,14 +177,38 @@ dv_resolve_vals <- function(fam, pos, neg, aux, tau) {
 }
 
 # Resolve a pc specification at Kendall's tau 'tau' (see dv_resolve_vals).
-dv_resolve_pair <- function(spec, tau, aux = spec@aux) {
-  dv_resolve_vals(spec@family, spec@pos, spec@neg, aux, tau)
+dv_resolve_pair <- function(spec, tau, aux = spec@aux, vt = NULL) {
+  dv_resolve_vals(spec@family, spec@pos, spec@neg, aux, tau, spec@base, vt)
+}
+
+# Resolved base copula of an IVT pair copula at Kendall's tau (>= 0); the
+# independence copula for a negligible tau.
+dv_ivt_base_pair <- function(base, tau) {
+  if (tau < 1e-9) return(list(family = "indep", rotation = 0, parameters = numeric(0)))
+  switch(base,
+    ast = list(family = "ast", rotation = 0, parameters = udp::astcopula_nu(min(tau, 0.999999))),
+    joe = list(family = "joe", rotation = 0, parameters = dv_ktau_to_par("joe", tau)),
+    gumbel = list(family = "gumbel", rotation = 0, parameters = dv_ktau_to_par("gumbel", tau)),
+    clayton180 = list(family = "clayton", rotation = 180, parameters = dv_ktau_to_par("clayton", tau)),
+    stop("unknown base copula '", base, "'")
+  )
+}
+
+# Resolved IVT pair copula: the base pair copula and the two fulcrums.
+dv_ivt_pair <- function(base, tau, vt) {
+  list(family = "ivt", rotation = 0, parameters = numeric(0),
+       base = dv_ivt_base_pair(base, tau), delta = as.numeric(vt))
 }
 
 # Resolve the tail family at a vector of Kendall's tau values; the tail
 # families have no auxiliary parameter and are always feasible.
-dv_resolve_tail <- function(spec, tau) {
+dv_resolve_tail <- function(spec, tau, vt = NULL) {
   fam <- spec@family
+  if (fam == "ivt") {
+    if (is.null(vt)) stop("inverse-v-transformed pair copulas need the v-transform parameters")
+    if (any(tau < -1e-10)) return(NULL)
+    return(lapply(pmax(tau, 0), function(t) dv_ivt_pair(spec@base, t, vt)))
+  }
   if (fam == "gauss") {
     rho <- sin(pi * tau / 2)
     return(lapply(rho, function(r) list(family = "gauss", rotation = 0, parameters = r)))
@@ -120,8 +217,18 @@ dv_resolve_tail <- function(spec, tau) {
     par <- vapply(tau, function(t) if (t == 0) 1e-10 else dv_ktau_to_par("frank", t), numeric(1))
     return(lapply(par, function(p) list(family = "frank", rotation = 0, parameters = p)))
   }
-  par <- dv_ktau_to_par(fam, abs(tau))
   rot <- ifelse(tau >= 0, spec@pos, spec@neg)
+  if (fam == "ast") {
+    at <- abs(tau)
+    nu <- rep(NA_real_, length(at))
+    big <- at >= 1e-9
+    if (any(big)) nu[big] <- udp::astcopula_nu(pmin(at[big], 0.999999))
+    return(Map(function(n, r) {
+      if (is.na(n)) list(family = "indep", rotation = 0, parameters = numeric(0))
+      else list(family = "ast", rotation = r, parameters = n)
+    }, nu, rot))
+  }
+  par <- dv_ktau_to_par(fam, abs(tau))
   Map(function(p, r) list(family = fam, rotation = r, parameters = p), par, rot)
 }
 
@@ -132,6 +239,11 @@ dv_from_bicop <- function(b) {
 
 # Kendall's tau of a resolved pair copula.
 dv_pair_ktau <- function(pair) {
+  if (dv_is_ivt(pair)) return(dv_pair_ktau(pair$base)) # the base copula's tau
+  if (dv_is_ast(pair)) {
+    tau0 <- udp::astcopula_tau(pair$parameters[1L])
+    return(if (pair$rotation %in% c(90, 270)) -tau0 else tau0)
+  }
   rvinecopulib::par_to_ktau(pair$family, pair$rotation, pair$parameters)
 }
 
@@ -170,6 +282,20 @@ dv_loglik <- function(u, pairs) {
         A <- Anew
         B <- Bnew
       }
+    } else if (dv_is_ast(pr) || dv_is_ivt(pr)) {
+      if (zscale) {
+        A <- stats::pnorm(A)
+        B <- stats::pnorm(B)
+        zscale <- FALSE
+      }
+      ll <- ll + sum(log(dv_dens(pr, A, B)))
+      if (j < K) {
+        m <- length(A)
+        Anew <- dv_h(pr, A[-m], B[-m], 2L)
+        Bnew <- dv_h(pr, A[-1L], B[-1L], 1L)
+        A <- Anew
+        B <- Bnew
+      }
     } else {
       if (zscale) {
         A <- stats::pnorm(A)
@@ -202,7 +328,16 @@ dv_loglik <- function(u, pairs) {
 dv_clamp <- function(x, eps = 1e-12) pmin(pmax(x, eps), 1 - eps)
 
 dv_h <- function(pr, a, b, cond_var) {
-  if (dv_is_gauss(pr)) {
+  if (dv_is_ivt(pr)) {
+    d1 <- pr$delta[1L]
+    d2 <- pr$delta[2L]
+    x <- dv_vlin(a, d1)
+    y <- dv_vlin(b, d2)
+    out <- if (cond_var == 1L) d2 - dv_alin(b, d2) * dv_h(pr$base, x, y, 1L)
+           else d1 - dv_alin(a, d1) * dv_h(pr$base, x, y, 2L)
+  } else if (dv_is_ast(pr)) {
+    out <- dv_ast_closures(pr)$h(a, b, cond_var)
+  } else if (dv_is_gauss(pr)) {
     rho <- pr$parameters[1L]
     s <- sqrt(1 - rho * rho)
     out <- if (cond_var == 1L) {
@@ -218,7 +353,13 @@ dv_h <- function(pr, a, b, cond_var) {
 }
 
 dv_hinv <- function(pr, a, p) {
-  if (dv_is_gauss(pr)) {
+  if (dv_is_ivt(pr)) {
+    d1 <- pr$delta[1L]
+    d2 <- pr$delta[2L]
+    out <- d2 - dv_alin(p, d2) * dv_hinv(pr$base, dv_vlin(a, d1), dv_vlin(p, d2))
+  } else if (dv_is_ast(pr)) {
+    out <- dv_ast_closures(pr)$hinv(a, p)
+  } else if (dv_is_gauss(pr)) {
     rho <- pr$parameters[1L]
     s <- sqrt(1 - rho * rho)
     out <- stats::pnorm(rho * stats::qnorm(a) + s * stats::qnorm(p))
@@ -230,7 +371,11 @@ dv_hinv <- function(pr, a, p) {
 }
 
 dv_dens <- function(pr, a, b) {
-  if (dv_is_gauss(pr)) {
+  if (dv_is_ivt(pr)) {
+    dv_dens(pr$base, dv_vlin(a, pr$delta[1L]), dv_vlin(b, pr$delta[2L]))
+  } else if (dv_is_ast(pr)) {
+    as.numeric(dv_ast_closures(pr)$d(a, b))
+  } else if (dv_is_gauss(pr)) {
     rho <- pr$parameters[1L]
     x <- stats::qnorm(a)
     y <- stats::qnorm(b)

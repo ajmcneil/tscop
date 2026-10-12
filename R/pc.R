@@ -1,11 +1,16 @@
 # Pair copula specifications for tied d-vine models.
 
-.pc_families <- c("gauss", "t", "gumbel", "clayton", "joe", "frank", "bb1")
-.pc_radial <- c("gauss", "t", "frank")
+.pc_families <- c("gauss", "t", "gumbel", "clayton", "joe", "frank", "bb1", "ast", "ivt")
+# families without rotation arguments: radially symmetric ones, and the IVT
+# pair copula (positive dependence only, the base copula is fixed)
+.pc_radial <- c("gauss", "t", "frank", "ivt")
+# base copulas of an inverse-v-transformed pair copula: upper tail dependence
+# and a finite density at the origin ("clayton180" is the survival Clayton)
+.pc_ivt_bases <- c("ast", "joe", "gumbel", "clayton180")
 .pc_aux_families <- c("t", "bb1")
 # families that tend to independence as Kendall's tau -> 0 with auxiliary
 # parameters fixed, hence admissible as the tail family
-.pc_tail_families <- c("gauss", "frank", "clayton", "gumbel", "joe")
+.pc_tail_families <- c("gauss", "frank", "clayton", "gumbel", "joe", "ast", "ivt")
 
 #' Pair copula specifications
 #'
@@ -16,9 +21,19 @@
 #' dependence, and (for two-parameter families) the auxiliary parameter.
 #'
 #' @slot family one of `"gauss"`, `"t"`, `"gumbel"`, `"clayton"`, `"joe"`,
-#'   `"frank"` and `"bb1"`.
+#'   `"frank"`, `"bb1"`, `"ast"` and `"ivt"`. `"ivt"` is the inverse-v-transformed
+#'   pair copula of Dias, Han and McNeil (2027), `c(u, v) = c*(V1(u), V2(v))`
+#'   with linear v-transforms whose fulcrums are parameters of the d-vine model
+#'   (`vt` in [dvinecop-class]) and a base copula with positive dependence
+#'   given by `base`; `"ast"` is (the absolute spherical t copula of Dias,
+#'   Han and McNeil, from the udp package: one parameter, positive dependence
+#'   and upper tail dependence, like Gumbel and Joe; calibrated to Kendall's
+#'   tau through its degrees-of-freedom parameter; roughly ten times slower to
+#'   evaluate than the `rvinecopulib` families).
 #' @slot pos rotation (0 or 180) used when Kendall's tau is non-negative.
 #' @slot neg rotation (90 or 270) used when Kendall's tau is negative.
+#' @slot base for `"ivt"`: the base copula, one of `"ast"`, `"joe"`, `"gumbel"`
+#'   and `"clayton180"` (survival Clayton); `NA` otherwise.
 #' @slot aux auxiliary parameter: degrees of freedom for `"t"` (at least 2)
 #'   or `delta` for `"bb1"` (at least 1); `NA` for other families, and `NA`
 #'   for `"t"`/`"bb1"` if it has not been given yet (a starting value is then
@@ -26,7 +41,7 @@
 #'
 #' @exportClass pc
 setClass("pc", slots = c(family = "character", pos = "numeric",
-                         neg = "numeric", aux = "numeric"))
+                         neg = "numeric", aux = "numeric", base = "character"))
 
 setValidity("pc", function(object) {
   if (length(object@family) != 1L || !(object@family %in% .pc_families)) {
@@ -40,6 +55,14 @@ setValidity("pc", function(object) {
   } else {
     if (!(object@pos %in% c(0, 180))) return("'pos' must be 0 or 180")
     if (!(object@neg %in% c(90, 270))) return("'neg' must be 90 or 270")
+  }
+  if (length(object@base) != 1L) return("'base' must be a single string")
+  if (object@family == "ivt") {
+    if (is.na(object@base) || !(object@base %in% .pc_ivt_bases)) {
+      return(paste0("an \"ivt\" pair copula needs a base copula, one of ", paste(.pc_ivt_bases, collapse = ", ")))
+    }
+  } else if (!is.na(object@base)) {
+    return("only the \"ivt\" family has a base copula")
   }
   if (object@family %in% .pc_aux_families) {
     if (!is.na(object@aux)) {
@@ -55,13 +78,16 @@ setValidity("pc", function(object) {
 #' Constructor for pair copula specifications
 #'
 #' @param family family name (case-insensitive): `"gauss"`, `"t"`,
-#'   `"gumbel"`, `"clayton"`, `"joe"`, `"frank"` or `"bb1"`.
+#'   `"gumbel"`, `"clayton"`, `"joe"`, `"frank"`, `"bb1"` or `"ast"`.
 #' @param pos rotation (0 or 180) used when Kendall's tau at the lag is
 #'   non-negative. Ignored for radially symmetric families (Gauss, t, Frank).
 #' @param neg rotation (90 or 270) used when Kendall's tau at the lag is
 #'   negative. Ignored for radially symmetric families.
 #' @param aux auxiliary parameter: degrees of freedom for `"t"`, `delta` for
 #'   `"bb1"`; `NULL` for the other families.
+#' @param base for `family = "ivt"` the base copula: `"ast"`, `"joe"`,
+#'   `"gumbel"` or `"clayton180"` (the survival Clayton copula); `NULL` for
+#'   the other families.
 #'
 #' @details Both rotations are always stored. Which one is used at a lag is
 #'   decided by the sign of Kendall's tau at the current parameter values, so
@@ -76,7 +102,8 @@ setValidity("pc", function(object) {
 #' pc("gumbel")
 #' pc("clayton", pos = 180, neg = 270)
 #' pc("t", aux = 6)
-pc <- function(family, pos = 0, neg = 90, aux = NULL) {
+#' pc("ivt", base = "ast")
+pc <- function(family, pos = 0, neg = 90, aux = NULL, base = NULL) {
   if (!is.character(family) || length(family) != 1L) stop("'family' must be a single name")
   family <- tolower(family)
   family <- switch(family, gaussian = "gauss", normal = "gauss", student = "t",
@@ -89,9 +116,14 @@ pc <- function(family, pos = 0, neg = 90, aux = NULL) {
     neg <- 0
   }
   if (is.null(aux)) aux <- NA_real_
+  if (is.null(base)) {
+    base <- NA_character_
+  } else {
+    base <- tolower(base)
+  }
   if (!is.numeric(pos) || !is.numeric(neg) || !is.numeric(aux)) stop("'pos', 'neg' and 'aux' must be numeric")
   new("pc", family = family, pos = as.numeric(pos), neg = as.numeric(neg),
-      aux = as.numeric(aux))
+      aux = as.numeric(aux), base = as.character(base))
 }
 
 # Coerce a family name or pc object to a pc object.
@@ -108,8 +140,9 @@ setClassUnion("armacopOrNULL", c("armacop", "NULL"))
 #' @param object a [pc-class] object.
 #' @export
 setMethod("show", "pc", function(object) {
-  rot <- if (object@family %in% .pc_radial) "" else
-    sprintf(" (positive: %g, negative: %g)", object@pos, object@neg)
+  rot <- if (object@family == "ivt") paste0(" with base ", object@base)
+         else if (object@family %in% .pc_radial) ""
+         else sprintf(" (positive: %g, negative: %g)", object@pos, object@neg)
   aux <- if (is.na(object@aux)) "" else sprintf(", aux = %g", object@aux)
   cat("pair copula specification: ", object@family, rot, aux, "\n", sep = "")
   invisible(object)

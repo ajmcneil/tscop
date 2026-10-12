@@ -8,6 +8,7 @@
 \description{
 Rebuilt tools for the analysis of time series using copula models, built on the udp package. Under development.
 }
+
 \author{
 \strong{Maintainer}: Alexander J. McNeil \email{alexanderjmcneil@gmail.com}
 

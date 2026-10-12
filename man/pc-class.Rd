@@ -27,11 +27,22 @@ dependence, and (for two-parameter families) the auxiliary parameter.
 
 \describe{
 \item{\code{family}}{one of \code{"gauss"}, \code{"t"}, \code{"gumbel"}, \code{"clayton"}, \code{"joe"},
-\code{"frank"} and \code{"bb1"}.}
+\code{"frank"}, \code{"bb1"}, \code{"ast"} and \code{"ivt"}. \code{"ivt"} is the inverse-v-transformed
+pair copula of Dias, Han and McNeil (2027), \verb{c(u, v) = c*(V1(u), V2(v))}
+with linear v-transforms whose fulcrums are parameters of the d-vine model
+(\code{vt} in \link[=dvinecop-class]{dvinecop}) and a base copula with positive dependence
+given by \code{base}; \code{"ast"} is (the absolute spherical t copula of Dias,
+Han and McNeil, from the udp package: one parameter, positive dependence
+and upper tail dependence, like Gumbel and Joe; calibrated to Kendall's
+tau through its degrees-of-freedom parameter; roughly ten times slower to
+evaluate than the \code{rvinecopulib} families).}
 
 \item{\code{pos}}{rotation (0 or 180) used when Kendall's tau is non-negative.}
 
 \item{\code{neg}}{rotation (90 or 270) used when Kendall's tau is negative.}
+
+\item{\code{base}}{for \code{"ivt"}: the base copula, one of \code{"ast"}, \code{"joe"}, \code{"gumbel"}
+and \code{"clayton180"} (survival Clayton); \code{NA} otherwise.}
 
 \item{\code{aux}}{auxiliary parameter: degrees of freedom for \code{"t"} (at least 2)
 or \code{delta} for \code{"bb1"} (at least 1); \code{NA} for other families, and \code{NA}

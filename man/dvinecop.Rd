@@ -5,15 +5,18 @@
 \title{Constructor for stationary d-vine copula processes}
 \usage{
 dvinecop(
-  arma = NULL,
+  kpacf = NULL,
   pairs = list(),
   tail = "gauss",
   tautol = 1e-04,
-  maxlag = Inf
+  maxlag = Inf,
+  vt = NULL,
+  vtpar = "both"
 )
 }
 \arguments{
-\item{arma}{an \link[=armacop-class]{armacop} object. In tied mode its Kendall partial
+\item{kpacf}{a Gaussian copula process (\link[=armacop-class]{armacop} or
+\code{arfactcop}). In tied mode its Kendall partial
 autocorrelations calibrate every pair copula; it may be a model structure
 (\code{armacop(order = ...)}) if the model is only to be passed to a fitting
 function. In free mode it is optional and supplies a Gaussian tail.}
@@ -32,6 +35,15 @@ rejected. Free mode has a Gaussian tail.}
 effective lag.}
 
 \item{maxlag}{cap on the effective lag (\code{Inf} for none).}
+
+\item{vt}{the fulcrums of the linear v-transforms of the \code{"ivt"} pair
+copulas, two numbers in (0, 1) (default \code{c(0.5, 0.5)} when the model has an
+\code{"ivt"} pair copula; an error otherwise). They are starting values when
+the model is fitted, unless \code{vtpar = "none"}.}
+
+\item{vtpar}{\code{"both"} (default): both fulcrums are estimated; \code{"common"}:
+one fulcrum for both (the vt-D-vine of Bladt and McNeil, with \code{vt} equal in
+its two components); \code{"none"}: the fulcrums are fixed at \code{vt}.}
 }
 \value{
 An object of class \link[=dvinecop-class]{dvinecop}.
