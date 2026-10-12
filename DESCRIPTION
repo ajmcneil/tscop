@@ -68,4 +68,5 @@ Collate:
     'emarg.R'
     'automarg.R'
     'tsmod.R'
+    'tsmod-predict.R'
     'tscop-package.R'

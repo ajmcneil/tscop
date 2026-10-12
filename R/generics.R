@@ -119,6 +119,17 @@ NULL
 #'   stochastic inverse of the v-transform. Horizons `h > 1` are available for
 #'   an `arfactcop` base only; a d-vine base has `h = 1`. `type` is `"df"`,
 #'   `"qf"` or `"dens"`.
+#'   \item [tsmod-class]: the predictive distribution of \eqn{x_{t+h}} on the
+#'   original scale given the data \eqn{x_1, \ldots, x_t}. The copula process
+#'   gives the predictive distribution of \eqn{u_{t+h}} given the past
+#'   probability integral transforms \eqn{F(x_s)}, and the margin maps it to
+#'   the original scale: the distribution function is
+#'   \eqn{C_{t+h|t}(F(x))}, the quantile function
+#'   \eqn{F^{-1}(C^{-1}_{t+h|t}(p))} and the density
+#'   \eqn{f(x) c_{t+h|t}(F(x))}. Here `data` are observations on the original
+#'   scale and `x` are values of \eqn{x_{t+h}} (probabilities in (0, 1) for
+#'   `"qf"`); `type` is `"df"`, `"qf"` or `"dens"`. See [tsrisk()] for the
+#'   predictive value-at-risk and expected shortfall.
 #' }
 #'
 #' @param object a model with known coefficients or a fitted model object.
