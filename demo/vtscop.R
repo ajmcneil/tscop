@@ -48,3 +48,4 @@ legend("top", c("h = 1", "h = 5"), lty = 1:2, bty = "n")
 predict(fit, u, type = "qf", x = c(0.05, 0.5, 0.95))
 
 cat("\nEnd of demo.\n")
+
