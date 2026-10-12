@@ -3,17 +3,7 @@
 \docType{class}
 \name{sdvinecop-class}
 \alias{sdvinecop-class}
-\alias{coef,sdvinecop-method}
-\alias{show,sdvinecop-method}
 \title{Stationary d-vine copula processes}
-\usage{
-\S4method{coef}{sdvinecop}(object)
-
-\S4method{show}{sdvinecop}(object)
-}
-\arguments{
-\item{object}{a \link[=sdvinecop-class]{sdvinecop} object.}
-}
 \description{
 Stationary d-vine copula process of finite order \eqn{K}, built from a
 sequence of pair copulas \eqn{C_1, \ldots, C_K} (independence beyond lag
@@ -44,15 +34,6 @@ at \code{maxlag}, and at least the number of explicit pair copulas; for a pure
 AR tail it is the AR order. The fitted and simulated process is therefore
 always a finite-order Markov chain.
 }
-\section{Functions}{
-\itemize{
-\item \code{coef(sdvinecop)}: Coefficients: the ARMA coefficients followed by
-the auxiliary parameters (\verb{nu<lag>} for t copulas, \verb{delta<lag>} for BB1
-copulas) of the explicit specifications (tied mode).
-
-\item \code{show(sdvinecop)}: Show method.
-
-}}
 \section{Slots}{
 
 \describe{

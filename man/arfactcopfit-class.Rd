@@ -3,41 +3,10 @@
 \docType{class}
 \name{arfactcopfit-class}
 \alias{arfactcopfit-class}
-\alias{coef,arfactcopfit-method}
-\alias{logLik,arfactcopfit-method}
-\alias{vcov,arfactcopfit-method}
-\alias{show,arfactcopfit-method}
 \title{Fitted AR-factor copula processes}
-\usage{
-\S4method{coef}{arfactcopfit}(object)
-
-\S4method{logLik}{arfactcopfit}(object)
-
-\S4method{vcov}{arfactcopfit}(object, ...)
-
-\S4method{show}{arfactcopfit}(object)
-}
-\arguments{
-\item{object}{an object of class \link[=arfactcopfit-class]{arfactcopfit}.}
-
-\item{...}{not used.}
-}
 \description{
 Class of objects returned by \code{\link[=tsfit]{tsfit()}} for \link[=arfactcop-class]{arfactcop} models.
 }
-\section{Functions}{
-\itemize{
-\item \code{coef(arfactcopfit)}: Coefficient estimates.
-
-\item \code{logLik(arfactcopfit)}: Log-likelihood, with \code{df} and \code{nobs}
-attributes so that \code{\link[stats:AIC]{stats::AIC()}} and \code{\link[stats:BIC]{stats::BIC()}} work.
-
-\item \code{vcov(arfactcopfit)}: Covariance matrix of the estimates (\code{NA}
-unless standard errors were requested).
-
-\item \code{show(arfactcopfit)}: Show method.
-
-}}
 \section{Slots}{
 
 \describe{

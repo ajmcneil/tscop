@@ -136,13 +136,11 @@ afc_coef <- function(object) {
   out
 }
 
-#' @describeIn arfactcop-class Coefficients: the rates `lambda1, ...` then the
-#'   weights `w1, ...` (the first `m - 1` weights without noise).
-#' @param object an object of class [arfactcop-class].
+#' @rdname tscop-methods
 #' @export
 setMethod("coef", "arfactcop", function(object) afc_coef(object))
 
-#' @describeIn arfactcop-class Show method.
+#' @rdname tscop-methods
 #' @export
 setMethod("show", "arfactcop", function(object) {
   cat("object class: arfactcop\n")

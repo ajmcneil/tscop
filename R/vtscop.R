@@ -165,9 +165,7 @@ vt_loglik <- function(object, u) {
   vt_base_loglik(object@base, v)
 }
 
-#' @describeIn vtscop-class Coefficients: those of the base process, then the
-#'   free parameters of the v-transform (`delta`, `kappa`, `xi`).
-#' @param object an object of class [vtscop-class].
+#' @rdname tscop-methods
 #' @export
 setMethod("coef", "vtscop", function(object) {
   p <- vt_params(object@vt)
@@ -175,7 +173,7 @@ setMethod("coef", "vtscop", function(object) {
   c(coef(object@base), p[free])
 })
 
-#' @describeIn vtscop-class Show method.
+#' @rdname tscop-methods
 #' @export
 setMethod("show", "vtscop", function(object) {
   cat("object class: vtscop\n")

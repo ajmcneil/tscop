@@ -403,25 +403,21 @@ setMethod("tsfit", signature(U = "ANY", object = "sdvinecop"),
 
 # ---- methods for fitted objects -------------------------------------------
 
-#' @describeIn sdvinecopfit-class Coefficient estimates.
-#' @param object an object of class [sdvinecopfit-class].
-#' @param ... not used.
+#' @rdname tscop-methods
 #' @export
 setMethod("coef", "sdvinecopfit", function(object) object@estimate)
 
-#' @describeIn sdvinecopfit-class Log-likelihood, with `df` and `nobs`
-#'   attributes so that [stats::AIC()] and [stats::BIC()] work.
+#' @rdname tscop-methods
 #' @export
 setMethod("logLik", "sdvinecopfit", function(object) {
   structure(object@loglik, df = object@npar, nobs = object@nobs, class = "logLik")
 })
 
-#' @describeIn sdvinecopfit-class Covariance matrix of the estimates (`NA`
-#'   unless standard errors were requested).
+#' @rdname tscop-methods
 #' @export
 setMethod("vcov", "sdvinecopfit", function(object, ...) object@vcov)
 
-#' @describeIn sdvinecopfit-class Show method.
+#' @rdname tscop-methods
 #' @export
 setMethod("show", "sdvinecopfit", function(object) {
   cat("object class: sdvinecopfit\n")

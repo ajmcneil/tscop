@@ -144,8 +144,7 @@ as_pc <- function(x) {
 setClassUnion("pcOrNULL", c("pc", "NULL"))
 setClassUnion("armacopOrNULL", c("armacop", "NULL"))
 
-#' @describeIn pc-class Show method.
-#' @param object a [pc-class] object.
+#' @rdname tscop-methods
 #' @export
 setMethod("show", "pc", function(object) {
   rot <- if (object@family == "ivt") paste0(" with base ", object@base)

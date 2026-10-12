@@ -3,17 +3,7 @@
 \docType{class}
 \name{arfactcop-class}
 \alias{arfactcop-class}
-\alias{coef,arfactcop-method}
-\alias{show,arfactcop-method}
 \title{AR-factor copula processes}
-\usage{
-\S4method{coef}{arfactcop}(object)
-
-\S4method{show}{arfactcop}(object)
-}
-\arguments{
-\item{object}{an object of class \link[=arfactcop-class]{arfactcop}.}
-}
 \description{
 The Gaussian copula of a sum of independent AR(1) "factors" plus white noise.
 The normal scores \eqn{x_t = \Phi^{-1}(u_t)} are
@@ -37,14 +27,6 @@ is the remainder); with \code{noise = FALSE} the weights sum to one and there
 are \verb{2m - 1} free parameters (the coefficient vector then contains the
 first \code{m - 1} weights).
 }
-\section{Functions}{
-\itemize{
-\item \code{coef(arfactcop)}: Coefficients: the rates \verb{lambda1, ...} then the
-weights \verb{w1, ...} (the first \code{m - 1} weights without noise).
-
-\item \code{show(arfactcop)}: Show method.
-
-}}
 \section{Slots}{
 
 \describe{

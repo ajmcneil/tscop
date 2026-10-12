@@ -3,41 +3,10 @@
 \docType{class}
 \name{vtscopfit-class}
 \alias{vtscopfit-class}
-\alias{coef,vtscopfit-method}
-\alias{logLik,vtscopfit-method}
-\alias{vcov,vtscopfit-method}
-\alias{show,vtscopfit-method}
 \title{Fitted process-level v-transform copula processes}
-\usage{
-\S4method{coef}{vtscopfit}(object)
-
-\S4method{logLik}{vtscopfit}(object)
-
-\S4method{vcov}{vtscopfit}(object, ...)
-
-\S4method{show}{vtscopfit}(object)
-}
-\arguments{
-\item{object}{an object of class \link[=vtscopfit-class]{vtscopfit}.}
-
-\item{...}{not used.}
-}
 \description{
 Class of objects returned by \code{\link[=tsfit]{tsfit()}} for \link[=vtscop-class]{vtscop} models.
 }
-\section{Functions}{
-\itemize{
-\item \code{coef(vtscopfit)}: Coefficient estimates.
-
-\item \code{logLik(vtscopfit)}: Log-likelihood, with \code{df} and \code{nobs} attributes
-so that \code{\link[stats:AIC]{stats::AIC()}} and \code{\link[stats:BIC]{stats::BIC()}} work.
-
-\item \code{vcov(vtscopfit)}: Covariance matrix of the estimates (\code{NA} unless
-standard errors were requested).
-
-\item \code{show(vtscopfit)}: Show method.
-
-}}
 \section{Slots}{
 
 \describe{

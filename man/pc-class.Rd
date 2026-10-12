@@ -3,14 +3,7 @@
 \docType{class}
 \name{pc-class}
 \alias{pc-class}
-\alias{show,pc-method}
 \title{Pair copula specifications}
-\usage{
-\S4method{show}{pc}(object)
-}
-\arguments{
-\item{object}{a \link[=pc-class]{pc} object.}
-}
 \description{
 Specification of the pair copula used at a lag of a tied \link[=sdvinecop-class]{sdvinecop}
 model. The copula is calibrated at each lag to the Kendall's tau value of
@@ -18,11 +11,6 @@ the model's Kendall partial autocorrelation function, so the specification
 needs only the family, the rotations to use under positive and negative
 dependence, and (for two-parameter families) the auxiliary parameter.
 }
-\section{Functions}{
-\itemize{
-\item \code{show(pc)}: Show method.
-
-}}
 \section{Slots}{
 
 \describe{

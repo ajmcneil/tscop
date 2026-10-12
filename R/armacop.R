@@ -193,16 +193,14 @@ arma_coef_expanded <- function(object) {
   arma_expand(p$ar, p$ma, p$sar, p$sma, object@period)
 }
 
-#' @describeIn armacop-class Coefficients, in the order `ar`, `ma`, `sar`,
-#'   `sma`; `NA` for a structure that has not been fitted.
-#' @param object an object of class [armacop-class].
+#' @rdname tscop-methods
 #' @export
 setMethod("coef", "armacop", function(object) {
   out <- unlist(unname(object@pars))
   if (is.null(out)) numeric(0) else out
 })
 
-#' @describeIn armacop-class Show method.
+#' @rdname tscop-methods
 #' @export
 setMethod("show", "armacop", function(object) {
   cat("object class: armacop\n")

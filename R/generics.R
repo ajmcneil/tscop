@@ -122,3 +122,38 @@ NULL
 #'   `x`.
 #' @name predict-tscop
 NULL
+
+#' Common methods for time series copula models
+#'
+#' Methods for extracting coefficients, the covariance matrix and the
+#' log-likelihood of time series copula models and fitted model objects, and
+#' for printing them. They apply to [armacop-class], [arfactcop-class],
+#' [sdvinecop-class], [vtscop-class], [pc-class] and the corresponding fitted
+#' classes (`armacopfit`, `arfactcopfit`, `sdvinecopfit`, `vtscopfit`; see
+#' [tsfit()]).
+#'
+#' * `coef()` of a model returns its coefficients: for [armacop-class] the
+#'   order `ar`, `ma`, `sar`, `sma` (`NA` for a structure that has not been
+#'   fitted); for [arfactcop-class] the rates `lambda1, ...` then the weights
+#'   `w1, ...` (the first `m - 1` weights without noise); for
+#'   [sdvinecop-class] the coefficients of the kpacf model followed by the
+#'   auxiliary parameters of the explicit pair copulas (`nu<lag>` for t
+#'   copulas, the second BB1 parameter `delta<lag>` for BB1 copulas) and, with
+#'   inverse-v-transformed pair copulas, `delta`, or `delta1` and `delta2`;
+#'   for [vtscop-class] those of the base process followed by the free
+#'   parameters of the v-transform (`delta`, `kappa`, `xi`). `coef()` of a
+#'   fitted object returns the estimates.
+#' * `vcov()` of a fitted object returns the covariance matrix of the
+#'   estimates (`NA` unless standard errors were requested in `tsfit()`).
+#' * `logLik()` of a fitted object returns the maximised log-likelihood with
+#'   `df` and `nobs` attributes, so that [stats::AIC()] and [stats::BIC()]
+#'   work.
+#' * `show()` prints a summary of the model or of the fit.
+#'
+#' @param object a model or fitted model object.
+#' @param ... not used.
+#'
+#' @return `coef()`: a named numeric vector; `vcov()`: a matrix; `logLik()`: an
+#'   object of class `"logLik"`; `show()`: the object, invisibly.
+#' @name tscop-methods
+NULL

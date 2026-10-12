@@ -274,10 +274,7 @@ dv_model_loglik <- function(object, u) {
   dv_loglik(u, pairs)
 }
 
-#' @describeIn sdvinecop-class Coefficients: the ARMA coefficients followed by
-#'   the auxiliary parameters (`nu<lag>` for t copulas, `delta<lag>` for BB1
-#'   copulas) of the explicit specifications (tied mode).
-#' @param object a [sdvinecop-class] object.
+#' @rdname tscop-methods
 #' @export
 setMethod("coef", "sdvinecop", function(object) {
   out <- if (is.null(object@kpacf)) numeric(0) else coef(object@kpacf)
@@ -318,7 +315,7 @@ dv_explicit_labels <- function(object) {
   }, character(1))
 }
 
-#' @describeIn sdvinecop-class Show method.
+#' @rdname tscop-methods
 #' @export
 setMethod("show", "sdvinecop", function(object) {
   cat("object class: sdvinecop (", object@mode, " mode)\n", sep = "")

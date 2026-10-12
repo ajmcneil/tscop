@@ -3,41 +3,10 @@
 \docType{class}
 \name{sdvinecopfit-class}
 \alias{sdvinecopfit-class}
-\alias{coef,sdvinecopfit-method}
-\alias{logLik,sdvinecopfit-method}
-\alias{vcov,sdvinecopfit-method}
-\alias{show,sdvinecopfit-method}
 \title{Fitted d-vine copula processes}
-\usage{
-\S4method{coef}{sdvinecopfit}(object)
-
-\S4method{logLik}{sdvinecopfit}(object)
-
-\S4method{vcov}{sdvinecopfit}(object, ...)
-
-\S4method{show}{sdvinecopfit}(object)
-}
-\arguments{
-\item{object}{an object of class \link[=sdvinecopfit-class]{sdvinecopfit}.}
-
-\item{...}{not used.}
-}
 \description{
 Class of objects returned by \code{\link[=tsfit]{tsfit()}} for \link[=sdvinecop-class]{sdvinecop} models.
 }
-\section{Functions}{
-\itemize{
-\item \code{coef(sdvinecopfit)}: Coefficient estimates.
-
-\item \code{logLik(sdvinecopfit)}: Log-likelihood, with \code{df} and \code{nobs}
-attributes so that \code{\link[stats:AIC]{stats::AIC()}} and \code{\link[stats:BIC]{stats::BIC()}} work.
-
-\item \code{vcov(sdvinecopfit)}: Covariance matrix of the estimates (\code{NA}
-unless standard errors were requested).
-
-\item \code{show(sdvinecopfit)}: Show method.
-
-}}
 \section{Slots}{
 
 \describe{

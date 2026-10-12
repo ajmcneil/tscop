@@ -3,17 +3,7 @@
 \docType{class}
 \name{vtscop-class}
 \alias{vtscop-class}
-\alias{coef,vtscop-method}
-\alias{show,vtscop-method}
 \title{Process-level v-transform copula processes}
-\usage{
-\S4method{coef}{vtscop}(object)
-
-\S4method{show}{vtscop}(object)
-}
-\arguments{
-\item{object}{an object of class \link[=vtscop-class]{vtscop}.}
-}
 \description{
 A copula process obtained from a base copula process \eqn{(V_t)} by
 stochastic inversion of a v-transform \eqn{\mathcal V}: \eqn{U_t =
@@ -39,14 +29,6 @@ The v-transform is any of the families of the udp package: \code{vsymmetric()}
 Its fulcrum \code{delta} appears in the coefficients under that name (\code{delta1}
 and \code{delta2} in the pairwise inverse-v-transformed models).
 }
-\section{Functions}{
-\itemize{
-\item \code{coef(vtscop)}: Coefficients: those of the base process, then the
-free parameters of the v-transform (\code{delta}, \code{kappa}, \code{xi}).
-
-\item \code{show(vtscop)}: Show method.
-
-}}
 \section{Slots}{
 
 \describe{

@@ -3,17 +3,7 @@
 \docType{class}
 \name{armacop-class}
 \alias{armacop-class}
-\alias{coef,armacop-method}
-\alias{show,armacop-method}
 \title{ARMA copula processes}
-\usage{
-\S4method{coef}{armacop}(object)
-
-\S4method{show}{armacop}(object)
-}
-\arguments{
-\item{object}{an object of class \link[=armacop-class]{armacop}.}
-}
 \description{
 The Gaussian copula of a stationary, invertible (seasonal) ARMA process with
 mean zero and variance one. If \eqn{u_t} are the copula data, the normal
@@ -33,14 +23,6 @@ An object is either a \emph{known model} (all coefficients given) or a
 \emph{structure to be fitted}, which records the orders and holds \code{NA}
 coefficients.
 }
-\section{Functions}{
-\itemize{
-\item \code{coef(armacop)}: Coefficients, in the order \code{ar}, \code{ma}, \code{sar},
-\code{sma}; \code{NA} for a structure that has not been fitted.
-
-\item \code{show(armacop)}: Show method.
-
-}}
 \section{Slots}{
 
 \describe{

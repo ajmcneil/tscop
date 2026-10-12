@@ -212,25 +212,21 @@ setMethod("tsfit", signature(U = "ANY", object = "arfactcop"),
 
 # ---- methods for fitted objects ---------------------------------------------
 
-#' @describeIn arfactcopfit-class Coefficient estimates.
-#' @param object an object of class [arfactcopfit-class].
-#' @param ... not used.
+#' @rdname tscop-methods
 #' @export
 setMethod("coef", "arfactcopfit", function(object) object@estimate)
 
-#' @describeIn arfactcopfit-class Log-likelihood, with `df` and `nobs`
-#'   attributes so that [stats::AIC()] and [stats::BIC()] work.
+#' @rdname tscop-methods
 #' @export
 setMethod("logLik", "arfactcopfit", function(object) {
   structure(object@loglik, df = object@npar, nobs = object@nobs, class = "logLik")
 })
 
-#' @describeIn arfactcopfit-class Covariance matrix of the estimates (`NA`
-#'   unless standard errors were requested).
+#' @rdname tscop-methods
 #' @export
 setMethod("vcov", "arfactcopfit", function(object, ...) object@vcov)
 
-#' @describeIn arfactcopfit-class Show method.
+#' @rdname tscop-methods
 #' @export
 setMethod("show", "arfactcopfit", function(object) {
   cat("object class: arfactcopfit\n")

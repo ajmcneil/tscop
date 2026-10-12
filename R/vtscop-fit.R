@@ -281,25 +281,21 @@ setMethod("tsfit", signature(U = "ANY", object = "vtscop"),
 
 # ---- methods for fitted objects -----------------------------------------------
 
-#' @describeIn vtscopfit-class Coefficient estimates.
-#' @param object an object of class [vtscopfit-class].
-#' @param ... not used.
+#' @rdname tscop-methods
 #' @export
 setMethod("coef", "vtscopfit", function(object) object@estimate)
 
-#' @describeIn vtscopfit-class Log-likelihood, with `df` and `nobs` attributes
-#'   so that [stats::AIC()] and [stats::BIC()] work.
+#' @rdname tscop-methods
 #' @export
 setMethod("logLik", "vtscopfit", function(object) {
   structure(object@loglik, df = object@npar, nobs = object@nobs, class = "logLik")
 })
 
-#' @describeIn vtscopfit-class Covariance matrix of the estimates (`NA` unless
-#'   standard errors were requested).
+#' @rdname tscop-methods
 #' @export
 setMethod("vcov", "vtscopfit", function(object, ...) object@vcov)
 
-#' @describeIn vtscopfit-class Show method.
+#' @rdname tscop-methods
 #' @export
 setMethod("show", "vtscopfit", function(object) {
   m <- object@model
