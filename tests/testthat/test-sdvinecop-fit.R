@@ -249,3 +249,16 @@ test_that("residuals agree with the legacy sdvinecopula residuals", {
   expect_equal(resid(mine, u, scale = "normal"), rl, tolerance = 1e-8)
   expect_equal(resid(mine, u), pnorm(rl), tolerance = 1e-8)
 })
+
+test_that("the staged fit and the direct fit reach the same optimum", {
+  skip_on_cran()
+  set.seed(31)
+  truth <- sdvinecop(arfactcop(lambda = 0.97, w = 0.5), pairs = list(pc("gumbel")), tautol = 1e-5)
+  u <- tssim(truth, 800)
+  spec <- sdvinecop(arfactcop(order = 1), pairs = list(pc("gumbel")), tautol = 1e-5)
+  fs <- tsfit(u, spec, pseudo = FALSE)                               # staged (K well above 20)
+  fd <- tsfit(u, spec, pseudo = FALSE, control = list(stageK = 0))   # direct
+  expect_gt(fs@model@K, 20L)
+  expect_equal(fs@loglik, fd@loglik, tolerance = 1e-4)
+  expect_equal(unname(coef(fs)), unname(coef(fd)), tolerance = 1e-2)
+})

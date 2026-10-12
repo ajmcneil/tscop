@@ -137,6 +137,12 @@ is refitted with the larger \code{K} (at most three times; \code{K} never decrea
 within a fit). The fitted object records the starting \code{K}, the number of
 refits and the final log-likelihood change.
 
+When the starting \code{K} exceeds 20 the optimisation is staged: a first fit
+uses only the first ten pair copulas (loose tolerance) and supplies the
+starting values of the fit at the full lag, which reduces the number of
+expensive evaluations. \code{control = list(stageK = 0)} switches this off, and
+\code{stageK} sets the number of pair copulas of the first stage.
+
 Free-mode models cannot be fitted. The data must be complete.
 \code{se = "bootstrap"} is recommended: the Hessian standard errors are
 unreliable where a rotated copula switches rotation (Kendall's tau near

@@ -82,8 +82,8 @@ dv_is_ivt <- function(pair) identical(pair$family, "ivt")
 # Linear v-transform with fulcrum d and the signed scale factor a(x) (d for
 # x <= d, d - 1 otherwise) of the IVT formulas (supplement to Dias, Han and
 # McNeil, Proposition S3).
-dv_vlin <- function(x, d) ifelse(x <= d, (d - x) / d, (x - d) / (1 - d))
-dv_alin <- function(x, d) ifelse(x <= d, d, d - 1)
+dv_vlin <- function(x, d) abs(x - d) / (d + (1 - 2 * d) * (x > d))
+dv_alin <- function(x, d) d - (x > d)
 
 # Rotations (rvinecopulib convention, applied to the pair (earlier, later)) of
 # a copula given by closures: d(a, b) the density, h(a, b, cond_var) the
@@ -282,7 +282,27 @@ dv_loglik <- function(u, pairs) {
         A <- Anew
         B <- Bnew
       }
-    } else if (dv_is_ast(pr) || dv_is_ivt(pr)) {
+    } else if (dv_is_ivt(pr)) {
+      # the v-transformed arguments and scale factors are computed once per
+      # level and shared by the density and the two h-functions
+      if (zscale) {
+        A <- stats::pnorm(A)
+        B <- stats::pnorm(B)
+        zscale <- FALSE
+      }
+      d1 <- pr$delta[1L]
+      d2 <- pr$delta[2L]
+      x <- dv_vlin(A, d1)
+      y <- dv_vlin(B, d2)
+      ll <- ll + sum(log(dv_dens(pr$base, x, y)))
+      if (j < K) {
+        m <- length(A)
+        Anew <- dv_clamp(d1 - dv_alin(A[-m], d1) * dv_h(pr$base, x[-m], y[-m], 2L))
+        Bnew <- dv_clamp(d2 - dv_alin(B[-1L], d2) * dv_h(pr$base, x[-1L], y[-1L], 1L))
+        A <- Anew
+        B <- Bnew
+      }
+    } else if (dv_is_ast(pr)) {
       if (zscale) {
         A <- stats::pnorm(A)
         B <- stats::pnorm(B)

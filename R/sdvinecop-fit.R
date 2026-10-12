@@ -253,6 +253,8 @@ dv_build_model <- function(object, z, lay, K, limit) {
 # Full fitting procedure on complete data u: starting values, the K rule and
 # the optimisation. Returns the pieces needed to build a sdvinecopfit.
 dv_fit_all <- function(u, object, init, control) {
+  stageK <- control$stageK
+  control$stageK <- NULL
   st <- dv_start(object, init, u, control)
   lay <- st$lay
   z0 <- st$z0
@@ -263,10 +265,10 @@ dv_fit_all <- function(u, object, init, control) {
     stop("the starting values are infeasible for these data (a BB1 copula needs |tau| >= 1 - 1/delta at its lag)")
   }
   ctrl <- modifyList(list(maxit = 500, reltol = 1e-10), control)
-  fit_fixed <- function(K, z) {
+  fit_fixed <- function(K, z, reltol = ctrl$reltol) {
     npar <- length(z)
     if (npar == 0L) return(list(z = z, value = dv_negll(z, lay, K, u), convergence = 0L, message = ""))
-    c1 <- modifyList(ctrl, list(ndeps = rep(1e-6, npar)))
+    c1 <- modifyList(ctrl, list(ndeps = rep(1e-6, npar), reltol = reltol))
     opt <- stats::optim(z, dv_negll, lay = lay, K = K, u = u, method = "BFGS", control = c1)
     if (opt$convergence != 0L || opt$value >= 1e10) {
       alt <- stats::optim(opt$par, dv_negll, lay = lay, K = K, u = u, method = "Nelder-Mead",
@@ -278,7 +280,15 @@ dv_fit_all <- function(u, object, init, control) {
   }
   K_of <- function(z) dv_K_at(z, lay, tautol, maxlag)$K
   ll_of <- function(z, K) -dv_negll(z, lay, K, u)
-  res <- dv_k_rule(fit_fixed, K_of, ll_of, K_start, z0)
+  # Staged fit: a long effective lag makes every evaluation expensive, so the
+  # first optimisation uses the first K1 pair copulas only (loose tolerance);
+  # its result is the starting point of the fit at the full lag.
+  K1 <- if (is.null(stageK)) 10L else as.integer(stageK)
+  if (K1 >= 1L && K_start > 2L * K1 && length(z0) > 0L) {
+    st1 <- fit_fixed(K1, z0, reltol = 1e-7)
+    if (st1$convergence == 0L && st1$value < 1e10 && dv_negll(st1$z, lay, K_start, u) < 1e10) z0 <- st1$z
+  }
+  res <- dv_k_rule(fit_fixed, K_of, ll_of, K_of(z0), z0)
   limit <- dv_K_at(res$z, lay, tautol, maxlag)$limit
   if (res$K != K_of(res$z)) limit <- "tol"
   c(res, list(lay = lay, st = st, limit = limit, loglik = ll_of(res$z, res$K), u = u))
@@ -303,6 +313,12 @@ dv_fit_all <- function(u, object, init, control) {
 #'   is refitted with the larger `K` (at most three times; `K` never decreases
 #'   within a fit). The fitted object records the starting `K`, the number of
 #'   refits and the final log-likelihood change.
+#'
+#'   When the starting `K` exceeds 20 the optimisation is staged: a first fit
+#'   uses only the first ten pair copulas (loose tolerance) and supplies the
+#'   starting values of the fit at the full lag, which reduces the number of
+#'   expensive evaluations. `control = list(stageK = 0)` switches this off, and
+#'   `stageK` sets the number of pair copulas of the first stage.
 #'
 #'   Free-mode models cannot be fitted. The data must be complete.
 #'   `se = "bootstrap"` is recommended: the Hessian standard errors are
