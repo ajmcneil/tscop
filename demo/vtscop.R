@@ -3,7 +3,8 @@
 # process for U_t by the stochastic inverse of a v-transform. The likelihood is
 # the base likelihood at V(u_t), for ANY v-transform, so the nonlinear
 # families of the udp package (v2p, v3p, v3b, ...) are fitted in seconds.
-# Takes about half a minute. Run with demo("vtscop", package = "tscop") or
+
+# Takes a few seconds. Run with demo("vtscop", package = "tscop") or
 #   devtools::load_all(); source("demo/vtscop.R", echo = TRUE)
 
 if (!("package:tscop" %in% search())) library(tscop)
