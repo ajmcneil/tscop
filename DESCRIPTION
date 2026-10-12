@@ -9,8 +9,13 @@ Authors@R: c(
       role = c("aut", "cre")
     )
   )
-Description: Rebuilt tools for the analysis of time series using copula
-    models, built on the udp package. Under development.
+Description: Tools for the analysis of time series using copula models, built
+    on the udp package: Gaussian ARMA and AR-factor copula processes, stationary
+    d-vine copula processes whose Kendall partial autocorrelations follow an
+    ARMA-type model (Bladt, Dias, Han and McNeil (2026)
+    <doi:10.1002/cjs.70033>), and v-transform models for stochastic volatility,
+    with inverse-v-transformed pair copulas (Dias, Han and McNeil (2027)
+    <doi:10.1016/j.jmva.2026.105695>). Under development.
 License: GPL-3
 Depends:
     R (>= 3.5.0)

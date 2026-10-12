@@ -30,7 +30,11 @@
 #' @slot vtfix names of v-transform parameters (`"delta"`, `"kappa"`,
 #'   `"xi"`) held fixed in fitting.
 #'
-#' @references McNeil, A. J. (2021). Modelling volatile time series with
+#' @references Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas,
+#'   v-transforms and D-vines for stochastic volatility. *Journal of
+#'   Multivariate Analysis*, 217, 105695. \doi{10.1016/j.jmva.2026.105695}
+#'
+#'   McNeil, A. J. (2021). Modelling volatile time series with
 #'   v-transforms and copulas. *Risks*, 9(1), 14.
 #'
 #'   Bladt, M. and McNeil, A. J. (2021). Time series copula models using
@@ -96,6 +100,9 @@ setValidity("vtscop", function(object) {
 #'   model is fitted.
 #'
 #' @return An object of class [vtscop-class].
+#' @references Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas,
+#'   v-transforms and D-vines for stochastic volatility. *Journal of
+#'   Multivariate Analysis*, 217, 105695. \doi{10.1016/j.jmva.2026.105695}
 #' @export
 #'
 #' @examples

@@ -57,3 +57,9 @@ seasonal AR and seasonal MA coefficients.}
 been fitted.}
 }}
 
+\references{
+Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+parametric distributional forecasting of univariate time series using
+non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics},
+54(1), e70033. \doi{10.1002/cjs.70033}
+}

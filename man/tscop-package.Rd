@@ -6,9 +6,19 @@
 \alias{tscop-package}
 \title{tscop: Time Series Copula Models}
 \description{
-Rebuilt tools for the analysis of time series using copula models, built on the udp package. Under development.
+Tools for the analysis of time series using copula models, built on the udp package: Gaussian ARMA and AR-factor copula processes, stationary d-vine copula processes whose Kendall partial autocorrelations follow an ARMA-type model (Bladt, Dias, Han and McNeil (2026) \doi{10.1002/cjs.70033}), and v-transform models for stochastic volatility, with inverse-v-transformed pair copulas (Dias, Han and McNeil (2027) \doi{10.1016/j.jmva.2026.105695}). Under development.
 }
 
+\references{
+Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+parametric distributional forecasting of univariate time series using
+non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics},
+54(1), e70033. \doi{10.1002/cjs.70033}
+
+Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+D-vines for stochastic volatility. \emph{Journal of Multivariate Analysis}, 217,
+105695. \doi{10.1016/j.jmva.2026.105695}
+}
 \author{
 \strong{Maintainer}: Alexander J. McNeil \email{alexanderjmcneil@gmail.com}
 

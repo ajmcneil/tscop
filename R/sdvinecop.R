@@ -7,7 +7,7 @@
 #' There are two modes.
 #'
 #' **Tied mode** (the only mode that can be fitted). A known Gaussian
-#' ARMA/SARMA [armacop-class] model supplies the Kendall partial
+#' ARMA/SARMA [armacop-class] model (or an [arfactcop-class] model) supplies the Kendall partial
 #' autocorrelation function (kpacf) \eqn{\tau_k = (2/\pi)\arcsin\alpha_k},
 #' with \eqn{\alpha_k} the partial autocorrelation of the ARMA process at lag
 #' \eqn{k}. The pair copula at lag \eqn{k} is a member of a family chosen for
@@ -47,6 +47,15 @@
 #'   `"maxlag"`, `"floor"` (number of explicit pair copulas), `"cap"`
 #'   (internal limit on the lags examined) or `"none"` (free mode without an
 #'   ARMA tail).
+#'
+#' @references Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+#'   parametric distributional forecasting of univariate time series using
+#'   non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*,
+#'   54(1), e70033. \doi{10.1002/cjs.70033}
+#'
+#' Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+#'   D-vines for stochastic volatility. *Journal of Multivariate Analysis*, 217,
+#'   105695. \doi{10.1016/j.jmva.2026.105695}
 #'
 #' @exportClass sdvinecop
 setClass("sdvinecop", slots = c(
@@ -106,7 +115,7 @@ setValidity("sdvinecop", function(object) {
 #' [rvinecopulib::bicop_dist()] objects).
 #'
 #' @param kpacf a Gaussian copula process ([armacop-class] or
-#'   `arfactcop`). In tied mode its Kendall partial
+#'   [arfactcop-class]). In tied mode its Kendall partial
 #'   autocorrelations calibrate every pair copula; it may be a model structure
 #'   (`armacop(order = ...)`) if the model is only to be passed to a fitting
 #'   function. In free mode it is optional and supplies a Gaussian tail.
@@ -130,6 +139,15 @@ setValidity("sdvinecop", function(object) {
 #' @param maxlag cap on the effective lag (`Inf` for none).
 #'
 #' @return An object of class [sdvinecop-class].
+#' @references Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+#'   parametric distributional forecasting of univariate time series using
+#'   non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*,
+#'   54(1), e70033. \doi{10.1002/cjs.70033}
+#'
+#' Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+#'   D-vines for stochastic volatility. *Journal of Multivariate Analysis*, 217,
+#'   105695. \doi{10.1016/j.jmva.2026.105695}
+#'
 #' @export
 #'
 #' @examples

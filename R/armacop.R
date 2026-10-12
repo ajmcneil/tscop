@@ -26,6 +26,11 @@
 #'   (each possibly of length zero); `NA` entries mark a structure that has not
 #'   been fitted.
 #'
+#' @references Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+#'   parametric distributional forecasting of univariate time series using
+#'   non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*,
+#'   54(1), e70033. \doi{10.1002/cjs.70033}
+#'
 #' @exportClass armacop
 setClass("armacop", contains = "gausscop", slots = c(
   name = "character",
@@ -98,6 +103,11 @@ setValidity("armacop", function(object) {
 #'   starting values. The ARMA(0,0) model, independence, is not allowed.
 #'
 #' @return An object of class [armacop-class].
+#' @references Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+#'   parametric distributional forecasting of univariate time series using
+#'   non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*,
+#'   54(1), e70033. \doi{10.1002/cjs.70033}
+#'
 #' @export
 #'
 #' @examples

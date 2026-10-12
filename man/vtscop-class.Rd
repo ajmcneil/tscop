@@ -62,6 +62,10 @@ the known values or the starting values.}
 }}
 
 \references{
+Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas,
+v-transforms and D-vines for stochastic volatility. \emph{Journal of
+Multivariate Analysis}, 217, 105695. \doi{10.1016/j.jmva.2026.105695}
+
 McNeil, A. J. (2021). Modelling volatile time series with
 v-transforms and copulas. \emph{Risks}, 9(1), 14.
 

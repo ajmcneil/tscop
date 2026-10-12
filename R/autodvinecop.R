@@ -162,6 +162,11 @@ dv_auto_start <- function(U, start, tautol, maxlag, pseudo, control) {
 #'
 #' @return A [sdvinecopfit-class] object for the selected model, with the
 #'   selection path in its `path` slot.
+#' @references Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+#'   parametric distributional forecasting of univariate time series using
+#'   non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*,
+#'   54(1), e70033. \doi{10.1002/cjs.70033}
+#'
 #' @export
 #'
 #' @examples

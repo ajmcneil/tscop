@@ -36,3 +36,8 @@ vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))),
 # a model structure to be fitted, with the fulcrum fixed
 vtscop(arfactcop(order = 2), udp::v2p(0.5, 1), vtfix = "delta")
 }
+\references{
+Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas,
+v-transforms and D-vines for stochastic volatility. \emph{Journal of
+Multivariate Analysis}, 217, 105695. \doi{10.1016/j.jmva.2026.105695}
+}

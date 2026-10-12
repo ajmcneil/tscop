@@ -16,7 +16,7 @@ sdvinecop(
 }
 \arguments{
 \item{kpacf}{a Gaussian copula process (\link[=armacop-class]{armacop} or
-\code{arfactcop}). In tied mode its Kendall partial
+\link[=arfactcop-class]{arfactcop}). In tied mode its Kendall partial
 autocorrelations calibrate every pair copula; it may be a model structure
 (\code{armacop(order = ...)}) if the model is only to be passed to a fitting
 function. In free mode it is optional and supplies a Gaussian tail.}
@@ -58,4 +58,14 @@ Creates a \link[=sdvinecop-class]{sdvinecop} object in tied mode (\code{pairs} a
 sdvinecop(armacop(ar = 0.7, ma = 0.3), pairs = list(pc("gumbel"), pc("clayton")))
 # AR(2) with a t copula at lag 1: a finite-order d-vine
 sdvinecop(armacop(ar = c(0.5, 0.2)), pairs = list(pc("t", aux = 6)))
+}
+\references{
+Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+parametric distributional forecasting of univariate time series using
+non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics},
+54(1), e70033. \doi{10.1002/cjs.70033}
+
+Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+D-vines for stochastic volatility. \emph{Journal of Multivariate Analysis}, 217,
+105695. \doi{10.1016/j.jmva.2026.105695}
 }

@@ -49,3 +49,9 @@ armacop(ar = 0.5, sar = 0.3, sma = 0.2, period = 12)
 armacop(order = c(1, 1))
 armacop(order = c(1, 1), seasonal = c(0, 1), period = 12)
 }
+\references{
+Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+parametric distributional forecasting of univariate time series using
+non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics},
+54(1), e70033. \doi{10.1002/cjs.70033}
+}

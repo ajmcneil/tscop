@@ -33,9 +33,9 @@ setGeneric("tssim", function(object, n, ...) standardGeneric("tssim"),
 #'
 #' Generic returning Kendall's tau of the pair copulas at lags
 #' `1, ..., lagmax` in the D-vine representation of the process. For an
-#' [armacop-class] model the pair copulas are Gaussian with parameters equal
-#' to the partial autocorrelations of the ARMA process, so
-#' \eqn{	au_k = (2/\pi)\arcsin(\alpha_k)} with \eqn{\alpha_k} the lag-`k`
+#' [armacop-class] or [arfactcop-class] model the pair copulas are Gaussian
+#' with parameters equal to the partial autocorrelations of the process, so
+#' \eqn{\tau_k = (2/\pi)\arcsin(\alpha_k)} with \eqn{\alpha_k} the lag-`k`
 #' partial autocorrelation.
 #'
 #' @param object a model object.

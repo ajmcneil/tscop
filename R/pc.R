@@ -39,6 +39,10 @@
 #'   for `"t"`/`"bb1"` if it has not been given yet (a starting value is then
 #'   chosen when the model is fitted).
 #'
+#' @references Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+#'   D-vines for stochastic volatility. *Journal of Multivariate Analysis*, 217,
+#'   105695. \doi{10.1016/j.jmva.2026.105695}
+#'
 #' @exportClass pc
 setClass("pc", slots = c(family = "character", pos = "numeric",
                          neg = "numeric", aux = "numeric", base = "character"))
@@ -96,6 +100,10 @@ setValidity("pc", function(object) {
 #'   (earlier variable, later variable).
 #'
 #' @return An object of class [pc-class].
+#' @references Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+#'   D-vines for stochastic volatility. *Journal of Multivariate Analysis*, 217,
+#'   105695. \doi{10.1016/j.jmva.2026.105695}
+#'
 #' @export
 #'
 #' @examples

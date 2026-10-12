@@ -45,9 +45,9 @@ A numeric vector of length \code{lagmax}.
 \description{
 Generic returning Kendall's tau of the pair copulas at lags
 \verb{1, ..., lagmax} in the D-vine representation of the process. For an
-\link[=armacop-class]{armacop} model the pair copulas are Gaussian with parameters equal
-to the partial autocorrelations of the ARMA process, so
-\eqn{	au_k = (2/\pi)\arcsin(\alpha_k)} with \eqn{\alpha_k} the lag-\code{k}
+\link[=armacop-class]{armacop} or \link[=arfactcop-class]{arfactcop} model the pair copulas are Gaussian
+with parameters equal to the partial autocorrelations of the process, so
+\eqn{\tau_k = (2/\pi)\arcsin(\alpha_k)} with \eqn{\alpha_k} the lag-\code{k}
 partial autocorrelation.
 }
 \section{Methods (by class)}{

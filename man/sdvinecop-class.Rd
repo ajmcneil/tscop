@@ -23,7 +23,7 @@ sequence of pair copulas \eqn{C_1, \ldots, C_K} (independence beyond lag
 There are two modes.
 
 \strong{Tied mode} (the only mode that can be fitted). A known Gaussian
-ARMA/SARMA \link[=armacop-class]{armacop} model supplies the Kendall partial
+ARMA/SARMA \link[=armacop-class]{armacop} model (or an \link[=arfactcop-class]{arfactcop} model) supplies the Kendall partial
 autocorrelation function (kpacf) \eqn{\tau_k = (2/\pi)\arcsin\alpha_k},
 with \eqn{\alpha_k} the partial autocorrelation of the ARMA process at lag
 \eqn{k}. The pair copula at lag \eqn{k} is a member of a family chosen for
@@ -86,3 +86,13 @@ coefficients are not yet specified).}
 ARMA tail).}
 }}
 
+\references{
+Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+parametric distributional forecasting of univariate time series using
+non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics},
+54(1), e70033. \doi{10.1002/cjs.70033}
+
+Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+D-vines for stochastic volatility. \emph{Journal of Multivariate Analysis}, 217,
+105695. \doi{10.1016/j.jmva.2026.105695}
+}

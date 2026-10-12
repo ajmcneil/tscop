@@ -11,6 +11,12 @@ autocorrelations can serve as the Kendall partial autocorrelation function
 standard normal margins is determined by its partial autocorrelations
 \eqn{\alpha_k}, and the kpacf is \eqn{\tau_k = (2/\pi)\arcsin\alpha_k}.
 Subclasses are \link[=armacop-class]{armacop} (ARMA and seasonal ARMA autocorrelations)
-and \code{arfactcop} (a sum of independent AR(1) factors plus white noise,
+and \link[=arfactcop-class]{arfactcop} (a sum of independent AR(1) factors plus white noise,
 with non-negative partial autocorrelations).
+}
+\references{
+Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+parametric distributional forecasting of univariate time series using
+non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics},
+54(1), e70033. \doi{10.1002/cjs.70033}
 }

@@ -31,3 +31,9 @@ arfactcop(lambda = c(0.98, 0.7), w = c(0.3, 0.4))   # noise share 0.3
 arfactcop(lambda = 0.9, w = 1, noise = FALSE)       # an AR(1)
 arfactcop(order = 2)                                # to be fitted
 }
+\references{
+Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+parametric distributional forecasting of univariate time series using
+non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics},
+54(1), e70033. \doi{10.1002/cjs.70033}
+}

@@ -27,6 +27,11 @@
 #' @slot lambda the AR(1) coefficients, decreasing (`NA` in a structure).
 #' @slot w the factor weights (`NA` in a structure).
 #'
+#' @references Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+#'   parametric distributional forecasting of univariate time series using
+#'   non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*,
+#'   54(1), e70033. \doi{10.1002/cjs.70033}
+#'
 #' @exportClass arfactcop
 setClass("arfactcop", contains = "gausscop", slots = c(
   name = "character", m = "integer", noise = "logical", lambda = "numeric", w = "numeric"
@@ -68,6 +73,11 @@ setValidity("arfactcop", function(object) {
 #'   `1 - sum(w)`? Default `TRUE`.
 #'
 #' @return An object of class [arfactcop-class].
+#' @references Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+#'   parametric distributional forecasting of univariate time series using
+#'   non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*,
+#'   54(1), e70033. \doi{10.1002/cjs.70033}
+#'
 #' @export
 #'
 #' @examples

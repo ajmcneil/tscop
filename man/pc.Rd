@@ -42,3 +42,8 @@ pc("clayton", pos = 180, neg = 270)
 pc("t", aux = 6)
 pc("ivt", base = "ast")
 }
+\references{
+Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+D-vines for stochastic volatility. \emph{Journal of Multivariate Analysis}, 217,
+105695. \doi{10.1016/j.jmva.2026.105695}
+}
