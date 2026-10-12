@@ -114,7 +114,7 @@ test_that("tsmod works with the d-vine and v-transform copula processes and chec
   expect_error(tsfit(c(x1[1:10], NA, x1[12:30]), tsmod(marg("nig"), arfactcop(order = 1))), "complete")
   expect_error(tsfit(x1[1:10], tsmod(marg("nig"), arfactcop(order = 1))), "at least 20")
   expect_error(tsfit("a", tsmod(marg("nig"), arfactcop(order = 1))), "numeric")
-  expect_error(tsfit(x1, tsmod(marg("nig"), arfactcop(order = 1)), se = "bootstrap"), "not yet available")
+  expect_error(tsfit(x1, tsmod(marg("nig"), arfactcop(order = 1)), se = "hessian"), "FALSE or")
 })
 
 test_that("ts attributes are restored in the residuals", {

@@ -31,6 +31,12 @@ fit
 rbind(true = coef(truth), estimate = coef(fit))
 c(logLik = as.numeric(logLik(fit)), AIC = AIC(fit), BIC = BIC(fit))
 
+# Standard errors by the parametric bootstrap: B series are simulated from the fitted
+# model and both stages are refitted, so the estimation of the margin enters the
+# standard errors of the copula parameters (cores > 1 runs the refits in parallel).
+fitse <- tsfit(x, tsmod("sst", arfactcop(order = 1)), se = "bootstrap", B = 40)
+round(cbind(estimate = fitse@estimate, se = fitse@se), 4)
+
 section("3. Residual diagnostics")
 r <- resid(fit)                         # copula residuals of the PITs: iid uniform if the model is right
 par(mfrow = c(1, 3))
@@ -57,6 +63,12 @@ a <- automarg(x)                        # ranks the nine families
 a@table[1:4, 1:6]
 fa <- tsfit(x, tsmod(a@best@model, arfactcop(order = 1)))   # the selected family as the margin
 c(sst = as.numeric(logLik(fit)), selected = as.numeric(logLik(fa)))
+
+# Choosing the margin automatically inside tsmod: automarg is run on the data and the
+# selection is recorded in the fitted object
+fauto <- tsfit(x, tsmod("auto", arfactcop(order = 1)))
+fauto@selection@table[1:4, 1:6]
+fauto@model@margin
 
 section("5. Semiparametric estimation: an empirical margin")
 fs <- tsfit(x, tsmod(emarg(x), arfactcop(order = 1)))

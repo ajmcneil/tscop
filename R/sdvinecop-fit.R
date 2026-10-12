@@ -284,7 +284,8 @@ dv_fit_all <- function(u, object, init, control) {
   # first optimisation uses the first K1 pair copulas only (loose tolerance);
   # its result is the starting point of the fit at the full lag.
   K1 <- if (is.null(stageK)) 10L else as.integer(stageK)
-  if (K1 >= 1L && K_start > 2L * K1 && length(z0) > 0L) {
+  user_start <- !is.null(init) || gc_is_specified(object@kpacf) # the user's values are the starting point
+  if (!user_start && K1 >= 1L && K_start > 2L * K1 && length(z0) > 0L) {
     st1 <- fit_fixed(K1, z0, reltol = 1e-7)
     if (st1$convergence == 0L && st1$value < 1e10 && dv_negll(st1$z, lay, K_start, u) < 1e10) z0 <- st1$z
   }
@@ -314,7 +315,8 @@ dv_fit_all <- function(u, object, init, control) {
 #'   within a fit). The fitted object records the starting `K`, the number of
 #'   refits and the final log-likelihood change.
 #'
-#'   When the starting `K` exceeds 20 the optimisation is staged: a first fit
+#'   When the starting `K` exceeds 20 and the starting values are not supplied
+#'   by the user (`init` or a specified `object`) the optimisation is staged: a first fit
 #'   uses only the first ten pair copulas (loose tolerance) and supplies the
 #'   starting values of the fit at the full lag, which reduces the number of
 #'   expensive evaluations. `control = list(stageK = 0)` switches this off, and

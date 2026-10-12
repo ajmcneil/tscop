@@ -37,6 +37,9 @@ log-likelihood only.}
 
 \item{\code{method}}{estimation method (\code{"twostage"}).}
 
+\item{\code{selection}}{the \link[=automarg-class]{automarg} object if the margin was chosen
+automatically, otherwise \code{NULL}.}
+
 \item{\code{template}}{the original input if it was a \code{ts}, \code{zoo} or \code{xts} object,
 otherwise \code{NULL}.}
 }}

@@ -48,6 +48,7 @@ exportMethods(tsfit)
 exportMethods(tssim)
 exportMethods(vcov)
 import(methods)
+importFrom(parallel,mclapply)
 importFrom(rvinecopulib,
   bicop_dist,
   dbicop,

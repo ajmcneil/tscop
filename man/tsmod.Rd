@@ -9,7 +9,9 @@ tsmod(margin, copula)
 \arguments{
 \item{margin}{a \link[=marg-class]{marg} or \link[=emarg-class]{emarg} object, or the name of a
 parametric family (\code{"sst"} is the same as \code{marg("sst")}, a margin to be
-fitted).}
+fitted), or \code{"auto"}: the margin is then chosen from the data by
+\code{\link[=automarg]{automarg()}} when the model is fitted with \code{\link[=tsfit]{tsfit()}} (the selection is
+recorded in the fitted object).}
 
 \item{copula}{an \link[=armacop-class]{armacop}, \link[=arfactcop-class]{arfactcop}, \link[=sdvinecop-class]{sdvinecop} or
 \link[=vtscop-class]{vtscop} model, with known coefficients or a structure to be fitted.}

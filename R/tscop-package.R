@@ -26,4 +26,5 @@
 #' @importFrom utils modifyList
 #' @importFrom rvinecopulib bicop_dist dbicop hbicop ktau_to_par par_to_ktau
 #' @importFrom udp pcoincide
+#' @importFrom parallel mclapply
 NULL

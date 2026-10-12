@@ -62,7 +62,17 @@ tsfit(U, object, ...)
 
 \S4method{tsfit}{ANY,marg}(U, object, se = FALSE, B = 200, init = NULL, control = list(), ...)
 
-\S4method{tsfit}{ANY,tsmod}(U, object, method = "twostage", se = FALSE, margin_control = list(), ...)
+\S4method{tsfit}{ANY,tsmod}(
+  U,
+  object,
+  method = "twostage",
+  se = FALSE,
+  B = 200,
+  cores = 1L,
+  margin_control = list(),
+  automarg_args = list(),
+  ...
+)
 }
 \arguments{
 \item{U}{a numeric vector or time series of copula data in (0, 1):
@@ -102,7 +112,13 @@ rule.}
 \item{method}{estimation method for a \link[=tsmod-class]{tsmod} model; only \code{"twostage"}
 so far.}
 
+\item{cores}{number of processes for the bootstrap refits of a
+\link[=tsmod-class]{tsmod} model (default 1).}
+
 \item{margin_control}{control list passed to the optimiser of the margin.}
+
+\item{automarg_args}{list of arguments of \code{\link[=automarg]{automarg()}} (\code{families}, \code{fix},
+\code{criterion}) used when the margin of a \link[=tsmod-class]{tsmod} model is \code{"auto"}.}
 }
 \value{
 A fitted model object.
@@ -149,7 +165,8 @@ is refitted with the larger \code{K} (at most three times; \code{K} never decrea
 within a fit). The fitted object records the starting \code{K}, the number of
 refits and the final log-likelihood change.
 
-When the starting \code{K} exceeds 20 the optimisation is staged: a first fit
+When the starting \code{K} exceeds 20 and the starting values are not supplied
+by the user (\code{init} or a specified \code{object}) the optimisation is staged: a first fit
 uses only the first ten pair copulas (loose tolerance) and supplies the
 starting values of the fit at the full lag, which reduces the number of
 expensive evaluations. \code{control = list(stageK = 0)} switches this off, and
@@ -200,10 +217,19 @@ With a parametric margin the estimation is in two stages: the margin is
 fitted by maximum likelihood to the data and the copula process to the
 probability integral transforms (\code{tsfit(u, copula, pseudo = FALSE)}); with an
 empirical margin the copula process is fitted to the pseudo-observations
-(the semiparametric approach). Further arguments in \code{...} (for example
-\code{control} or \code{init}) are passed to the copula's fit; \code{margin_control} is the
-control list of the margin's optimiser. Standard errors are not yet
-available (\code{se = FALSE}).
+(the semiparametric approach); with \code{margin = "auto"} the parametric margin
+is first chosen by \code{\link[=automarg]{automarg()}} (options in \code{automarg_args}, for example
+\code{list(families = c("st", "sst", "nig"), criterion = "BIC")}) and the
+selection is stored in the fitted object. Further arguments in \code{...} (for
+example \code{control} or \code{init}) are passed to the copula's fit;
+\code{margin_control} is the control list of the margin's optimiser. Standard
+errors come from the parametric bootstrap (\code{se = "bootstrap"}): \code{B} series
+are simulated from the fitted model and both stages are refitted from the
+fitted values, so that the estimation of the margin enters the standard
+errors of the copula parameters; with an automatically chosen margin the
+selected family is kept in the refits. With \code{cores > 1} the refits run in
+parallel (\code{parallel::mclapply}, not on Windows); the simulated series are
+generated first, so the results do not depend on \code{cores}.
 
 }}
 \examples{
