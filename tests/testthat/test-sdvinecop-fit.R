@@ -232,3 +232,20 @@ test_that("the fit agrees with the legacy sdvinecopula fit", {
   expect_equal(unname(coef(f)), unname(coef(fo)), tolerance = 0.02)
   expect_equal(f@loglik, as.numeric(logLik(fo)), tolerance = 0.05)
 })
+
+test_that("residuals agree with the legacy sdvinecopula residuals", {
+  skip_if_no_oracle()
+  skip_on_cran()
+  set.seed(11)
+  truth <- sdvinecop(armacop(ar = 0.6, ma = 0.4), pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270)))
+  u <- tssim(truth, 400)
+  old <- tscopula::sdvinecopula(pars = list(ar = 0.3, ma = 0.1), family = c("gumbel", "clayton"),
+                                posrot = c(0, 180), negrot = c(90, 270), tautol = 1e-4)
+  fo <- tscopula::fit(old, u)
+  co <- tscopula::coef(fo)
+  mine <- sdvinecop(armacop(ar = co[["ar"]], ma = co[["ma"]]),
+                    pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270)), tautol = 1e-4)
+  rl <- as.numeric(tscopula::resid(fo))   # normal scale
+  expect_equal(resid(mine, u, scale = "normal"), rl, tolerance = 1e-8)
+  expect_equal(resid(mine, u), pnorm(rl), tolerance = 1e-8)
+})

@@ -128,3 +128,19 @@ test_that("methods on the fitted object delegate to the model", {
   ft <- tsfit(ts(u1, start = c(2000, 1), frequency = 12), arfactcop(order = 1), pseudo = FALSE)
   expect_s3_class(resid(ft), "ts")
 })
+
+test_that("residuals agree with the legacy ARMA(1,1) copula once its filter has settled", {
+  skip_if_no_oracle()
+  skip_on_cran()
+  # one factor plus noise is an ARMA(1,1) copula with ar = lambda, -ar <= ma <= 0;
+  # tscopula's residuals are only accurate after a start-up stretch
+  set.seed(12)
+  u <- tssim(arfactcop(lambda = 0.9, w = 0.6), 300)
+  g <- tscopula::fit(tscopula::armacopula(list(ar = 0.5, ma = -0.2)), u)
+  ar <- tscopula::coef(g)[["ar1"]]
+  ma <- tscopula::coef(g)[["ma1"]]
+  rho1 <- (1 + ar * ma) * (ar + ma) / (1 + 2 * ar * ma + ma^2)
+  mine <- arfactcop(lambda = ar, w = rho1 / ar)
+  expect_equal(resid(mine, u, scale = "normal")[21:300], as.numeric(tscopula::resid(g))[21:300],
+               tolerance = 1e-6)
+})

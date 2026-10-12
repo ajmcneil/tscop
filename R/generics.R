@@ -69,6 +69,17 @@ setGeneric("ktau", function(object, lagmax = 20, ...) standardGeneric("ktau"),
 #'   time point at a time and can be slow.
 #' }
 #'
+#' The residuals of [armacop-class], [arfactcop-class] and [sdvinecop-class]
+#' models are those of the legacy `tscopula` package, except that tscopula's
+#' Gaussian-process residuals are accurate only after a start-up stretch of
+#' about ten values, whereas these are exact from the first observation. For a
+#' [vtscop-class] model they are not: `tscopula::resid` for a `vtscopula`
+#' returns the normal-scale residuals of the base process at \eqn{V(u_t)},
+#' which is `resid(model@base, V(u), scale = "normal")` here, whereas the
+#' residuals of a [vtscop-class] model are the conditional probability integral
+#' transforms of \eqn{u_t} itself, so that they test the model for the
+#' observed series rather than for its v-transform.
+#'
 #' @param object a model with known coefficients or a fitted model object.
 #' @param data copula data in (0, 1); for a fitted object it defaults to the
 #'   data to which the model was fitted.

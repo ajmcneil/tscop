@@ -91,3 +91,15 @@ d-vine base with a nonlinear v-transform the residuals are computed one
 time point at a time and can be slow.
 }
 }
+\details{
+The residuals of \link[=armacop-class]{armacop}, \link[=arfactcop-class]{arfactcop} and \link[=sdvinecop-class]{sdvinecop}
+models are those of the legacy \code{tscopula} package, except that tscopula's
+Gaussian-process residuals are accurate only after a start-up stretch of
+about ten values, whereas these are exact from the first observation. For a
+\link[=vtscop-class]{vtscop} model they are not: \code{tscopula::resid} for a \code{vtscopula}
+returns the normal-scale residuals of the base process at \eqn{V(u_t)},
+which is \code{resid(model@base, V(u), scale = "normal")} here, whereas the
+residuals of a \link[=vtscop-class]{vtscop} model are the conditional probability integral
+transforms of \eqn{u_t} itself, so that they test the model for the
+observed series rather than for its v-transform.
+}
