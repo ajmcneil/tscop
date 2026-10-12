@@ -46,3 +46,79 @@ setGeneric("tssim", function(object, n, ...) standardGeneric("tssim"),
 #' @export
 setGeneric("ktau", function(object, lagmax = 20, ...) standardGeneric("ktau"),
            signature = "object")
+
+#' Residuals of time series copula models
+#'
+#' Residuals of a known model or of a fitted model object, iid uniform (or
+#' standard normal on the `"normal"` scale) if the model is correct. If the
+#' data are a `ts`, `zoo` or `xts` object the time index is restored.
+#' \itemize{
+#'   \item [armacop-class] and [arfactcop-class]: the standardised one-step
+#'   prediction errors of the normal scores \eqn{\Phi^{-1}(u_t)}, on the
+#'   default `"uniform"` scale their `pnorm`. Missing observations give `NA`.
+#'   \item [sdvinecop-class]: the forward Rosenblatt transforms
+#'   \eqn{R_{\min(t-1,K)}(u_t; u_{t-1}, \ldots)}, with lower-order
+#'   Rosenblatt functions for the first \eqn{K} values. The data must be
+#'   complete.
+#'   \item [vtscop-class]: the conditional probability integral transforms
+#'   \eqn{F(u_t \mid u_{t-1}, \ldots)}. The conditional distribution of
+#'   \eqn{U_t} is that of the base process at \eqn{V(U_t)} passed through the
+#'   stochastic inverse of the v-transform: closed form for linear
+#'   v-transforms, otherwise a one-dimensional Gauss-Legendre integral. For a
+#'   d-vine base with a nonlinear v-transform the residuals are computed one
+#'   time point at a time and can be slow.
+#' }
+#'
+#' @param object a model with known coefficients or a fitted model object.
+#' @param data copula data in (0, 1); for a fitted object it defaults to the
+#'   data to which the model was fitted.
+#' @param scale `"uniform"` (default) or `"normal"` (the `qnorm` of the
+#'   uniform residuals).
+#' @param nodes ([vtscop-class] only) number of quadrature nodes for nonlinear
+#'   v-transforms.
+#' @param ... not used.
+#'
+#' @return A numeric vector the length of the data.
+#' @name resid-tscop
+NULL
+
+#' Prediction for time series copula models
+#'
+#' Predictive distribution of the copula variable `h` steps ahead given the
+#' past data.
+#' \itemize{
+#'   \item [armacop-class] and [arfactcop-class]: on the normal scale,
+#'   \eqn{x_{n+h} = \Phi^{-1}(u_{n+h})} given the past is normal with the mean
+#'   and standard deviation returned by `type = "moments"`; the other types
+#'   transform this to the uniform scale. A vector of horizons is allowed for
+#'   `type = "moments"`.
+#'   \item [sdvinecop-class]: one-step-ahead (`h = 1`) distribution given the
+#'   last \eqn{K} values, from the forward Rosenblatt functions and their
+#'   inverses; the data must be complete. `type` is `"df"`, `"qf"` or
+#'   `"dens"`.
+#'   \item [vtscop-class]: the base process's conditional law of
+#'   \eqn{V_{n+h}} given \eqn{V(u_1), \ldots, V(u_n)} passed through the
+#'   stochastic inverse of the v-transform. Horizons `h > 1` are available for
+#'   an `arfactcop` base only; a d-vine base has `h = 1`. `type` is `"df"`,
+#'   `"qf"` or `"dens"`.
+#' }
+#'
+#' @param object a model with known coefficients or a fitted model object.
+#' @param data past copula data in (0, 1); for a fitted object it defaults to
+#'   the data to which the model was fitted.
+#' @param h horizon (number of steps ahead).
+#' @param type `"moments"` (Gaussian models; default for them) for a data
+#'   frame with columns `h`, `mean` and `sd` of the normal score; `"df"` for
+#'   the conditional distribution function of \eqn{u_{n+h}} at `x`; `"qf"` for
+#'   its quantile function at probabilities `x`; `"dens"` for its density at
+#'   `x`. The default is `"df"` for [sdvinecop-class] and [vtscop-class].
+#' @param x points in (0, 1) at which to evaluate `"df"`, `"qf"` or `"dens"`
+#'   (probabilities for `"qf"`).
+#' @param nodes ([vtscop-class] only) number of quadrature nodes for nonlinear
+#'   v-transforms.
+#' @param ... not used.
+#'
+#' @return A data frame (`type = "moments"`) or a numeric vector the length of
+#'   `x`.
+#' @name predict-tscop
+NULL

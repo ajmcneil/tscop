@@ -472,21 +472,21 @@ dv_fit_data <- function(object, data) {
   if (is.null(object@template)) object@data else object@template
 }
 
-#' @rdname resid-sdvinecop
+#' @rdname resid-tscop
 #' @export
 setMethod("resid", "sdvinecopfit", function(object, data, scale = "uniform", ...) {
   if (missing(data)) data <- dv_fit_data(object)
   dv_resid(object@model, data, scale)
 })
 
-#' @rdname resid-sdvinecop
+#' @rdname resid-tscop
 #' @export
 setMethod("residuals", "sdvinecopfit", function(object, data, scale = "uniform", ...) {
   if (missing(data)) data <- dv_fit_data(object)
   dv_resid(object@model, data, scale)
 })
 
-#' @rdname predict-sdvinecop
+#' @rdname predict-tscop
 #' @export
 setMethod("predict", "sdvinecopfit", function(object, data, h = 1, type = "df", x = NULL, ...) {
   if (missing(data)) data <- object@data

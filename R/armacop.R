@@ -285,63 +285,17 @@ armacop_resid <- function(model, data, scale) {
   restore_attrs(out, data)
 }
 
-#' Residuals of ARMA copula models
-#'
-#' The residuals are the standardised one-step prediction errors of the normal
-#' scores \eqn{\Phi^{-1}(u_t)}. If the model is correct they are independent
-#' standard normal, so on the default `"uniform"` scale (their `pnorm`) they
-#' are iid uniform. Missing observations give `NA`. If the data are a `ts`,
-#' `zoo` or `xts` object the time index is restored.
-#'
-#' @param object an [armacop-class] model with known coefficients, or an
-#'   [armacopfit-class] object.
-#' @param data copula data in (0, 1) for a known model; for a fitted object it
-#'   defaults to the data to which the model was fitted.
-#' @param scale `"uniform"` (default) or `"normal"`.
-#' @param ... not used.
-#'
-#' @return A numeric vector the length of the data.
-#' @name resid-armacop
-#' @aliases resid,armacop-method residuals,armacop-method
-NULL
-
-#' @rdname resid-armacop
+#' @rdname resid-tscop
 #' @export
 setMethod("resid", "armacop", function(object, data, scale = "uniform", ...) {
   armacop_resid(object, data, scale)
 })
 
-#' @rdname resid-armacop
+#' @rdname resid-tscop
 #' @export
 setMethod("residuals", "armacop", function(object, data, scale = "uniform", ...) {
   armacop_resid(object, data, scale)
 })
-
-#' Prediction for ARMA copula models
-#'
-#' Conditional distribution of the copula variable `h` steps ahead given the
-#' past data. On the normal scale, \eqn{x_{n+h} = \Phi^{-1}(u_{n+h})} given
-#' the past is normal with the mean and standard deviation returned by
-#' `type = "moments"`. The other types transform this to the uniform scale.
-#'
-#' @param object an [armacop-class] model with known coefficients, or an
-#'   [armacopfit-class] object.
-#' @param data past copula data in (0, 1); for a fitted object it defaults to
-#'   the data to which the model was fitted.
-#' @param h horizon (number of steps ahead). For `type = "moments"` a vector
-#'   of horizons is allowed; for the other types a single value.
-#' @param type `"moments"` (default) for a data frame with columns `h`,
-#'   `mean` and `sd`; `"df"` for the conditional distribution function of
-#'   \eqn{u_{n+h}} at `x`; `"qf"` for its quantile function at probabilities
-#'   `x`; `"dens"` for its density at `x`.
-#' @param x points in (0, 1) at which to evaluate `"df"`, `"qf"` or `"dens"`.
-#' @param ... not used.
-#'
-#' @return A data frame (`type = "moments"`) or a numeric vector the length of
-#'   `x`.
-#' @name predict-armacop
-#' @aliases predict,armacop-method
-NULL
 
 # Validate the arguments of a Gaussian-process predict method; returns the
 # matched type.
@@ -392,7 +346,7 @@ armacop_predict <- function(model, data, h, type, x) {
   gauss_predict_result(mu, v, h, type, x)
 }
 
-#' @rdname predict-armacop
+#' @rdname predict-tscop
 #' @export
 setMethod("predict", "armacop", function(object, data, h = 1, type = "moments",
                                          x = NULL, ...) {

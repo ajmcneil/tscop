@@ -405,7 +405,7 @@ setMethod("ktau", "armacopfit", function(object, lagmax, ...) {
   ktau(object@model, lagmax)
 })
 
-#' @rdname resid-armacop
+#' @rdname resid-tscop
 #' @export
 setMethod("resid", "armacopfit", function(object, data, scale = "uniform", ...) {
   if (missing(data)) {
@@ -414,7 +414,7 @@ setMethod("resid", "armacopfit", function(object, data, scale = "uniform", ...) 
   armacop_resid(object@model, data, scale)
 })
 
-#' @rdname resid-armacop
+#' @rdname resid-tscop
 #' @export
 setMethod("residuals", "armacopfit", function(object, data, scale = "uniform", ...) {
   if (missing(data)) {
@@ -423,7 +423,7 @@ setMethod("residuals", "armacopfit", function(object, data, scale = "uniform", .
   armacop_resid(object@model, data, scale)
 })
 
-#' @rdname predict-armacop
+#' @rdname predict-tscop
 #' @export
 setMethod("predict", "armacopfit", function(object, data, h = 1, type = "moments",
                                             x = NULL, ...) {

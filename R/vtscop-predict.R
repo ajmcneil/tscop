@@ -157,37 +157,13 @@ vt_resid <- function(model, data, scale, nodes) {
   restore_attrs(if (scale == "uniform") r else stats::qnorm(r), data)
 }
 
-#' Residuals of process-level v-transform copula models
-#'
-#' The residuals are the conditional probability integral transforms
-#' \eqn{F(u_t \mid u_{t-1}, \ldots)} of the series, iid uniform under the
-#' model. The conditional distribution of \eqn{U_t} is that of the base
-#' process at \eqn{V(U_t)} passed through the stochastic inverse of the
-#' v-transform: closed form for linear v-transforms, otherwise a
-#' one-dimensional Gauss-Legendre integral. For a d-vine base with a
-#' nonlinear v-transform the residuals are computed one time point at a time
-#' and can be slow.
-#'
-#' @param object a [vtscop-class] model with known coefficients or a
-#'   [vtscopfit-class] object.
-#' @param data copula data in (0, 1); for a fitted object the data used in the
-#'   fit by default.
-#' @param scale `"uniform"` (default) or `"normal"`.
-#' @param nodes number of quadrature nodes for nonlinear v-transforms.
-#' @param ... not used.
-#'
-#' @return A numeric vector the length of the data.
-#' @name resid-vtscop
-#' @aliases resid,vtscop-method residuals,vtscop-method
-NULL
-
-#' @rdname resid-vtscop
+#' @rdname resid-tscop
 #' @export
 setMethod("resid", "vtscop", function(object, data, scale = "uniform", nodes = 64, ...) {
   vt_resid(object, data, scale, nodes)
 })
 
-#' @rdname resid-vtscop
+#' @rdname resid-tscop
 #' @export
 setMethod("residuals", "vtscop", function(object, data, scale = "uniform", nodes = 64, ...) {
   vt_resid(object, data, scale, nodes)
@@ -195,53 +171,28 @@ setMethod("residuals", "vtscop", function(object, data, scale = "uniform", nodes
 
 vt_fit_data <- function(object) if (is.null(object@template)) object@data else object@template
 
-#' @rdname resid-vtscop
+#' @rdname resid-tscop
 #' @export
 setMethod("resid", "vtscopfit", function(object, data, scale = "uniform", nodes = 64, ...) {
   if (missing(data)) data <- vt_fit_data(object)
   vt_resid(object@model, data, scale, nodes)
 })
 
-#' @rdname resid-vtscop
+#' @rdname resid-tscop
 #' @export
 setMethod("residuals", "vtscopfit", function(object, data, scale = "uniform", nodes = 64, ...) {
   if (missing(data)) data <- vt_fit_data(object)
   vt_resid(object@model, data, scale, nodes)
 })
 
-#' Prediction for process-level v-transform copula models
-#'
-#' Predictive distribution of \eqn{u_{n+h}} given the data: the distribution
-#' function (`type = "df"`), quantile function (`type = "qf"`) or density
-#' (`type = "dens"`) evaluated at `x`. The base process's conditional law of
-#' \eqn{V_{n+h}} given \eqn{V(u_1), \ldots, V(u_n)} is passed through the
-#' stochastic inverse of the v-transform. Horizons `h > 1` are available for an
-#' `arfactcop` base only; a d-vine base has `h = 1`.
-#'
-#' @param object a [vtscop-class] model with known coefficients or a
-#'   [vtscopfit-class] object.
-#' @param data past copula data in (0, 1); for a fitted object the data used in
-#'   the fit by default.
-#' @param h horizon.
-#' @param type `"df"`, `"qf"` or `"dens"`.
-#' @param x points in (0, 1) at which to evaluate the function (for `"qf"`,
-#'   probabilities).
-#' @param nodes number of quadrature nodes for nonlinear v-transforms.
-#' @param ... not used.
-#'
-#' @return A numeric vector the length of `x`.
-#' @name predict-vtscop
-#' @aliases predict,vtscop-method
-NULL
-
-#' @rdname predict-vtscop
+#' @rdname predict-tscop
 #' @export
 setMethod("predict", "vtscop", function(object, data, h = 1, type = "df", x = NULL,
                                         nodes = 64, ...) {
   vt_predict(object, data, h, type, x, nodes)
 })
 
-#' @rdname predict-vtscop
+#' @rdname predict-tscop
 #' @export
 setMethod("predict", "vtscopfit", function(object, data, h = 1, type = "df", x = NULL,
                                            nodes = 64, ...) {

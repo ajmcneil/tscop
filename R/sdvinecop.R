@@ -412,57 +412,17 @@ dv_resid <- function(model, data, scale) {
   restore_attrs(out, data)
 }
 
-#' Residuals of d-vine copula models
-#'
-#' The residuals are the forward Rosenblatt transforms
-#' \eqn{R_{\min(t-1,K)}(u_t; u_{t-1}, \ldots)} of the series: under the model
-#' they are iid uniform from the first observation (lower-order Rosenblatt
-#' functions are used for the first \eqn{K} values). The data must be
-#' complete. If the data are a `ts`, `zoo` or `xts` object the time index is
-#' restored.
-#'
-#' @param object a [sdvinecop-class] model with known coefficients.
-#' @param data copula data in (0, 1).
-#' @param scale `"uniform"` (default) or `"normal"` (the `qnorm` of the
-#'   uniform residuals).
-#' @param ... not used.
-#'
-#' @return A numeric vector the length of the data.
-#' @name resid-sdvinecop
-#' @aliases resid,sdvinecop-method residuals,sdvinecop-method
-NULL
-
-#' @rdname resid-sdvinecop
+#' @rdname resid-tscop
 #' @export
 setMethod("resid", "sdvinecop", function(object, data, scale = "uniform", ...) {
   dv_resid(object, data, scale)
 })
 
-#' @rdname resid-sdvinecop
+#' @rdname resid-tscop
 #' @export
 setMethod("residuals", "sdvinecop", function(object, data, scale = "uniform", ...) {
   dv_resid(object, data, scale)
 })
-
-#' Prediction for d-vine copula models
-#'
-#' One-step-ahead predictive distribution of \eqn{u_{n+1}} given the last
-#' \eqn{K} values of the data: the distribution function (`type = "df"`),
-#' quantile function (`type = "qf"`) or density (`type = "dens"`) evaluated at
-#' `x`, from the forward Rosenblatt functions and their inverses.
-#'
-#' @param object a [sdvinecop-class] model with known coefficients.
-#' @param data past copula data in (0, 1), complete.
-#' @param h horizon; only `h = 1` is implemented.
-#' @param type `"df"`, `"qf"` or `"dens"`.
-#' @param x points in (0, 1) at which to evaluate the function (for `"qf"`,
-#'   probabilities).
-#' @param ... not used.
-#'
-#' @return A numeric vector the length of `x`.
-#' @name predict-sdvinecop
-#' @aliases predict,sdvinecop-method
-NULL
 
 dv_predict <- function(model, data, h, type, x) {
   type <- match.arg(type, c("df", "qf", "dens"))
@@ -474,7 +434,7 @@ dv_predict <- function(model, data, h, type, x) {
   dv_predictive(dv_pairs_or_stop(model), u, as.numeric(x), type)
 }
 
-#' @rdname predict-sdvinecop
+#' @rdname predict-tscop
 #' @export
 setMethod("predict", "sdvinecop", function(object, data, h = 1, type = "df", x = NULL, ...) {
   dv_predict(object, data, h, type, x)

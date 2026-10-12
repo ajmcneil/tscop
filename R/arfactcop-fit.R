@@ -108,19 +108,19 @@ afc_predict <- function(model, data, h, type, x) {
   gauss_predict_result(mu, v, h, type, x)
 }
 
-#' @rdname resid-armacop
+#' @rdname resid-tscop
 #' @export
 setMethod("resid", "arfactcop", function(object, data, scale = "uniform", ...) {
   afc_resid(object, data, scale)
 })
 
-#' @rdname resid-armacop
+#' @rdname resid-tscop
 #' @export
 setMethod("residuals", "arfactcop", function(object, data, scale = "uniform", ...) {
   afc_resid(object, data, scale)
 })
 
-#' @rdname predict-armacop
+#' @rdname predict-tscop
 #' @export
 setMethod("predict", "arfactcop", function(object, data, h = 1, type = "moments",
                                            x = NULL, ...) {
@@ -267,21 +267,21 @@ setMethod("ktau", "arfactcopfit", function(object, lagmax, ...) {
 
 afc_fit_data <- function(object) if (is.null(object@template)) object@data else object@template
 
-#' @rdname resid-armacop
+#' @rdname resid-tscop
 #' @export
 setMethod("resid", "arfactcopfit", function(object, data, scale = "uniform", ...) {
   if (missing(data)) data <- afc_fit_data(object)
   afc_resid(object@model, data, scale)
 })
 
-#' @rdname resid-armacop
+#' @rdname resid-tscop
 #' @export
 setMethod("residuals", "arfactcopfit", function(object, data, scale = "uniform", ...) {
   if (missing(data)) data <- afc_fit_data(object)
   afc_resid(object@model, data, scale)
 })
 
-#' @rdname predict-armacop
+#' @rdname predict-tscop
 #' @export
 setMethod("predict", "arfactcopfit", function(object, data, h = 1, type = "moments",
                                               x = NULL, ...) {
