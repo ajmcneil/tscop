@@ -37,7 +37,14 @@ vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))),
 vtscop(arfactcop(order = 2), udp::v2p(0.5, 1), vtfix = "delta")
 }
 \references{
-Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas,
-v-transforms and D-vines for stochastic volatility. \emph{Journal of
-Multivariate Analysis}, 217, 105695. \doi{10.1016/j.jmva.2026.105695}
+Bladt, M. and McNeil, A. J. (2022). Time series copula models using d-vines
+and v-transforms. \emph{Econometrics and Statistics}, 24, 27-48.
+\doi{10.1016/j.ecosta.2021.07.004}
+
+Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+D-vines for stochastic volatility. \emph{Journal of Multivariate Analysis}, 217,
+105695. \doi{10.1016/j.jmva.2026.105695}
+
+McNeil, A. J. (2021). Modelling volatile time series with v-transforms and
+copulas. \emph{Risks}, 9(1), 14. \doi{10.3390/risks9010014}
 }

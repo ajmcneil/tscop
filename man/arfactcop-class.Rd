@@ -60,8 +60,15 @@ weights \verb{w1, ...} (the first \code{m - 1} weights without noise).
 }}
 
 \references{
+Bladt, M. and McNeil, A. J. (2022). Time series with infinite-order partial
+copula dependence. \emph{Dependence Modeling}, 10(1), 87-107.
+\doi{10.1515/demo-2022-0105}
+
 Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
 parametric distributional forecasting of univariate time series using
 non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics},
 54(1), e70033. \doi{10.1002/cjs.70033}
+
+McNeil, A. J. (2021). Modelling volatile time series with v-transforms and
+copulas. \emph{Risks}, 9(1), 14. \doi{10.3390/risks9010014}
 }

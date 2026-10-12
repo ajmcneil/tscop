@@ -3,7 +3,8 @@
 #' A copula process obtained from a base copula process \eqn{(V_t)} by
 #' stochastic inversion of a v-transform \eqn{\mathcal V}: \eqn{U_t =
 #' \mathcal V^{\leftarrow}(V_t, W_t)} with independent uniform \eqn{W_t}
-#' (McNeil, 2021; Bladt and McNeil, 2021). The copula density of
+#' (McNeil, 2021, with a Gaussian base process; Bladt and McNeil, 2022, with a
+#' non-Gaussian d-vine base). The copula density of
 #' \eqn{(U_1, \ldots, U_n)} is \eqn{c_V(\mathcal V(u_1), \ldots, \mathcal
 #' V(u_n))}, where \eqn{c_V} is the density of the base process, for **any**
 #' v-transform, so the likelihood is the base likelihood evaluated at the
@@ -30,15 +31,16 @@
 #' @slot vtfix names of v-transform parameters (`"delta"`, `"kappa"`,
 #'   `"xi"`) held fixed in fitting.
 #'
-#' @references Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas,
-#'   v-transforms and D-vines for stochastic volatility. *Journal of
-#'   Multivariate Analysis*, 217, 105695. \doi{10.1016/j.jmva.2026.105695}
+#' @references Bladt, M. and McNeil, A. J. (2022). Time series copula models using d-vines
+#'   and v-transforms. *Econometrics and Statistics*, 24, 27-48.
+#'   \doi{10.1016/j.ecosta.2021.07.004}
 #'
-#'   McNeil, A. J. (2021). Modelling volatile time series with
-#'   v-transforms and copulas. *Risks*, 9(1), 14.
+#'   Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+#'   D-vines for stochastic volatility. *Journal of Multivariate Analysis*, 217,
+#'   105695. \doi{10.1016/j.jmva.2026.105695}
 #'
-#'   Bladt, M. and McNeil, A. J. (2021). Time series copula models using
-#'   d-vines and v-transforms. *Econometrics and Statistics*.
+#'   McNeil, A. J. (2021). Modelling volatile time series with v-transforms and
+#'   copulas. *Risks*, 9(1), 14. \doi{10.3390/risks9010014}
 #'
 #' @exportClass vtscop
 setClass("vtscop", slots = c(name = "character", base = "ANY", vt = "vtransform",
@@ -100,9 +102,17 @@ setValidity("vtscop", function(object) {
 #'   model is fitted.
 #'
 #' @return An object of class [vtscop-class].
-#' @references Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas,
-#'   v-transforms and D-vines for stochastic volatility. *Journal of
-#'   Multivariate Analysis*, 217, 105695. \doi{10.1016/j.jmva.2026.105695}
+#' @references Bladt, M. and McNeil, A. J. (2022). Time series copula models using d-vines
+#'   and v-transforms. *Econometrics and Statistics*, 24, 27-48.
+#'   \doi{10.1016/j.ecosta.2021.07.004}
+#'
+#'   Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
+#'   D-vines for stochastic volatility. *Journal of Multivariate Analysis*, 217,
+#'   105695. \doi{10.1016/j.jmva.2026.105695}
+#'
+#'   McNeil, A. J. (2021). Modelling volatile time series with v-transforms and
+#'   copulas. *Risks*, 9(1), 14. \doi{10.3390/risks9010014}
+#'
 #' @export
 #'
 #' @examples

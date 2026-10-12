@@ -9,7 +9,11 @@
 #' and [arfactcop-class] (a sum of independent AR(1) factors plus white noise,
 #' with non-negative partial autocorrelations).
 #'
-#' @references Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+#' @references Bladt, M. and McNeil, A. J. (2022). Time series with infinite-order partial
+#'   copula dependence. *Dependence Modeling*, 10(1), 87-107.
+#'   \doi{10.1515/demo-2022-0105}
+#'
+#'   Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
 #'   parametric distributional forecasting of univariate time series using
 #'   non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*,
 #'   54(1), e70033. \doi{10.1002/cjs.70033}

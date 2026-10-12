@@ -27,10 +27,17 @@
 #' @slot lambda the AR(1) coefficients, decreasing (`NA` in a structure).
 #' @slot w the factor weights (`NA` in a structure).
 #'
-#' @references Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+#' @references Bladt, M. and McNeil, A. J. (2022). Time series with infinite-order partial
+#'   copula dependence. *Dependence Modeling*, 10(1), 87-107.
+#'   \doi{10.1515/demo-2022-0105}
+#'
+#'   Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
 #'   parametric distributional forecasting of univariate time series using
 #'   non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*,
 #'   54(1), e70033. \doi{10.1002/cjs.70033}
+#'
+#'   McNeil, A. J. (2021). Modelling volatile time series with v-transforms and
+#'   copulas. *Risks*, 9(1), 14. \doi{10.3390/risks9010014}
 #'
 #' @exportClass arfactcop
 setClass("arfactcop", contains = "gausscop", slots = c(
@@ -73,10 +80,17 @@ setValidity("arfactcop", function(object) {
 #'   `1 - sum(w)`? Default `TRUE`.
 #'
 #' @return An object of class [arfactcop-class].
-#' @references Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
+#' @references Bladt, M. and McNeil, A. J. (2022). Time series with infinite-order partial
+#'   copula dependence. *Dependence Modeling*, 10(1), 87-107.
+#'   \doi{10.1515/demo-2022-0105}
+#'
+#'   Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
 #'   parametric distributional forecasting of univariate time series using
 #'   non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*,
 #'   54(1), e70033. \doi{10.1002/cjs.70033}
+#'
+#'   McNeil, A. J. (2021). Modelling volatile time series with v-transforms and
+#'   copulas. *Risks*, 9(1), 14. \doi{10.3390/risks9010014}
 #'
 #' @export
 #'

@@ -58,6 +58,10 @@ been fitted.}
 }}
 
 \references{
+Bladt, M. and McNeil, A. J. (2022). Time series with infinite-order partial
+copula dependence. \emph{Dependence Modeling}, 10(1), 87-107.
+\doi{10.1515/demo-2022-0105}
+
 Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
 parametric distributional forecasting of univariate time series using
 non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics},

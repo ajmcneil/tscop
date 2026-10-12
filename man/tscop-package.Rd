@@ -6,10 +6,18 @@
 \alias{tscop-package}
 \title{tscop: Time Series Copula Models}
 \description{
-Tools for the analysis of time series using copula models, built on the udp package: Gaussian ARMA and AR-factor copula processes, stationary d-vine copula processes whose Kendall partial autocorrelations follow an ARMA-type model (Bladt, Dias, Han and McNeil (2026) \doi{10.1002/cjs.70033}), and v-transform models for stochastic volatility, with inverse-v-transformed pair copulas (Dias, Han and McNeil (2027) \doi{10.1016/j.jmva.2026.105695}). Under development.
+Tools for the analysis of time series using copula models, built on the udp package: Gaussian ARMA and AR-factor copula processes, stationary d-vine copula processes parameterised through the Kendall partial autocorrelation function (Bladt and McNeil (2022) \doi{10.1515/demo-2022-0105}; Bladt, Dias, Han and McNeil (2026) \doi{10.1002/cjs.70033}), and v-transform models for volatile time series: process-level v-transforms of Gaussian (McNeil (2021) \doi{10.3390/risks9010014}) and non-Gaussian d-vine base processes (Bladt and McNeil (2022) \doi{10.1016/j.ecosta.2021.07.004}), and inverse-v-transformed pair copulas for stochastic volatility (Dias, Han and McNeil (2027) \doi{10.1016/j.jmva.2026.105695}). Under development.
 }
 
 \references{
+Bladt, M. and McNeil, A. J. (2022). Time series copula models using d-vines
+and v-transforms. \emph{Econometrics and Statistics}, 24, 27-48.
+\doi{10.1016/j.ecosta.2021.07.004}
+
+Bladt, M. and McNeil, A. J. (2022). Time series with infinite-order partial
+copula dependence. \emph{Dependence Modeling}, 10(1), 87-107.
+\doi{10.1515/demo-2022-0105}
+
 Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and
 parametric distributional forecasting of univariate time series using
 non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics},
@@ -18,6 +26,9 @@ non-Gaussian ARMA models based on D-vines. \emph{Canadian Journal of Statistics}
 Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and
 D-vines for stochastic volatility. \emph{Journal of Multivariate Analysis}, 217,
 105695. \doi{10.1016/j.jmva.2026.105695}
+
+McNeil, A. J. (2021). Modelling volatile time series with v-transforms and
+copulas. \emph{Risks}, 9(1), 14. \doi{10.3390/risks9010014}
 }
 \author{
 \strong{Maintainer}: Alexander J. McNeil \email{alexanderjmcneil@gmail.com}

@@ -11,11 +11,15 @@ Authors@R: c(
   )
 Description: Tools for the analysis of time series using copula models, built
     on the udp package: Gaussian ARMA and AR-factor copula processes, stationary
-    d-vine copula processes whose Kendall partial autocorrelations follow an
-    ARMA-type model (Bladt, Dias, Han and McNeil (2026)
-    <doi:10.1002/cjs.70033>), and v-transform models for stochastic volatility,
-    with inverse-v-transformed pair copulas (Dias, Han and McNeil (2027)
-    <doi:10.1016/j.jmva.2026.105695>). Under development.
+    d-vine copula processes parameterised through the Kendall partial
+    autocorrelation function (Bladt and McNeil (2022)
+    <doi:10.1515/demo-2022-0105>; Bladt, Dias, Han and McNeil (2026)
+    <doi:10.1002/cjs.70033>), and v-transform models for volatile time series:
+    process-level v-transforms of Gaussian (McNeil (2021)
+    <doi:10.3390/risks9010014>) and non-Gaussian d-vine base processes (Bladt
+    and McNeil (2022) <doi:10.1016/j.ecosta.2021.07.004>), and
+    inverse-v-transformed pair copulas for stochastic volatility (Dias, Han
+    and McNeil (2027) <doi:10.1016/j.jmva.2026.105695>). Under development.
 License: GPL-3
 Depends:
     R (>= 3.5.0)
