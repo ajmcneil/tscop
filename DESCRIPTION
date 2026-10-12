@@ -57,4 +57,7 @@ Collate:
     'vtscop.R'
     'vtscop-fit.R'
     'vtscop-predict.R'
+    'marg-families.R'
+    'marg.R'
+    'marg-fit.R'
     'tscop-package.R'

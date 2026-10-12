@@ -67,6 +67,9 @@ setGeneric("ktau", function(object, lagmax = 20, ...) standardGeneric("ktau"),
 #'   v-transforms, otherwise a one-dimensional Gauss-Legendre integral. For a
 #'   d-vine base with a nonlinear v-transform the residuals are computed one
 #'   time point at a time and can be slow.
+#'   \item [marg-class]: the probability integral transforms
+#'   \eqn{F(x_t)} of the observations (uniform if the margin is correct; the
+#'   `qnorm` of them on the `"normal"` scale).
 #' }
 #'
 #' The residuals of [armacop-class], [arfactcop-class] and [sdvinecop-class]
@@ -139,9 +142,9 @@ NULL
 #' Methods for extracting coefficients, the covariance matrix and the
 #' log-likelihood of time series copula models and fitted model objects, and
 #' for printing them. They apply to [armacop-class], [arfactcop-class],
-#' [sdvinecop-class], [vtscop-class], [pc-class] and the corresponding fitted
-#' classes (`armacopfit`, `arfactcopfit`, `sdvinecopfit`, `vtscopfit`; see
-#' [tsfit()]).
+#' [sdvinecop-class], [vtscop-class], [marg-class], [pc-class] and the
+#' corresponding fitted classes (`armacopfit`, `arfactcopfit`, `sdvinecopfit`,
+#' `vtscopfit`, `margfit`; see [tsfit()]).
 #'
 #' * `coef()` of a model returns its coefficients: for [armacop-class] the
 #'   order `ar`, `ma`, `sar`, `sma` (`NA` for a structure that has not been
@@ -159,6 +162,9 @@ NULL
 #' * `logLik()` of a fitted object returns the maximised log-likelihood with
 #'   `df` and `nobs` attributes, so that [stats::AIC()] and [stats::BIC()]
 #'   work.
+#' For [marg-class] the coefficients are the free parameters (those not in
+#' `fix`), in the order of the family's parameters (`mu`, `sigma`, shapes).
+#'
 #' * `show()` prints a summary of the model or of the fit.
 #'
 #' @param object a model or fitted model object.
