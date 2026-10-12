@@ -18,8 +18,7 @@ without noise) with real positive AR eigenvalues. Its partial
 autocorrelations are non-negative at all lags in every numerical check
 (random draws with up to four factors; this is a conjecture, not a
 theorem), which makes it a suitable kpacf for the inverse-v-transformed
-base copulas of volatility models. See \code{docs/factor-kpacf-theory.Rmd} in
-the source tree.
+base copulas of volatility models.
 }
 \details{
 The free parameters are the \code{m} rates and the \code{m} weights (the noise share

@@ -5,3 +5,6 @@
 .DS_Store
 CLAUDE.local.md
 literature/
+docs/
+CLAUDE.md
+inst/extdata/

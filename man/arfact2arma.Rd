@@ -25,7 +25,7 @@ sum of the factors' spectral densities, choosing the invertible root. This
 function returns that \link[=armacop-class]{armacop} model, so the implied ARMA
 coefficients can be inspected, or the model passed to ARMA software. The two
 models have identical autocorrelations, partial autocorrelations and
-Gaussian copula likelihoods. See \code{docs/factor-kpacf-theory.Rmd}.
+Gaussian copula likelihoods.
 }
 \examples{
 g <- arfactcop(lambda = c(0.98, 0.7), w = c(0.3, 0.4))

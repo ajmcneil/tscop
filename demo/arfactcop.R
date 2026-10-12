@@ -3,7 +3,7 @@
 # autocorrelations are non-negative. Run it with
 #   demo("arfactcop", package = "tscop")      (after installing tscop), or
 #   devtools::load_all(); source("demo/arfactcop.R", echo = TRUE)
-# from the source folder. The theory is in docs/factor-kpacf-theory.Rmd.
+# from the source folder.
 
 if (!("package:tscop" %in% search())) library(tscop)
 set.seed(2028)

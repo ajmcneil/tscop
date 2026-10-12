@@ -13,8 +13,7 @@
 #' autocorrelations are non-negative at all lags in every numerical check
 #' (random draws with up to four factors; this is a conjecture, not a
 #' theorem), which makes it a suitable kpacf for the inverse-v-transformed
-#' base copulas of volatility models. See `docs/factor-kpacf-theory.Rmd` in
-#' the source tree.
+#' base copulas of volatility models.
 #'
 #' The free parameters are the `m` rates and the `m` weights (the noise share
 #' is the remainder); with `noise = FALSE` the weights sum to one and there
@@ -418,7 +417,7 @@ setMethod("gc_prefit", "arfactcop", function(G, U, control) arfactcop_mle(U, G, 
 #' function returns that [armacop-class] model, so the implied ARMA
 #' coefficients can be inspected, or the model passed to ARMA software. The two
 #' models have identical autocorrelations, partial autocorrelations and
-#' Gaussian copula likelihoods. See `docs/factor-kpacf-theory.Rmd`.
+#' Gaussian copula likelihoods.
 #'
 #' @param object an [arfactcop-class] model with specified coefficients, or
 #'   an [arfactcopfit-class] object (its fitted model is converted; the

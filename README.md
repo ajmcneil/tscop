@@ -2,8 +2,6 @@
 
 A ground-up rebuild of the `tscopula` package for time series copula models, built on [udp](https://github.com/ajmcneil/udp). Under development; the legacy `tscopula` package is left untouched.
 
-Design documents are in `docs/`.
-
 ## Background and references
 
 The package implements and extends models from the following papers (BibTeX entries in `inst/REFERENCES.bib`):
@@ -13,4 +11,5 @@ The package implements and extends models from the following papers (BibTeX entr
 - Bladt, M. and McNeil, A. J. (2022). Time series with infinite-order partial copula dependence. *Dependence Modeling*, 10(1), 87-107. [doi:10.1515/demo-2022-0105](https://doi.org/10.1515/demo-2022-0105). Models parameterised through the Kendall partial autocorrelation function.
 - Bladt, M., Dias, A., Han, J. and McNeil, A. J. (2026). Semiparametric and parametric distributional forecasting of univariate time series using non-Gaussian ARMA models based on D-vines. *Canadian Journal of Statistics*, 54(1), e70033. [doi:10.1002/cjs.70033](https://doi.org/10.1002/cjs.70033). Non-Gaussian ARMA models based on d-vines (`sdvinecop`).
 - Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and D-vines for stochastic volatility. *Journal of Multivariate Analysis*, 217, 105695. [doi:10.1016/j.jmva.2026.105695](https://doi.org/10.1016/j.jmva.2026.105695). Inverse-v-transformed pair copulas and the `ast` family (the copula of the absolute values of a spherical t distribution).
+
 
