@@ -190,6 +190,7 @@ dv_ivt_base_pair <- function(base, tau) {
     joe = list(family = "joe", rotation = 0, parameters = dv_ktau_to_par("joe", tau)),
     gumbel = list(family = "gumbel", rotation = 0, parameters = dv_ktau_to_par("gumbel", tau)),
     clayton180 = list(family = "clayton", rotation = 180, parameters = dv_ktau_to_par("clayton", tau)),
+    gauss = list(family = "gauss", rotation = 0, parameters = sin(pi * tau / 2)),
     stop("unknown base copula '", base, "'")
   )
 }
@@ -263,11 +264,17 @@ dv_loglik <- function(u, pairs) {
   B <- u[-1L] # later variable
   zscale <- FALSE
   bs <- FALSE # is the recursion on the base scale of a run of IVT levels?
+  zb <- FALSE # ... and are the base-scale values normal scores (Gaussian base)?
   ll <- 0
   for (j in seq_len(K)) {
     pr <- pairs[[j]]
     if (bs && !dv_is_ivt(pr)) {
       # leave the base scale: u-scale values from the base-scale ones
+      if (zb) {
+        x <- stats::pnorm(x)
+        y <- stats::pnorm(y)
+        zb <- FALSE
+      }
       A <- dv_clamp(d1 - sA * x)
       B <- dv_clamp(d2 - sB * y)
       bs <- FALSE
@@ -310,12 +317,40 @@ dv_loglik <- function(u, pairs) {
         sA <- dv_alin(A, d1)
         sB <- dv_alin(B, d2)
         bs <- TRUE
+        zb <- FALSE
       }
-      ll <- ll + sum(log(dv_dens(pr$base, x, y)))
+      # a Gaussian base is evaluated on the normal-score scale, where its
+      # h-functions are linear, so a run of Gaussian-base levels needs no
+      # pnorm/qnorm calls between the levels
+      gb <- dv_is_gauss(pr$base)
+      if (gb && !zb) {
+        x <- stats::qnorm(dv_clamp(x))
+        y <- stats::qnorm(dv_clamp(y))
+        zb <- TRUE
+      } else if (!gb && zb) {
+        x <- stats::pnorm(x)
+        y <- stats::pnorm(y)
+        zb <- FALSE
+      }
+      if (gb) {
+        rho <- pr$base$parameters[1L]
+        r2 <- rho * rho
+        ll <- ll + sum(-0.5 * log1p(-r2) - (r2 * (x * x + y * y) - 2 * rho * x * y) / (2 * (1 - r2)))
+        if (j < K) {
+          m <- length(x)
+          s <- sqrt(1 - r2)
+          xn <- (x[-m] - rho * y[-m]) / s
+          yn <- (y[-1L] - rho * x[-1L]) / s
+        }
+      } else {
+        ll <- ll + sum(log(dv_dens(pr$base, x, y)))
+        if (j < K) {
+          m <- length(x)
+          xn <- dv_h(pr$base, x[-m], y[-m], 2L)
+          yn <- dv_h(pr$base, x[-1L], y[-1L], 1L)
+        }
+      }
       if (j < K) {
-        m <- length(x)
-        xn <- dv_h(pr$base, x[-m], y[-m], 2L)
-        yn <- dv_h(pr$base, x[-1L], y[-1L], 1L)
         sA <- sA[-m]
         sB <- sB[-1L]
         x <- xn

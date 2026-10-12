@@ -20,8 +20,10 @@ negative. Ignored for radially symmetric families.}
 \code{"bb1"}; \code{NULL} for the other families.}
 
 \item{base}{for \code{family = "ivt"} the base copula: \code{"ast"}, \code{"joe"},
-\code{"gumbel"} or \code{"clayton180"} (the survival Clayton copula); \code{NULL} for
-the other families.}
+\code{"gumbel"}, \code{"clayton180"} (the survival Clayton copula) or \code{"gauss"}
+(the Gaussian copula, whose inverse-v-transformed version has a
+cross-shaped density; cheap to evaluate, so useful for the weakly
+dependent high lags); \code{NULL} for the other families.}
 }
 \value{
 An object of class \link[=pc-class]{pc}.

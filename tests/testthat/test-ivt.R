@@ -3,7 +3,8 @@ udp_base <- function(base, tau) {
     ast = udp::astcopula(udp::astcopula_nu(tau)),
     joe = rvinecopulib::bicop_dist("joe", 0, as.numeric(rvinecopulib::ktau_to_par("joe", tau))),
     gumbel = rvinecopulib::bicop_dist("gumbel", 0, as.numeric(rvinecopulib::ktau_to_par("gumbel", tau))),
-    clayton180 = rvinecopulib::bicop_dist("clayton", 180, as.numeric(rvinecopulib::ktau_to_par("clayton", tau)))
+    clayton180 = rvinecopulib::bicop_dist("clayton", 180, as.numeric(rvinecopulib::ktau_to_par("clayton", tau))),
+    gauss = rvinecopulib::bicop_dist("gaussian", 0, sin(pi * tau / 2))
   )
 }
 
@@ -22,7 +23,7 @@ test_that("IVT pair copula functions equal the udp stochastic-inversion copula (
   set.seed(1)
   a <- runif(40, 0.03, 0.97)
   b <- runif(40, 0.03, 0.97)
-  for (base in c("ast", "joe", "gumbel", "clayton180")) {
+  for (base in c("ast", "joe", "gumbel", "clayton180", "gauss")) {
     for (d in list(c(0.5, 0.5), c(0.3, 0.7), c(0.62, 0.41))) {
       tau <- 0.35
       pr <- dv_ivt_pair(base, tau, d)
@@ -76,7 +77,7 @@ test_that("the d-vine log-likelihood equals a loop over the udp pair copulas", {
 test_that("with one common fulcrum the d-vine density is the base d-vine density at V(u)", {
   set.seed(4)
   u <- runif(80)
-  for (base in c("ast", "gumbel")) {
+  for (base in c("ast", "gumbel", "gauss")) {
     for (delta in c(0.5, 0.35)) {
       taus <- c(0.3, 0.15, 0.07, 0.03)
       ivt <- lapply(taus, function(t) dv_ivt_pair(base, t, c(delta, delta)))
@@ -235,7 +236,7 @@ test_that("the base-scale recursion of IVT runs equals the u-scale recursion (as
   set.seed(8)
   u <- runif(120)
   u[40:60] <- runif(21, 0.4, 0.6)   # a quiet stretch, to put values on both sides of the fulcrums
-  for (base in c("ast", "joe", "gumbel", "clayton180")) {
+  for (base in c("ast", "joe", "gumbel", "clayton180", "gauss")) {
     for (d in list(c(0.5, 0.5), c(0.3, 0.7), c(0.62, 0.41))) {
       taus <- c(0.3, 0.2, 0.12, 0.07, 0.04, 0.02)
       ivt <- lapply(taus, function(t) dv_ivt_pair(base, t, d))
@@ -251,4 +252,35 @@ test_that("the base-scale recursion of IVT runs equals the u-scale recursion (as
       expect_equal(dv_loglik(u, lead), dv_loglik_uscale(u, lead), tolerance = 1e-7)
     }
   }
+})
+
+test_that("a run of Gaussian-base IVT levels after non-Gaussian-base levels equals the u-scale recursion", {
+  set.seed(9)
+  u <- runif(150)
+  for (d in list(c(0.5, 0.5), c(0.3, 0.7))) {
+    taus <- c(0.3, 0.2, 0.12, 0.08, 0.05, 0.03, 0.02)
+    jo <- lapply(taus[1:3], function(t) dv_ivt_pair("joe", t, d))
+    ga <- lapply(taus[4:7], function(t) dv_ivt_pair("gauss", t, d))
+    pairs <- c(jo, ga)
+    expect_equal(dv_loglik(u, pairs), dv_loglik_uscale(u, pairs), tolerance = 1e-7)
+    # Gaussian-base levels first, then a Joe-base IVT pair, then plain pairs
+    pairs2 <- c(ga[1:2], list(jo[[1]]), list(pair("gumbel", 0, 1.2)), ga[3])
+    expect_equal(dv_loglik(u, pairs2), dv_loglik_uscale(u, pairs2), tolerance = 1e-7)
+  }
+})
+
+test_that("an sdvinecop with Joe-base IVT pairs at the first lags and a Gaussian-base IVT tail simulates and fits", {
+  skip_on_cran()
+  set.seed(10)
+  spec <- function(k) sdvinecop(k, pairs = rep(list(pc("ivt", base = "joe")), 3), tail = pc("ivt", base = "gauss"),
+                                vt = c(0.45, 0.55), maxlag = 30, tautol = 1e-3)
+  truth <- spec(arfactcop(lambda = 0.9, w = 0.5))
+  expect_s4_class(truth, "sdvinecop")
+  u <- tssim(truth, 700)
+  expect_true(all(u > 0 & u < 1))
+  r <- resid(truth, u)                       # Rosenblatt residuals, uniform if the simulator is right
+  expect_gt(stats::ks.test(r, "punif")$p.value, 0.001)
+  f <- tsfit(u, spec(arfactcop(order = 1)), pseudo = FALSE)
+  expect_equal(unname(coef(f)[1:2]), c(0.9, 0.5), tolerance = 0.2)
+  expect_gt(f@loglik, 0)
 })
