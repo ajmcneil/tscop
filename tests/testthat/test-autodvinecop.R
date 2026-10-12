@@ -21,20 +21,20 @@ test_that("candidates carry the rotations of the sign of tau", {
 test_that("screening scores equal the log-likelihood of the corresponding model", {
   set.seed(1)
   arma <- armacop(ar = c(0.5, -0.2))
-  base <- dvinecop(arma, pairs = list(pc("gumbel")))
+  base <- sdvinecop(arma, pairs = list(pc("gumbel")))
   u <- tssim(base, 300)
   cands <- list(pc("clayton", pos = 0, neg = 270), pc("frank"), pc("joe", pos = 180))
   sc <- dv_screen(u, base, 2L, cands, "AIC", npar = 2L)
   for (i in seq_along(cands)) {
-    ll <- dv_model_loglik(dvinecop(arma, pairs = list(pc("gumbel"), cands[[i]])), u)
+    ll <- dv_model_loglik(sdvinecop(arma, pairs = list(pc("gumbel"), cands[[i]])), u)
     expect_equal(sc$loglik[i], ll, tolerance = 1e-9)
     expect_equal(sc$ic[i], dv_ic(ll, 2L, 300L, "AIC"), tolerance = 1e-9)
   }
   # t: the 1-D search finds a value at least as good as nu = 10 and is consistent
   sct <- dv_screen(u, base, 2L, list(pc("t")), "AIC", npar = 2L)
-  lt <- dv_model_loglik(dvinecop(arma, pairs = list(pc("gumbel"), pc("t", aux = sct$aux))), u)
+  lt <- dv_model_loglik(sdvinecop(arma, pairs = list(pc("gumbel"), pc("t", aux = sct$aux))), u)
   expect_equal(sct$loglik, lt, tolerance = 1e-6)
-  l10 <- dv_model_loglik(dvinecop(arma, pairs = list(pc("gumbel"), pc("t", aux = 10))), u)
+  l10 <- dv_model_loglik(sdvinecop(arma, pairs = list(pc("gumbel"), pc("t", aux = 10))), u)
   expect_gte(sct$loglik, l10 - 1e-9)
   expect_equal(sct$ic, dv_ic(lt, 3L, 300L, "AIC"), tolerance = 1e-6)
   # BB1 with infeasible delta range at a small |tau|
@@ -43,7 +43,7 @@ test_that("screening scores equal the log-likelihood of the corresponding model"
 })
 
 test_that("the model's free vector reproduces its coefficients", {
-  m <- dvinecop(armacop(ar = 0.5, ma = 0.3), pairs = list(pc("t", aux = 6), pc("gumbel"), pc("bb1", aux = 1.4)))
+  m <- sdvinecop(armacop(ar = 0.5, ma = 0.3), pairs = list(pc("t", aux = 6), pc("gumbel"), pc("bb1", aux = 1.4)))
   z <- dv_model_z(m)
   lay <- dv_layout(m)
   expect_equal(dv_free_to_coef(z, lay), coef(m), tolerance = 1e-10, ignore_attr = TRUE)
@@ -53,16 +53,16 @@ test_that("the model's free vector reproduces its coefficients", {
 
 test_that("autodvinecop recovers the substitutions of a finite-order model", {
   set.seed(2)
-  truth <- dvinecop(armacop(ar = c(0.6, -0.25)),
+  truth <- sdvinecop(armacop(ar = c(0.6, -0.25)),
                     pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270)))
   u <- tssim(truth, 1000)
   gauss <- tsfit(u, armacop(order = c(2, 0)), pseudo = FALSE)
   a <- autodvinecop(u, gauss, nreplace = 5, pseudo = FALSE, verbose = FALSE)
-  expect_s4_class(a, "dvinecopfit")
+  expect_s4_class(a, "sdvinecopfit")
   expect_equal(a@path$choice[1:2], c("gumbel0", "clayton270"))
   expect_true(all(a@path$accepted[1:2]))
   expect_gt(a@path$improvement[1], 20)
-  expect_lt(AIC(a), AIC(tsfit(u, dvinecop(armacop(order = c(2, 0))), pseudo = FALSE)) - 40)
+  expect_lt(AIC(a), AIC(tsfit(u, sdvinecop(armacop(order = c(2, 0))), pseudo = FALSE)) - 40)
   expect_equal(unname(coef(a)), c(0.6, -0.25), tolerance = 0.15)
   # lags beyond the kpacf's range are skipped, not fitted
   skipped <- a@path[a@path$lag > 2, ]
@@ -75,7 +75,7 @@ test_that("autodvinecop recovers the substitutions of a finite-order model", {
 
 test_that("screening and full refitting select the same copulas on easy data", {
   set.seed(3)
-  truth <- dvinecop(armacop(ar = c(0.6, -0.25)),
+  truth <- sdvinecop(armacop(ar = c(0.6, -0.25)),
                     pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270)))
   u <- tssim(truth, 800)
   gauss <- tsfit(u, armacop(order = c(2, 0)), pseudo = FALSE)
@@ -87,7 +87,7 @@ test_that("screening and full refitting select the same copulas on easy data", {
 
 test_that("a t copula is found when requested", {
   set.seed(4)
-  truth <- dvinecop(armacop(ar = 0.7), pairs = list(pc("t", aux = 3)))
+  truth <- sdvinecop(armacop(ar = 0.7), pairs = list(pc("t", aux = 3)))
   u <- tssim(truth, 1000)
   a <- autodvinecop(u, armacop(order = c(1, 0)), nreplace = 1, aux = "t", pseudo = FALSE,
                     verbose = FALSE)
@@ -100,7 +100,7 @@ test_that("a t copula is found when requested", {
 
 test_that("negative dependence is modelled with the 90/270 rotations", {
   set.seed(5)
-  truth <- dvinecop(armacop(ar = -0.6), pairs = list(pc("gumbel", neg = 270)))
+  truth <- sdvinecop(armacop(ar = -0.6), pairs = list(pc("gumbel", neg = 270)))
   u <- tssim(truth, 1000)
   a <- autodvinecop(u, armacop(order = c(1, 0)), nreplace = 1, pseudo = FALSE, verbose = FALSE)
   expect_match(a@path$choice, "^(gumbel|joe|clayton)(90|270)$")
@@ -109,7 +109,7 @@ test_that("negative dependence is modelled with the 90/270 rotations", {
 
 test_that("a search can be continued and stops when nothing is left to do", {
   set.seed(6)
-  truth <- dvinecop(armacop(ar = c(0.6, -0.25)), pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270)))
+  truth <- sdvinecop(armacop(ar = c(0.6, -0.25)), pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270)))
   u <- tssim(truth, 800)
   a1 <- autodvinecop(u, armacop(order = c(2, 0)), nreplace = 1, pseudo = FALSE, verbose = FALSE)
   expect_equal(nrow(a1@path), 1L)
@@ -123,7 +123,7 @@ test_that("a search can be continued and stops when nothing is left to do", {
 
 test_that("accepttol and the criterion are honoured", {
   set.seed(7)
-  truth <- dvinecop(armacop(ar = c(0.6, -0.25)), pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270)))
+  truth <- sdvinecop(armacop(ar = c(0.6, -0.25)), pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270)))
   u <- tssim(truth, 800)
   none <- autodvinecop(u, armacop(order = c(2, 0)), nreplace = 2, accepttol = 1e6, pseudo = FALSE,
                        verbose = FALSE)
@@ -146,7 +146,7 @@ test_that("autodvinecop validates its input", {
   expect_error(autodvinecop(u, a, criterion = "foo"), "arg")
   expect_error(autodvinecop(u, a, nreplace = 0), "nreplace")
   expect_error(autodvinecop(u, 1), "start")
-  free <- dvinecop(pairs = list(rvinecopulib::bicop_dist("gumbel", 0, 2)))
+  free <- sdvinecop(pairs = list(rvinecopulib::bicop_dist("gumbel", 0, 2)))
   expect_error(autodvinecop(u, free), "tied")
   u2 <- u
   u2[4] <- NA

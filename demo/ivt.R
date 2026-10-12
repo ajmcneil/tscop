@@ -17,11 +17,11 @@ section <- function(title) cat("\n\n==== ", title, " ====\n\n", sep = "")
 # ---------------------------------------------------------------------------
 section("1. An IVT d-vine and its cross-shaped lag-1 dependence")
 kp <- arfactcop(lambda = 0.8, w = 0.35)     # ARMA(1,1)-type kpacf, non-negative
-mod <- dvinecop(kp, tail = pc("ivt", base = "ast"), vt = c(0.45, 0.55), tautol = 1e-3)
+mod <- sdvinecop(kp, tail = pc("ivt", base = "ast"), vt = c(0.45, 0.55), tautol = 1e-3)
 mod                                         # fulcrums 0.45 (earlier) and 0.55 (later variable)
 round(ktau(mod, 6), 3)                      # the kpacf = Kendall's tau of the *base* copulas
 u <- tssim(mod, 3000)
-gauss <- tssim(dvinecop(kp, tautol = 1e-3), 3000)
+gauss <- tssim(sdvinecop(kp, tautol = 1e-3), 3000)
 par(mfrow = c(1, 3))
 plot(u, type = "l", main = "IVT d-vine", xlab = "t", ylab = "u")
 plot(u[-3000], u[-1], pch = 20, cex = 0.4, xlab = "u[t]", ylab = "u[t+1]",
@@ -34,7 +34,7 @@ par(op)
 section("2. The four base copulas")
 par(mfrow = c(2, 2))
 for (b in c("ast", "joe", "gumbel", "clayton180")) {
-  m <- dvinecop(kp, tail = pc("ivt", base = b), vt = c(0.5, 0.5), tautol = 1e-3)
+  m <- sdvinecop(kp, tail = pc("ivt", base = b), vt = c(0.5, 0.5), tautol = 1e-3)
   x <- tssim(m, 2500)
   plot(x[-2500], x[-1], pch = 20, cex = 0.4, xlab = "u[t]", ylab = "u[t+1]", main = b)
 }
@@ -52,7 +52,7 @@ sim_garch <- function(n, a0 = 0.1, a1 = 0.3, b1 = 0.6, df = 4, burn = 1000) {
 }
 x <- sim_garch(2500)
 pobs <- rank(x) / (length(x) + 1)             # pseudo-observations
-spec <- dvinecop(arfactcop(order = 1), tail = pc("ivt", base = "ast"), maxlag = 20, tautol = 1e-3)
+spec <- sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "ast"), maxlag = 20, tautol = 1e-3)
 t0 <- Sys.time()
 fit <- tsfit(pobs, spec, pseudo = TRUE)
 fit
@@ -69,10 +69,10 @@ section("4. Gaussian alternative and fulcrum options")
 # moves of either sign follow large moves), so its log-likelihood is about zero
 # and its AIC about 4; the IVT d-vine captures the dependence. Fixed (0.5) or
 # common fulcrums need fewer parameters when the data are (nearly) symmetric.
-gfit <- tsfit(pobs, dvinecop(arfactcop(order = 1), maxlag = 20, tautol = 1e-3), pseudo = TRUE)
-cfit <- tsfit(pobs, dvinecop(arfactcop(order = 1), vtpar = "common", maxlag = 20, tautol = 1e-3,
+gfit <- tsfit(pobs, sdvinecop(arfactcop(order = 1), maxlag = 20, tautol = 1e-3), pseudo = TRUE)
+cfit <- tsfit(pobs, sdvinecop(arfactcop(order = 1), vtpar = "common", maxlag = 20, tautol = 1e-3,
                              tail = pc("ivt", base = "ast")), pseudo = TRUE)       # one common fulcrum
-sfit <- tsfit(pobs, dvinecop(arfactcop(order = 1), vtpar = "none", maxlag = 20, tautol = 1e-3,
+sfit <- tsfit(pobs, sdvinecop(arfactcop(order = 1), vtpar = "none", maxlag = 20, tautol = 1e-3,
                              tail = pc("ivt", base = "ast")), pseudo = TRUE)       # fulcrums fixed at 0.5
 c(gaussian = AIC(gfit), ivt_both = AIC(fit), ivt_common = AIC(cfit), ivt_fixed = AIC(sfit))
 

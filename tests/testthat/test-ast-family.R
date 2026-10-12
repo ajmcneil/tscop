@@ -127,15 +127,15 @@ test_that("simulation and Rosenblatt are inverse for models with ast pairs", {
   for (r in 1:3) expect_equal(dv_rosenblatt(pairs, u[, r]), w[, r], tolerance = 1e-6)
 })
 
-# ---- the pc and dvinecop interface -----------------------------------------
+# ---- the pc and sdvinecop interface -----------------------------------------
 
 test_that("ast is a valid pair copula family and tail", {
   p <- pc("ast", pos = 180, neg = 270)
   expect_equal(c(p@family, p@pos, p@neg), c("ast", "180", "270"))
   expect_true(is.na(p@aux))
   expect_error(pc("ast", aux = 2), "auxiliary")
-  expect_s4_class(dvinecop(armacop(ar = 0.5, ma = 0.4), tail = "ast"), "dvinecop")
-  m <- dvinecop(armacop(ar = 0.5, ma = 0.4), pairs = list(pc("ast"), pc("gumbel")), tail = pc("ast"))
+  expect_s4_class(sdvinecop(armacop(ar = 0.5, ma = 0.4), tail = "ast"), "sdvinecop")
+  m <- sdvinecop(armacop(ar = 0.5, ma = 0.4), pairs = list(pc("ast"), pc("gumbel")), tail = pc("ast"))
   expect_output(show(m), "tail family: ast")
   pr <- dv_resolve(m)
   expect_equal(pr[[1]]$family, "ast")
@@ -145,14 +145,14 @@ test_that("ast is a valid pair copula family and tail", {
 
 test_that("a d-vine with ast pair copulas simulates, scores and refits", {
   set.seed(5)
-  truth <- dvinecop(armacop(ar = 0.6), pairs = list(pc("ast")))
+  truth <- sdvinecop(armacop(ar = 0.6), pairs = list(pc("ast")))
   u <- tssim(truth, 600)
   expect_true(all(u > 0 & u < 1))
   r <- resid(truth, u)
   expect_gt(ks.test(r, "punif")$p.value, 0.001)
-  f <- tsfit(u, dvinecop(armacop(order = c(1, 0)), pairs = list(pc("ast"))), pseudo = FALSE)
+  f <- tsfit(u, sdvinecop(armacop(order = c(1, 0)), pairs = list(pc("ast"))), pseudo = FALSE)
   expect_equal(unname(coef(f)), 0.6, tolerance = 0.12)
-  fg <- tsfit(u, dvinecop(armacop(order = c(1, 0))), pseudo = FALSE)
+  fg <- tsfit(u, sdvinecop(armacop(order = c(1, 0))), pseudo = FALSE)
   expect_gt(f@loglik, fg@loglik)
   # predictive distribution functions are consistent
   x <- c(0.1, 0.5, 0.9)
@@ -162,12 +162,12 @@ test_that("a d-vine with ast pair copulas simulates, scores and refits", {
 
 test_that("autodvinecop can select the ast copula", {
   set.seed(6)
-  truth <- dvinecop(armacop(ar = 0.7), pairs = list(pc("ast")))
+  truth <- sdvinecop(armacop(ar = 0.7), pairs = list(pc("ast")))
   u <- tssim(truth, 700)
   gauss <- tsfit(u, armacop(order = c(1, 0)), pseudo = FALSE)
   a <- autodvinecop(u, gauss, nreplace = 1, choices = "ast", pseudo = FALSE, verbose = FALSE)
   expect_equal(a@path$choice, "ast0")
   expect_true(a@path$accepted)
-  expect_lt(AIC(a), AIC(tsfit(u, dvinecop(armacop(order = c(1, 0))), pseudo = FALSE)) - 10)
+  expect_lt(AIC(a), AIC(tsfit(u, sdvinecop(armacop(order = c(1, 0))), pseudo = FALSE)) - 10)
   expect_error(autodvinecop(u, gauss, choices = "t"), "choices")
 })

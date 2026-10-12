@@ -7,7 +7,7 @@
 \description{
 Virtual class of the Gaussian copula processes whose partial
 autocorrelations can serve as the Kendall partial autocorrelation function
-(kpacf) of a \link[=dvinecop-class]{dvinecop} model: a stationary Gaussian process with
+(kpacf) of a \link[=sdvinecop-class]{sdvinecop} model: a stationary Gaussian process with
 standard normal margins is determined by its partial autocorrelations
 \eqn{\alpha_k}, and the kpacf is \eqn{\tau_k = (2/\pi)\arcsin\alpha_k}.
 Subclasses are \link[=armacop-class]{armacop} (ARMA and seasonal ARMA autocorrelations)

@@ -29,7 +29,7 @@ Simulation applies the stochastic inverse to a simulated base series.
 The base process has non-negative Kendall partial autocorrelations: it is an
 \link[=arfactcop-class]{arfactcop} model (the Gaussian copula of independent AR(1) factors
 plus noise, a generalisation of the VT-ARMA model of McNeil, 2021) or a
-tied \link[=dvinecop-class]{dvinecop} model whose kpacf is an \code{arfactcop} (pair copulas with
+tied \link[=sdvinecop-class]{sdvinecop} model whose kpacf is an \code{arfactcop} (pair copulas with
 non-Gaussian dependence, without inverse-v-transformed pair copulas).
 
 The v-transform is any of the families of the udp package: \code{vsymmetric()}
@@ -51,7 +51,7 @@ free parameters of the v-transform (\code{fulcrum}, \code{kappa}, \code{xi}).
 \describe{
 \item{\code{name}}{short description.}
 
-\item{\code{base}}{the base process: an \link[=arfactcop-class]{arfactcop} or a tied \link[=dvinecop-class]{dvinecop}
+\item{\code{base}}{the base process: an \link[=arfactcop-class]{arfactcop} or a tied \link[=sdvinecop-class]{sdvinecop}
 object (specified or a structure to be fitted).}
 
 \item{\code{vt}}{a v-transform object of the udp package; its parameter values are

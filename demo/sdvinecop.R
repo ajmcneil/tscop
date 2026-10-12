@@ -1,7 +1,7 @@
-# Demonstration of the dvinecop class: stationary d-vine copula processes with
+# Demonstration of the sdvinecop class: stationary d-vine copula processes with
 # an ARMA kpacf and non-Gaussian pair copulas. Run it with
-#   demo("dvinecop", package = "tscop")      (after installing tscop), or
-#   devtools::load_all(); source("demo/dvinecop.R", echo = TRUE)
+#   demo("sdvinecop", package = "tscop")      (after installing tscop), or
+#   devtools::load_all(); source("demo/sdvinecop.R", echo = TRUE)
 # from the source folder. It produces several plots and takes about a minute.
 
 if (!("package:tscop" %in% search())) library(tscop)
@@ -17,7 +17,7 @@ section("1. Specifying a model")
 # chosen family calibrated to have Kendall's tau tau_k. Lags without an
 # explicit specification use the tail family (Gaussian by default).
 arma <- armacop(ar = 0.5, ma = 0.4)
-mod <- dvinecop(arma, pairs = list(
+mod <- sdvinecop(arma, pairs = list(
   pc("gumbel"),                           # lag 1: upper-tail dependent
   pc("clayton", pos = 180, neg = 270),    # lag 2: survival Clayton / Clayton 270
   pc("t", aux = 5)))                      # lag 3: t copula, 5 degrees of freedom
@@ -30,14 +30,14 @@ coef(mod)
 # The effective lag K is the last lag at which |tau_k| exceeds tautol; the
 # model is a finite-order Markov chain of order K. It is stored in the object.
 mod@K
-dvinecop(arma, pairs = list(pc("gumbel")), tautol = 1e-2)@K     # coarser truncation
-dvinecop(arma, pairs = list(pc("gumbel")), maxlag = 5)@K        # imposed cap
+sdvinecop(arma, pairs = list(pc("gumbel")), tautol = 1e-2)@K     # coarser truncation
+sdvinecop(arma, pairs = list(pc("gumbel")), maxlag = 5)@K        # imposed cap
 # A pure AR kpacf has exactly the AR order:
-dvinecop(armacop(ar = c(0.5, 0.2)), pairs = list(pc("gumbel"), pc("frank")))@K
+sdvinecop(armacop(ar = c(0.5, 0.2)), pairs = list(pc("gumbel"), pc("frank")))@K
 
 # Tail families that tend to independence are allowed as the tail:
-dvinecop(arma, pairs = list(pc("gumbel")), tail = pc("clayton", pos = 180))
-try(dvinecop(arma, tail = "t"))   # t and BB1 cannot be tails
+sdvinecop(arma, pairs = list(pc("gumbel")), tail = pc("clayton", pos = 180))
+try(sdvinecop(arma, tail = "t"))   # t and BB1 cannot be tails
 
 # ---------------------------------------------------------------------------
 section("2. Kendall's tau of the pair copulas (ktau)")
@@ -50,7 +50,7 @@ barplot(tau, names.arg = 1:20, xlab = "lag", ylab = "Kendall's tau",
 section("3. Simulation (tssim) and non-Gaussian features")
 # Exact stationary simulation (inverse Rosenblatt transform, O(nK)).
 u <- tssim(mod, 600)
-g <- tssim(dvinecop(arma), 600)    # the Gaussian ARMA copula with the same kpacf
+g <- tssim(sdvinecop(arma), 600)    # the Gaussian ARMA copula with the same kpacf
 par(mfrow = c(2, 2))
 plot(u, type = "l", xlab = "t", ylab = "u", main = "d-vine with Gumbel/Clayton/t")
 plot(g, type = "l", xlab = "t", ylab = "u", main = "Gaussian ARMA copula")
@@ -65,7 +65,7 @@ section("4. Residuals (resid) and prediction (predict)")
 # Rosenblatt residuals are iid uniform from the first observation if the model
 # is right; compare the true and a Gaussian model.
 r_true <- resid(mod, u, scale = "normal")
-r_gauss <- resid(dvinecop(arma), u, scale = "normal")
+r_gauss <- resid(sdvinecop(arma), u, scale = "normal")
 par(mfrow = c(1, 3))
 qqnorm(r_true, main = "true model"); qqline(r_true)
 qqnorm(r_gauss, main = "Gaussian model"); qqline(r_gauss)
@@ -78,14 +78,14 @@ hist_hi <- c(u[1:(length(u) - 1)], 0.97)
 plot(x, predict(mod, hist_hi, type = "dens", x = x), type = "l", lwd = 2,
      xlab = "u[t+1]", ylab = "predictive density",
      main = "one-step density after u[t] = 0.97")
-lines(x, predict(dvinecop(arma), hist_hi, type = "dens", x = x), lty = 2, col = 2)
+lines(x, predict(sdvinecop(arma), hist_hi, type = "dens", x = x), lty = 2, col = 2)
 legend("topleft", c("d-vine", "Gaussian"), lty = c(1, 2), col = c(1, 2), bty = "n")
 predict(mod, u, type = "qf", x = c(0.05, 0.5, 0.95))   # predictive quantiles
 
 # ---------------------------------------------------------------------------
 section("5. Fitting a specified model (tsfit)")
 u <- tssim(mod, 800)
-spec <- dvinecop(armacop(order = c(1, 1)),
+spec <- sdvinecop(armacop(order = c(1, 1)),
                  pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270), pc("t", aux = 5)))
 t0 <- Sys.time()
 fit <- tsfit(u, spec, pseudo = FALSE)
@@ -95,7 +95,7 @@ cat("fitted in", format(round(as.numeric(difftime(Sys.time(), t0, units = "secs"
 # updated by a rule at the end (refits recorded in the object):
 c(Kstart = fit@Kstart, K = fit@model@K, refits = fit@nrefit)
 # Compare with the Gaussian ARMA copula (AIC counts the t degrees of freedom)
-gfit <- tsfit(u, dvinecop(armacop(order = c(1, 1))), pseudo = FALSE)
+gfit <- tsfit(u, sdvinecop(armacop(order = c(1, 1))), pseudo = FALSE)
 c(dvine = AIC(fit), gaussian = AIC(gfit))
 
 # ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ section("8. Free mode: explicit pair copulas for simulation")
 # evaluated, but not fitted: whether a freely specified set of one-signed
 # copulas can match the pattern of positive and negative Kendall partial
 # autocorrelations of data is not known in advance, so fitting uses tied mode.
-free <- dvinecop(pairs = list(rvinecopulib::bicop_dist("gumbel", 0, 2),
+free <- sdvinecop(pairs = list(rvinecopulib::bicop_dist("gumbel", 0, 2),
                               rvinecopulib::bicop_dist("clayton", 270, 1.5),
                               rvinecopulib::bicop_dist("frank", 0, 3)))
 free

@@ -103,7 +103,7 @@ vt_predict <- function(model, data, h, type, x, nodes) {
     stop("'x' must be numeric values strictly inside (0, 1)")
   }
   if (!vt_base_specified(model)) stop("the model has unspecified coefficients; fit it to data first")
-  u <- if (is(model@base, "dvinecop")) check_complete_copula_data(data) else check_copula_data(data, min_n = 1L)
+  u <- if (is(model@base, "sdvinecop")) check_complete_copula_data(data) else check_copula_data(data, min_n = 1L)
   v <- rep(NA_real_, length(u))
   ok <- !is.na(u)
   v[ok] <- vt_transform_data(model@vt, u[ok])
@@ -121,7 +121,7 @@ vt_resid <- function(model, data, scale, nodes) {
   if (!vt_base_specified(model)) stop("the model has unspecified coefficients; fit it to data first")
   b <- model@base
   vt <- model@vt
-  u <- if (is(b, "dvinecop")) check_complete_copula_data(data) else check_copula_data(data, min_n = 1L)
+  u <- if (is(b, "sdvinecop")) check_complete_copula_data(data) else check_copula_data(data, min_n = 1L)
   n <- length(u)
   ok <- !is.na(u)
   v <- rep(NA_real_, n)

@@ -8,7 +8,7 @@ vtscop(base, vt, vtfix = character(0))
 }
 \arguments{
 \item{base}{the base copula process: an \link[=arfactcop-class]{arfactcop} model, or a tied
-\link[=dvinecop-class]{dvinecop} model whose kpacf is an \code{arfactcop} and which has no
+\link[=sdvinecop-class]{sdvinecop} model whose kpacf is an \code{arfactcop} and which has no
 inverse-v-transformed pair copula; specified, or a structure to be fitted.}
 
 \item{vt}{a v-transform from the udp package: \code{udp::vsymmetric()},
@@ -31,7 +31,7 @@ Constructor for process-level v-transform copula processes
 # VT-ARMA-type model: one AR factor plus noise, asymmetric v-transform
 vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::v2p(delta = 0.45, kappa = 0.8))
 # a d-vine base with a Gumbel copula at lag 1
-vtscop(dvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))),
+vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))),
        udp::vlinear(0.5))
 # a model structure to be fitted, with the fulcrum fixed
 vtscop(arfactcop(order = 2), udp::v2p(0.5, 1), vtfix = "fulcrum")

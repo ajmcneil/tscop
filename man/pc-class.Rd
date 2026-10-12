@@ -12,7 +12,7 @@
 \item{object}{a \link[=pc-class]{pc} object.}
 }
 \description{
-Specification of the pair copula used at a lag of a tied \link[=dvinecop-class]{dvinecop}
+Specification of the pair copula used at a lag of a tied \link[=sdvinecop-class]{sdvinecop}
 model. The copula is calibrated at each lag to the Kendall's tau value of
 the model's Kendall partial autocorrelation function, so the specification
 needs only the family, the rotations to use under positive and negative
@@ -30,7 +30,7 @@ dependence, and (for two-parameter families) the auxiliary parameter.
 \code{"frank"}, \code{"bb1"}, \code{"ast"} and \code{"ivt"}. \code{"ivt"} is the inverse-v-transformed
 pair copula of Dias, Han and McNeil (2027), \verb{c(u, v) = c*(V1(u), V2(v))}
 with linear v-transforms whose fulcrums are parameters of the d-vine model
-(\code{vt} in \link[=dvinecop-class]{dvinecop}) and a base copula with positive dependence
+(\code{vt} in \link[=sdvinecop-class]{sdvinecop}) and a base copula with positive dependence
 given by \code{base}; \code{"ast"} is (the absolute spherical t copula of Dias,
 Han and McNeil, from the udp package: one parameter, positive dependence
 and upper tail dependence, like Gumbel and Joe; calibrated to Kendall's

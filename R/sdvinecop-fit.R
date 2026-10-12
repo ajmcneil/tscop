@@ -1,10 +1,10 @@
-# Maximum likelihood fitting of tied dvinecop models.
+# Maximum likelihood fitting of tied sdvinecop models.
 
 #' Fitted d-vine copula processes
 #'
-#' Class of objects returned by [tsfit()] for [dvinecop-class] models.
+#' Class of objects returned by [tsfit()] for [sdvinecop-class] models.
 #'
-#' @slot model the fitted [dvinecop-class] model (with its effective lag).
+#' @slot model the fitted [sdvinecop-class] model (with its effective lag).
 #' @slot data the copula data to which the model was fitted.
 #' @slot pseudo logical: were the data pseudo-observations?
 #' @slot estimate named numeric vector of estimates: the ARMA coefficients
@@ -21,7 +21,7 @@
 #' @slot convergence convergence code of the last optimisation (0 is
 #'   success).
 #' @slot message optimiser message.
-#' @slot start the [dvinecop-class] model used as starting values.
+#' @slot start the [sdvinecop-class] model used as starting values.
 #' @slot Kstart the effective lag at the starting values.
 #' @slot nrefit number of refits triggered by a change in the effective lag.
 #' @slot dloglik the change in log-likelihood at the fitted parameters when
@@ -31,12 +31,12 @@
 #' @slot path for a model selected by [autodvinecop()], a data frame with one
 #'   row per lag examined; an empty data frame otherwise.
 #'
-#' @exportClass dvinecopfit
-setClass("dvinecopfit", slots = c(
-  model = "dvinecop", data = "numeric", pseudo = "logical",
+#' @exportClass sdvinecopfit
+setClass("sdvinecopfit", slots = c(
+  model = "sdvinecop", data = "numeric", pseudo = "logical",
   estimate = "numeric", se = "numeric", vcov = "matrix", se_method = "character",
   boot = "matrix", loglik = "numeric", nobs = "integer", npar = "integer",
-  convergence = "integer", message = "character", start = "dvinecop",
+  convergence = "integer", message = "character", start = "sdvinecop",
   Kstart = "integer", nrefit = "integer", dloglik = "numeric", template = "ANY",
   path = "data.frame"
 ))
@@ -199,11 +199,11 @@ dv_start <- function(object, init, u, control) {
   specaux <- vapply(object@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
   vt <- if (lay$has_ivt) object@vt else numeric(0)
   if (!is.null(init)) {
-    if (is(init, "dvinecop")) {
+    if (is(init, "sdvinecop")) {
       ok <- !is.null(init@kpacf) && identical(gc_structure(init@kpacf), gc_structure(kp)) &&
         length(init@pairs) == lay$K0 && identical(init@mode, "tied") &&
         identical(lapply(init@pairs, function(sp) sp@family), lapply(object@pairs, function(sp) sp@family))
-      if (!ok) stop("'init' must be a tied dvinecop with the same kpacf structure and pair copula families as 'object'")
+      if (!ok) stop("'init' must be a tied sdvinecop with the same kpacf structure and pair copula families as 'object'")
       if (!gc_is_specified(init@kpacf)) stop("'init' has unspecified kpacf coefficients")
       kp <- init@kpacf
       specaux <- vapply(init@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
@@ -213,7 +213,7 @@ dv_start <- function(object, init, u, control) {
       specaux <- as.numeric(init[na + seq_along(lay$aux_lags)])
       if (lay$nvt > 0L) vt <- rep(as.numeric(init[na + length(lay$aux_lags) + seq_len(lay$nvt)]), length.out = 2L)
     } else {
-      stop("'init' must be a dvinecop model or a numeric vector of coefficients")
+      stop("'init' must be a sdvinecop model or a numeric vector of coefficients")
     }
   } else if (!gc_is_specified(kp)) {
     # Inverse-v-transformed pair copulas have cross-shaped dependence with no
@@ -241,7 +241,7 @@ dv_build_model <- function(object, z, lay, K, limit) {
   }
   vt <- dv_vt_from_free(z, lay)
   if (!is.null(vt)) names(vt) <- c("fulcrum1", "fulcrum2")
-  m <- dvinecop(kp, pairs = pairs, tail = object@tail, tautol = object@tautol,
+  m <- sdvinecop(kp, pairs = pairs, tail = object@tail, tautol = object@tautol,
                 maxlag = object@maxlag, vt = vt, vtpar = object@vtpar)
   m@K <- as.integer(K)
   m@Klimit <- limit
@@ -251,7 +251,7 @@ dv_build_model <- function(object, z, lay, K, limit) {
 # ---- fitting --------------------------------------------------------------
 
 # Full fitting procedure on complete data u: starting values, the K rule and
-# the optimisation. Returns the pieces needed to build a dvinecopfit.
+# the optimisation. Returns the pieces needed to build a sdvinecopfit.
 dv_fit_all <- function(u, object, init, control) {
   st <- dv_start(object, init, u, control)
   lay <- st$lay
@@ -284,15 +284,15 @@ dv_fit_all <- function(u, object, init, control) {
   c(res, list(lay = lay, st = st, limit = limit, loglik = ll_of(res$z, res$K), u = u))
 }
 
-#' @describeIn tsfit Maximum likelihood fit of a tied [dvinecop-class] model.
+#' @describeIn tsfit Maximum likelihood fit of a tied [sdvinecop-class] model.
 #'
-#' @param bootstart for `se = "bootstrap"` on a [dvinecop-class] model: `"fitted"`
+#' @param bootstart for `se = "bootstrap"` on a [sdvinecop-class] model: `"fitted"`
 #'   (default) starts each replicate's refit from the fitted values with the
 #'   effective lag held fixed, which is much cheaper; `"user"` repeats the whole
 #'   procedure from the original starting rules, including the effective-lag
 #'   rule.
 #'
-#' @details For a [dvinecop-class] model the ARMA coefficients and the
+#' @details For a [sdvinecop-class] model the ARMA coefficients and the
 #'   auxiliary parameters (degrees of freedom of `t` copulas, `delta` of BB1
 #'   copulas) are estimated jointly, by BFGS on an unconstrained scale with a
 #'   Nelder-Mead fallback. Starting values come from `init`, otherwise from
@@ -310,10 +310,10 @@ dv_fit_all <- function(u, object, init, control) {
 #'   zero), at the boundary of a BB1 copula's feasible region, and for
 #'   pseudo-observations.
 #'
-#' @return For a [dvinecop-class] model, an object of class
-#'   [dvinecopfit-class].
+#' @return For a [sdvinecop-class] model, an object of class
+#'   [sdvinecopfit-class].
 #' @export
-setMethod("tsfit", signature(U = "ANY", object = "dvinecop"),
+setMethod("tsfit", signature(U = "ANY", object = "sdvinecop"),
   function(U, object, pseudo = TRUE, se = FALSE, B = 200, init = NULL,
            control = list(), bootstart = "fitted", ...) {
     if (object@mode != "tied") {
@@ -389,7 +389,7 @@ setMethod("tsfit", signature(U = "ANY", object = "dvinecop"),
     names(se_vec) <- cn
     start_model <- tryCatch(dv_build_model(object, fit$st$z0, lay, fit$Kstart, "tol"),
                             error = function(e) object)
-    new("dvinecopfit",
+    new("sdvinecopfit",
       model = model, data = u, pseudo = pseudo, estimate = est, se = se_vec, vcov = V,
       se_method = se_method, boot = boot, loglik = fit$loglik, nobs = n, npar = as.integer(npar),
       convergence = as.integer(fit$fit$convergence), message = fit$fit$message,
@@ -403,28 +403,28 @@ setMethod("tsfit", signature(U = "ANY", object = "dvinecop"),
 
 # ---- methods for fitted objects -------------------------------------------
 
-#' @describeIn dvinecopfit-class Coefficient estimates.
-#' @param object an object of class [dvinecopfit-class].
+#' @describeIn sdvinecopfit-class Coefficient estimates.
+#' @param object an object of class [sdvinecopfit-class].
 #' @param ... not used.
 #' @export
-setMethod("coef", "dvinecopfit", function(object) object@estimate)
+setMethod("coef", "sdvinecopfit", function(object) object@estimate)
 
-#' @describeIn dvinecopfit-class Log-likelihood, with `df` and `nobs`
+#' @describeIn sdvinecopfit-class Log-likelihood, with `df` and `nobs`
 #'   attributes so that [stats::AIC()] and [stats::BIC()] work.
 #' @export
-setMethod("logLik", "dvinecopfit", function(object) {
+setMethod("logLik", "sdvinecopfit", function(object) {
   structure(object@loglik, df = object@npar, nobs = object@nobs, class = "logLik")
 })
 
-#' @describeIn dvinecopfit-class Covariance matrix of the estimates (`NA`
+#' @describeIn sdvinecopfit-class Covariance matrix of the estimates (`NA`
 #'   unless standard errors were requested).
 #' @export
-setMethod("vcov", "dvinecopfit", function(object, ...) object@vcov)
+setMethod("vcov", "sdvinecopfit", function(object, ...) object@vcov)
 
-#' @describeIn dvinecopfit-class Show method.
+#' @describeIn sdvinecopfit-class Show method.
 #' @export
-setMethod("show", "dvinecopfit", function(object) {
-  cat("object class: dvinecopfit\n")
+setMethod("show", "sdvinecopfit", function(object) {
+  cat("object class: sdvinecopfit\n")
   m <- object@model
   cat("kpacf: ", gc_describe(m@kpacf), "\n", sep = "")
   lab <- dv_explicit_labels(m)
@@ -455,14 +455,14 @@ setMethod("show", "dvinecopfit", function(object) {
 
 #' @rdname tssim
 #' @export
-setMethod("tssim", "dvinecopfit", function(object, n, ...) {
+setMethod("tssim", "sdvinecopfit", function(object, n, ...) {
   if (missing(n)) n <- length(object@data)
   tssim(object@model, n)
 })
 
 #' @rdname ktau
 #' @export
-setMethod("ktau", "dvinecopfit", function(object, lagmax, ...) {
+setMethod("ktau", "sdvinecopfit", function(object, lagmax, ...) {
   if (missing(lagmax)) lagmax <- 20
   ktau(object@model, lagmax)
 })
@@ -472,23 +472,23 @@ dv_fit_data <- function(object, data) {
   if (is.null(object@template)) object@data else object@template
 }
 
-#' @rdname resid-dvinecop
+#' @rdname resid-sdvinecop
 #' @export
-setMethod("resid", "dvinecopfit", function(object, data, scale = "uniform", ...) {
+setMethod("resid", "sdvinecopfit", function(object, data, scale = "uniform", ...) {
   if (missing(data)) data <- dv_fit_data(object)
   dv_resid(object@model, data, scale)
 })
 
-#' @rdname resid-dvinecop
+#' @rdname resid-sdvinecop
 #' @export
-setMethod("residuals", "dvinecopfit", function(object, data, scale = "uniform", ...) {
+setMethod("residuals", "sdvinecopfit", function(object, data, scale = "uniform", ...) {
   if (missing(data)) data <- dv_fit_data(object)
   dv_resid(object@model, data, scale)
 })
 
-#' @rdname predict-dvinecop
+#' @rdname predict-sdvinecop
 #' @export
-setMethod("predict", "dvinecopfit", function(object, data, h = 1, type = "df", x = NULL, ...) {
+setMethod("predict", "sdvinecopfit", function(object, data, h = 1, type = "df", x = NULL, ...) {
   if (missing(data)) data <- object@data
   dv_predict(object@model, data, h, type, x)
 })

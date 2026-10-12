@@ -2,7 +2,7 @@
 #'
 #' Virtual class of the Gaussian copula processes whose partial
 #' autocorrelations can serve as the Kendall partial autocorrelation function
-#' (kpacf) of a [dvinecop-class] model: a stationary Gaussian process with
+#' (kpacf) of a [sdvinecop-class] model: a stationary Gaussian process with
 #' standard normal margins is determined by its partial autocorrelations
 #' \eqn{\alpha_k}, and the kpacf is \eqn{\tau_k = (2/\pi)\arcsin\alpha_k}.
 #' Subclasses are [armacop-class] (ARMA and seasonal ARMA autocorrelations)
@@ -16,7 +16,7 @@ setClassUnion("gausscopOrNULL", c("gausscop", "NULL"))
 
 # ---- internal interface of a Gaussian copula process ---------------------
 #
-# Every subclass implements these generics; dvinecop, tsfit for dvinecop and
+# Every subclass implements these generics; sdvinecop, tsfit for sdvinecop and
 # autodvinecop use only this interface.
 #
 #   gc_is_specified(G)        TRUE if all coefficients are specified

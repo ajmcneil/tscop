@@ -15,51 +15,51 @@ test_that("pc specifications are validated", {
 })
 
 test_that("tied models are constructed and the effective lag is stored", {
-  m <- dvinecop(armacop(ar = 0.5, ma = 0.4), pairs = list(pc("gumbel"), pc("clayton")))
-  expect_s4_class(m, "dvinecop")
+  m <- sdvinecop(armacop(ar = 0.5, ma = 0.4), pairs = list(pc("gumbel"), pc("clayton")))
+  expect_s4_class(m, "sdvinecop")
   expect_equal(m@mode, "tied")
   expect_equal(m@tail@family, "gauss")
   e <- arma_coef_expanded(m@kpacf)
   expect_equal(m@K, dv_effective_lag(e$ar, e$ma, 2L)$K)
   expect_equal(m@Klimit, "tol")
   # pure ARMA copula
-  m0 <- dvinecop(armacop(ar = 0.5, ma = 0.4))
+  m0 <- sdvinecop(armacop(ar = 0.5, ma = 0.4))
   expect_equal(length(m0@pairs), 0)
   # pure AR: K is the AR order
-  m1 <- dvinecop(armacop(ar = c(0.5, 0.2)), pairs = list(pc("t", aux = 6)))
+  m1 <- sdvinecop(armacop(ar = c(0.5, 0.2)), pairs = list(pc("t", aux = 6)))
   expect_equal(m1@K, 2L)
   expect_equal(m1@Klimit, "ar")
   # floor at number of explicit pairs
-  m2 <- dvinecop(armacop(ar = 0.5), pairs = list(pc("gumbel"), pc("clayton"), pc("joe")))
+  m2 <- sdvinecop(armacop(ar = 0.5), pairs = list(pc("gumbel"), pc("clayton"), pc("joe")))
   expect_equal(m2@K, 3L)
   expect_equal(m2@Klimit, "floor")
   # maxlag
-  m3 <- dvinecop(armacop(ar = 0.9, ma = 0.5), maxlag = 5)
+  m3 <- sdvinecop(armacop(ar = 0.9, ma = 0.5), maxlag = 5)
   expect_equal(c(m3@K, m3@Klimit), c("5", "maxlag"), ignore_attr = TRUE)
 })
 
 test_that("tails are restricted to families that tend to independence", {
   for (f in c("gumbel", "clayton", "joe", "frank", "gauss")) {
-    expect_s4_class(dvinecop(armacop(ar = 0.5, ma = 0.4), tail = f), "dvinecop")
+    expect_s4_class(sdvinecop(armacop(ar = 0.5, ma = 0.4), tail = f), "sdvinecop")
   }
-  expect_error(dvinecop(armacop(ar = 0.5, ma = 0.4), tail = "t"), "tail family")
-  expect_error(dvinecop(armacop(ar = 0.5, ma = 0.4), tail = pc("bb1", aux = 1.5)), "tail family")
-  m <- dvinecop(armacop(ar = 0.5, ma = 0.4), tail = pc("clayton", pos = 180, neg = 270))
+  expect_error(sdvinecop(armacop(ar = 0.5, ma = 0.4), tail = "t"), "tail family")
+  expect_error(sdvinecop(armacop(ar = 0.5, ma = 0.4), tail = pc("bb1", aux = 1.5)), "tail family")
+  m <- sdvinecop(armacop(ar = 0.5, ma = 0.4), tail = pc("clayton", pos = 180, neg = 270))
   expect_equal(m@tail@pos, 180)
 })
 
 test_that("construction errors are informative", {
-  expect_error(dvinecop(), "needs 'kpacf'")
-  expect_error(dvinecop(pairs = list(pc("gumbel"))), "needs 'kpacf'")
-  expect_error(dvinecop(kpacf = 1), "Gaussian copula process")
-  expect_error(dvinecop(armacop(ar = 0.5), pairs = list(pc("gumbel"), rvinecopulib::bicop_dist("gauss", 0, 0.3))), "mix")
-  expect_error(dvinecop(armacop(ar = 0.5), pairs = list(1)), "pc\\(\\)")
-  expect_error(dvinecop(armacop(ar = 0.5), tautol = 0), "tautol")
-  expect_error(dvinecop(armacop(ar = 0.5), maxlag = 0), "maxlag")
+  expect_error(sdvinecop(), "needs 'kpacf'")
+  expect_error(sdvinecop(pairs = list(pc("gumbel"))), "needs 'kpacf'")
+  expect_error(sdvinecop(kpacf = 1), "Gaussian copula process")
+  expect_error(sdvinecop(armacop(ar = 0.5), pairs = list(pc("gumbel"), rvinecopulib::bicop_dist("gauss", 0, 0.3))), "mix")
+  expect_error(sdvinecop(armacop(ar = 0.5), pairs = list(1)), "pc\\(\\)")
+  expect_error(sdvinecop(armacop(ar = 0.5), tautol = 0), "tautol")
+  expect_error(sdvinecop(armacop(ar = 0.5), maxlag = 0), "maxlag")
 })
 
 test_that("a model structure has an undetermined effective lag", {
-  m <- dvinecop(armacop(order = c(1, 1)), pairs = list(pc("gumbel")))
+  m <- sdvinecop(armacop(order = c(1, 1)), pairs = list(pc("gumbel")))
   expect_true(is.na(m@K))
   expect_output(show(m), "not yet determined")
   expect_error(dv_resolve(m), "unspecified")
@@ -67,25 +67,25 @@ test_that("a model structure has an undetermined effective lag", {
 
 test_that("free-mode models hold bicop_dist objects", {
   b <- list(rvinecopulib::bicop_dist("gumbel", 90, 2), rvinecopulib::bicop_dist("clayton", 0, 1))
-  m <- dvinecop(pairs = b)
+  m <- sdvinecop(pairs = b)
   expect_equal(m@mode, "free")
   expect_equal(m@K, 2L)
   expect_null(m@tail)
   pr <- dv_resolve(m)
   expect_equal(pr[[1]]$rotation, 90)
   # Gaussian ARMA tail beyond the explicit copulas
-  m2 <- dvinecop(armacop(ar = 0.5, ma = 0.4), pairs = b)
+  m2 <- sdvinecop(armacop(ar = 0.5, ma = 0.4), pairs = b)
   expect_equal(m2@mode, "free")
   expect_gt(m2@K, 2L)
   pr2 <- dv_resolve(m2)
   alpha <- arma_pacf(0.5, 0.4, m2@K)
   expect_equal(pr2[[5]]$parameters, alpha[5])
-  expect_error(dvinecop(armacop(ar = 0.5), pairs = b, tail = "gumbel"), "Gaussian tail")
+  expect_error(sdvinecop(armacop(ar = 0.5), pairs = b, tail = "gumbel"), "Gaussian tail")
   expect_output(show(m), "free mode")
 })
 
 test_that("tied resolution calibrates every lag to the ARMA kpacf", {
-  m <- dvinecop(armacop(ar = 0.5, ma = 0.4),
+  m <- sdvinecop(armacop(ar = 0.5, ma = 0.4),
                 pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270), pc("t", aux = 6)),
                 tail = "frank")
   pr <- dv_resolve(m)
@@ -97,22 +97,22 @@ test_that("tied resolution calibrates every lag to the ARMA kpacf", {
 })
 
 test_that("negative lags use the negative rotations", {
-  m <- dvinecop(armacop(ar = -0.5), pairs = list(pc("gumbel", neg = 270)))
+  m <- sdvinecop(armacop(ar = -0.5), pairs = list(pc("gumbel", neg = 270)))
   expect_equal(dv_resolve(m)[[1]]$rotation, 270)
   expect_output(show(m), "gumbel270")
-  m2 <- dvinecop(armacop(ar = 0.5), pairs = list(pc("gumbel", pos = 180)))
+  m2 <- sdvinecop(armacop(ar = 0.5), pairs = list(pc("gumbel", pos = 180)))
   expect_output(show(m2), "gumbel180")
 })
 
-test_that("dvinecop without substitutions reproduces armacop", {
+test_that("sdvinecop without substitutions reproduces armacop", {
   set.seed(5)
   for (cs in list(list(ar = 0.5, ma = 0.4), list(ar = c(0.5, 0.3)), list(ma = 0.6))) {
     arma <- do.call(armacop, cs)
     e <- arma_coef_expanded(arma)
     u <- pnorm(sim_arma_scores(40, e$ar, e$ma))
-    m <- dvinecop(arma, tautol = 1e-14)
+    m <- sdvinecop(arma, tautol = 1e-14)
     expect_equal(dv_model_loglik(m, u), arma_copula_loglik(u, e$ar, e$ma), tolerance = 1e-8)
-    m2 <- dvinecop(arma, pairs = lapply(seq_len(2), function(i) pc("gauss")), tautol = 1e-14)
+    m2 <- sdvinecop(arma, pairs = lapply(seq_len(2), function(i) pc("gauss")), tautol = 1e-14)
     expect_equal(dv_model_loglik(m2, u), arma_copula_loglik(u, e$ar, e$ma), tolerance = 1e-8)
   }
 })
@@ -123,24 +123,24 @@ test_that("truncation error is small at the default tolerance", {
   e <- arma_coef_expanded(arma)
   u <- pnorm(sim_arma_scores(300, e$ar, e$ma))
   exact <- arma_copula_loglik(u, e$ar, e$ma)
-  m <- dvinecop(arma)
+  m <- sdvinecop(arma)
   expect_lt(abs(dv_model_loglik(m, u) - exact), 1e-2)
 })
 
 test_that("infeasible models give -Inf log-likelihood", {
-  m <- dvinecop(armacop(ar = 0.3), pairs = list(pc("bb1", aux = 3)))
+  m <- sdvinecop(armacop(ar = 0.3), pairs = list(pc("bb1", aux = 3)))
   expect_equal(dv_model_loglik(m, runif(50)), -Inf)
 })
 
 test_that("coef lists ARMA coefficients then auxiliary parameters", {
-  m <- dvinecop(armacop(ar = 0.5, ma = 0.4),
+  m <- sdvinecop(armacop(ar = 0.5, ma = 0.4),
                 pairs = list(pc("gumbel"), pc("t", aux = 6), pc("bb1", aux = 1.4)))
   expect_equal(names(coef(m)), c("ar1", "ma1", "nu2", "delta3"))
   expect_equal(unname(coef(m)), c(0.5, 0.4, 6, 1.4))
 })
 
 test_that("show describes the model", {
-  m <- dvinecop(armacop(ar = 0.5, ma = 0.4), pairs = list(pc("gumbel"), pc("t", aux = 6)))
+  m <- sdvinecop(armacop(ar = 0.5, ma = 0.4), pairs = list(pc("gumbel"), pc("t", aux = 6)))
   expect_output(show(m), "tied mode")
   expect_output(show(m), "gumbel0, t")
   expect_output(show(m), "effective lag K")
@@ -151,7 +151,7 @@ test_that("log-likelihood agrees with the legacy sdvinecopula objective", {
   set.seed(7)
   u <- pnorm(sim_arma_scores(200, 0.5, 0.3))
   check <- function(ar, ma, fam, posrot, negrot, auxpar, pcs) {
-    mod <- dvinecop(armacop(ar = ar, ma = ma), pairs = pcs)
+    mod <- sdvinecop(armacop(ar = ar, ma = ma), pairs = pcs)
     old <- tscopula::sdvinecopula(pars = list(ar = ar, ma = ma), family = fam, posrot = posrot,
                                   negrot = negrot, auxpar = auxpar, tautol = 1e-4)
     th <- unlist(old@pars)

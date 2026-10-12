@@ -14,7 +14,7 @@
 
 #' Pair copula specifications
 #'
-#' Specification of the pair copula used at a lag of a tied [dvinecop-class]
+#' Specification of the pair copula used at a lag of a tied [sdvinecop-class]
 #' model. The copula is calibrated at each lag to the Kendall's tau value of
 #' the model's Kendall partial autocorrelation function, so the specification
 #' needs only the family, the rotations to use under positive and negative
@@ -24,7 +24,7 @@
 #'   `"frank"`, `"bb1"`, `"ast"` and `"ivt"`. `"ivt"` is the inverse-v-transformed
 #'   pair copula of Dias, Han and McNeil (2027), `c(u, v) = c*(V1(u), V2(v))`
 #'   with linear v-transforms whose fulcrums are parameters of the d-vine model
-#'   (`vt` in [dvinecop-class]) and a base copula with positive dependence
+#'   (`vt` in [sdvinecop-class]) and a base copula with positive dependence
 #'   given by `base`; `"ast"` is (the absolute spherical t copula of Dias,
 #'   Han and McNeil, from the udp package: one parameter, positive dependence
 #'   and upper tail dependence, like Gumbel and Joe; calibrated to Kendall's

@@ -71,8 +71,8 @@ the free v-transform parameters).}
 
 \item{\code{start}}{the \link[=vtscop-class]{vtscop} model with the starting values.}
 
-\item{\code{Kstart,nrefit,dloglik}}{effective-lag bookkeeping for a \link[=dvinecop-class]{dvinecop}
-base (as in \link[=dvinecopfit-class]{dvinecopfit}); \code{NA} for an \code{arfactcop} base.}
+\item{\code{Kstart,nrefit,dloglik}}{effective-lag bookkeeping for a \link[=sdvinecop-class]{sdvinecop}
+base (as in \link[=sdvinecopfit-class]{sdvinecopfit}); \code{NA} for an \code{arfactcop} base.}
 
 \item{\code{template}}{the original input if it was a \code{ts}, \code{zoo} or \code{xts} object,
 otherwise \code{NULL}.}

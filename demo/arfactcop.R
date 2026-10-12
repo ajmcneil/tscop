@@ -81,10 +81,10 @@ predict(fit2, type = "qf", x = c(0.05, 0.5, 0.95))
 section("6. As the kpacf of a d-vine with absolute spherical t copulas")
 # The partial autocorrelations of the factor model can calibrate the pair
 # copulas of a d-vine (here ast copulas at lags 1 and 2, Gaussian beyond).
-m <- dvinecop(g, pairs = list(pc("ast"), pc("ast")))
+m <- sdvinecop(g, pairs = list(pc("ast"), pc("ast")))
 m
 ud <- tssim(m, 600)
-fd <- tsfit(ud, dvinecop(arfactcop(order = 2), pairs = list(pc("ast"), pc("ast"))), pseudo = FALSE)
+fd <- tsfit(ud, sdvinecop(arfactcop(order = 2), pairs = list(pc("ast"), pc("ast"))), pseudo = FALSE)
 fd
 # automatic selection of the pair copulas, starting from a fitted factor model
 auto <- autodvinecop(ud, tsfit(ud, arfactcop(order = 2), pseudo = FALSE), nreplace = 3,

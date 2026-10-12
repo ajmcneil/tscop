@@ -185,11 +185,11 @@ test_that("the Gaussian MLE recovers a factor model and a poor start converges t
   expect_true(gc_is_specified(g))
 })
 
-# ---- use as a kpacf source in dvinecop -----------------------------------------
+# ---- use as a kpacf source in sdvinecop -----------------------------------------
 
-test_that("dvinecop accepts an arfactcop and resolves pair copulas from its kpacf", {
+test_that("sdvinecop accepts an arfactcop and resolves pair copulas from its kpacf", {
   g <- arfactcop(lambda = c(0.98, 0.7), w = c(0.3, 0.4))
-  m <- dvinecop(g, pairs = list(pc("ast"), pc("gumbel")), tail = "ast")
+  m <- sdvinecop(g, pairs = list(pc("ast"), pc("gumbel")), tail = "ast")
   expect_equal(m@mode, "tied")
   expect_gt(m@K, 5L)
   expect_output(show(m), "kpacf: 2-factor AR\\(1\\) model")
@@ -198,7 +198,7 @@ test_that("dvinecop accepts an arfactcop and resolves pair copulas from its kpac
   for (j in seq_len(m@K)) expect_lt(abs(dv_pair_ktau(pr[[j]]) - tau[j]), 1e-6)
   expect_equal(names(coef(m)), c("lambda1", "lambda2", "w1", "w2"))
   # the structure only gives an undetermined effective lag
-  expect_true(is.na(dvinecop(arfactcop(order = 2), pairs = list(pc("ast")))@K))
+  expect_true(is.na(sdvinecop(arfactcop(order = 2), pairs = list(pc("ast")))@K))
 })
 
 test_that("a d-vine with an arfactcop kpacf equals the ARMA-based one for one factor plus noise", {
@@ -209,18 +209,18 @@ test_that("a d-vine with an arfactcop kpacf equals the ARMA-based one for one fa
   r <- Re(polyroot(c(1, b, 1)))
   theta <- r[abs(r) < 1]
   u <- tssim(armacop(ar = lam, ma = theta), 300)
-  ma <- dvinecop(armacop(ar = lam, ma = theta), pairs = list(pc("gumbel"), pc("ast")), tautol = 1e-8)
-  mf <- dvinecop(arfactcop(lambda = lam, w = w), pairs = list(pc("gumbel"), pc("ast")), tautol = 1e-8)
+  ma <- sdvinecop(armacop(ar = lam, ma = theta), pairs = list(pc("gumbel"), pc("ast")), tautol = 1e-8)
+  mf <- sdvinecop(arfactcop(lambda = lam, w = w), pairs = list(pc("gumbel"), pc("ast")), tautol = 1e-8)
   expect_equal(dv_model_loglik(mf, u), dv_model_loglik(ma, u), tolerance = 1e-6)
   # Gaussian d-vine log-likelihood approaches the exact factor likelihood
-  g <- dvinecop(arfactcop(lambda = lam, w = w), tautol = 1e-12)
+  g <- sdvinecop(arfactcop(lambda = lam, w = w), tautol = 1e-12)
   expect_equal(dv_model_loglik(g, u), afc_copula_loglik(u, lam, w, 1 - w), tolerance = 1e-6)
 })
 
 test_that("free mode accepts an arfactcop tail", {
   g <- arfactcop(lambda = 0.9, w = 0.6)
   b <- list(rvinecopulib::bicop_dist("gumbel", 0, 2), rvinecopulib::bicop_dist("clayton", 0, 1))
-  m <- dvinecop(g, pairs = b)
+  m <- sdvinecop(g, pairs = b)
   expect_equal(m@mode, "free")
   expect_gt(m@K, 2L)
   pr <- dv_resolve(m)
@@ -232,18 +232,18 @@ test_that("free mode accepts an arfactcop tail", {
 
 test_that("tsfit and autodvinecop work with an arfactcop kpacf", {
   set.seed(9)
-  truth <- dvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel")), tautol = 1e-3)
+  truth <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel")), tautol = 1e-3)
   u <- tssim(truth, 700)
-  spec <- dvinecop(arfactcop(order = 1), pairs = list(pc("gumbel")), tautol = 1e-3)
+  spec <- sdvinecop(arfactcop(order = 1), pairs = list(pc("gumbel")), tautol = 1e-3)
   f <- tsfit(u, spec, pseudo = FALSE)
-  expect_s4_class(f, "dvinecopfit")
+  expect_s4_class(f, "sdvinecopfit")
   expect_equal(names(coef(f)), c("lambda1", "w1"))
   expect_equal(unname(coef(f)), c(0.9, 0.6), tolerance = 0.2)
   expect_equal(f@npar, 2L)
-  gfit <- tsfit(u, dvinecop(arfactcop(order = 1), tautol = 1e-3), pseudo = FALSE)
+  gfit <- tsfit(u, sdvinecop(arfactcop(order = 1), tautol = 1e-3), pseudo = FALSE)
   expect_gt(f@loglik, gfit@loglik)
   a <- autodvinecop(u, arfactcop(order = 1), nreplace = 2, pseudo = FALSE, verbose = FALSE, tautol = 1e-3)
-  expect_s4_class(a, "dvinecopfit")
+  expect_s4_class(a, "sdvinecopfit")
   expect_equal(a@path$choice[1], "gumbel0")
   # standard errors
   fh <- tsfit(u, spec, pseudo = FALSE, se = "hessian")

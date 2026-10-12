@@ -20,8 +20,8 @@
 #' @slot convergence convergence code of the last optimisation (0 is success).
 #' @slot message optimiser message.
 #' @slot start the [vtscop-class] model with the starting values.
-#' @slot Kstart,nrefit,dloglik effective-lag bookkeeping for a [dvinecop-class]
-#'   base (as in [dvinecopfit-class]); `NA` for an `arfactcop` base.
+#' @slot Kstart,nrefit,dloglik effective-lag bookkeeping for a [sdvinecop-class]
+#'   base (as in [sdvinecopfit-class]); `NA` for an `arfactcop` base.
 #' @slot template the original input if it was a `ts`, `zoo` or `xts` object,
 #'   otherwise `NULL`.
 #'
@@ -68,7 +68,7 @@ vt_pars_to_free <- function(p, free) {
 }
 
 # Negative copula log-likelihood on the free scale (base free vector, then the
-# v-transform free parameters) at fixed effective lag K (dvinecop bases).
+# v-transform free parameters) at fixed effective lag K (sdvinecop bases).
 vt_negll <- function(z, L, K, u) {
   nb <- L$nb
   zv <- z[nb + seq_along(L$free)]
@@ -194,7 +194,7 @@ vt_build_model <- function(object, z, L, K, limit) {
 #'   parameters and the free v-transform parameters (fulcrum, kappa, xi) are
 #'   estimated jointly on an unconstrained scale (BFGS with a Nelder-Mead
 #'   fallback). The base is first fitted as a Gaussian copula (for a d-vine base
-#'   with the effective-lag rule of [dvinecop-class]) to the v-transformed
+#'   with the effective-lag rule of [sdvinecop-class]) to the v-transformed
 #'   data at the starting v-transform. `init` is a [vtscop-class] model of the
 #'   same structure or a numeric vector in `coef` order; `bootstart` is
 #'   accepted for compatibility: bootstrap refits start from the fitted values
@@ -214,7 +214,7 @@ setMethod("tsfit", signature(U = "ANY", object = "vtscop"),
         (!is.numeric(B) || length(B) != 1L || B < 10 || B != round(B))) {
       stop("'B' must be a whole number of at least 10")
     }
-    u <- if (is(object@base, "dvinecop")) check_complete_copula_data(U, min_n = 20L) else check_copula_data(U)
+    u <- if (is(object@base, "sdvinecop")) check_complete_copula_data(U, min_n = 20L) else check_copula_data(U)
     n <- length(u)
     fit <- vt_fit_all(u, object, init, control)
     L <- fit$L

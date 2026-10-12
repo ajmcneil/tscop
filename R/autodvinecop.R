@@ -94,14 +94,14 @@ dv_tau_positive <- function(model, k) {
 
 # Starting model for the search: a fitted d-vine of the same data.
 dv_auto_start <- function(U, start, tautol, maxlag, pseudo, control) {
-  if (is(start, "dvinecopfit")) return(tsfit(U, start@model, pseudo = pseudo, control = control))
-  if (is(start, "dvinecop")) return(tsfit(U, start, pseudo = pseudo, control = control))
+  if (is(start, "sdvinecopfit")) return(tsfit(U, start@model, pseudo = pseudo, control = control))
+  if (is(start, "sdvinecop")) return(tsfit(U, start, pseudo = pseudo, control = control))
   if (is(start, "armacopfit") || is(start, "arfactcopfit")) start <- start@model
   if (is(start, "gausscop")) {
-    return(tsfit(U, dvinecop(start, tautol = tautol, maxlag = maxlag), pseudo = pseudo,
+    return(tsfit(U, sdvinecop(start, tautol = tautol, maxlag = maxlag), pseudo = pseudo,
                  control = control))
   }
-  stop("'start' must be an armacop (or arfactcop) model or fit, or a dvinecop or dvinecopfit object")
+  stop("'start' must be an armacop (or arfactcop) model or fit, or a sdvinecop or sdvinecopfit object")
 }
 
 #' Automatic selection of non-Gaussian pair copulas
@@ -133,7 +133,7 @@ dv_auto_start <- function(U, start, tautol, maxlag, pseudo, control) {
 #' @param U complete copula data in (0, 1).
 #' @param start the starting model: an [armacop-class] model or fit (the
 #'   Gaussian d-vine with this ARMA kpacf is fitted first), or a tied
-#'   [dvinecop-class] model or fit (to continue a search).
+#'   [sdvinecop-class] model or fit (to continue a search).
 #' @param nreplace the largest lag at which a substitution is examined (the
 #'   search examines lags after any explicit pair copulas already present, up
 #'   to `nreplace`).
@@ -160,14 +160,14 @@ dv_auto_start <- function(U, start, tautol, maxlag, pseudo, control) {
 #' @param control list of control parameters for [stats::optim()].
 #' @param verbose logical: print a line per lag.
 #'
-#' @return A [dvinecopfit-class] object for the selected model, with the
+#' @return A [sdvinecopfit-class] object for the selected model, with the
 #'   selection path in its `path` slot.
 #' @export
 #'
 #' @examples
 #' \donttest{
 #' set.seed(1)
-#' truth <- dvinecop(armacop(ar = c(0.6, -0.2)), pairs = list(pc("gumbel"), pc("frank")))
+#' truth <- sdvinecop(armacop(ar = c(0.6, -0.2)), pairs = list(pc("gumbel"), pc("frank")))
 #' u <- tssim(truth, 800)
 #' gauss <- tsfit(u, armacop(order = c(2, 0)), pseudo = FALSE)
 #' autodvinecop(u, gauss, nreplace = 4, pseudo = FALSE)
@@ -192,8 +192,8 @@ autodvinecop <- function(U, start, nreplace = 10, choices = .auto_choices, aux =
   if (!is.numeric(nstrike) || nstrike < 1) stop("'nstrike' must be at least 1")
   u <- check_complete_copula_data(U, min_n = 20L)
   n <- length(u)
-  if (is(start, "dvinecop") && start@mode != "tied") stop("'start' must be a tied d-vine model")
-  if (is(start, "dvinecopfit") && start@model@mode != "tied") stop("'start' must be a tied d-vine model")
+  if (is(start, "sdvinecop") && start@mode != "tied") stop("'start' must be a tied d-vine model")
+  if (is(start, "sdvinecopfit") && start@model@mode != "tied") stop("'start' must be a tied d-vine model")
 
   best <- dv_auto_start(U, start, tautol, maxlag, pseudo, control)
   K0 <- length(best@model@pairs)
@@ -246,7 +246,7 @@ autodvinecop <- function(U, start, nreplace = 10, choices = .auto_choices, aux =
     }
     base_pairs <- c(cur@pairs, rep(list(pc("gauss")), pad))
     fit_with <- function(sp) {
-      m <- dvinecop(cur@kpacf, pairs = c(base_pairs, list(sp)), tail = cur@tail,
+      m <- sdvinecop(cur@kpacf, pairs = c(base_pairs, list(sp)), tail = cur@tail,
                     tautol = cur@tautol, maxlag = cur@maxlag,
                     vt = if (length(cur@vt)) cur@vt else NULL, vtpar = cur@vtpar)
       tryCatch(suppressWarnings(tsfit(u, m, pseudo = pseudo, control = control)),

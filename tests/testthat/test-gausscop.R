@@ -38,9 +38,9 @@ test_that("a prefit returns a specified model", {
   expect_equal(unname(coef(g)), 0.6, tolerance = 0.15)
 })
 
-test_that("dvinecop accepts any gausscop and rejects other objects", {
-  expect_error(dvinecop(kpacf = "ar"), "Gaussian copula process")
-  m <- dvinecop(armacop(ar = 0.5))
+test_that("sdvinecop accepts any gausscop and rejects other objects", {
+  expect_error(sdvinecop(kpacf = "ar"), "Gaussian copula process")
+  m <- sdvinecop(armacop(ar = 0.5))
   expect_s4_class(m@kpacf, "gausscop")
   expect_output(show(m), "kpacf: ARMA\\(1,0\\)")
 })

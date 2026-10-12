@@ -13,7 +13,7 @@
 #' The base process has non-negative Kendall partial autocorrelations: it is an
 #' [arfactcop-class] model (the Gaussian copula of independent AR(1) factors
 #' plus noise, a generalisation of the VT-ARMA model of McNeil, 2021) or a
-#' tied [dvinecop-class] model whose kpacf is an `arfactcop` (pair copulas with
+#' tied [sdvinecop-class] model whose kpacf is an `arfactcop` (pair copulas with
 #' non-Gaussian dependence, without inverse-v-transformed pair copulas).
 #'
 #' The v-transform is any of the families of the udp package: `vsymmetric()`
@@ -23,7 +23,7 @@
 #' pairwise inverse-v-transformed models, where there are two fulcrums).
 #'
 #' @slot name short description.
-#' @slot base the base process: an [arfactcop-class] or a tied [dvinecop-class]
+#' @slot base the base process: an [arfactcop-class] or a tied [sdvinecop-class]
 #'   object (specified or a structure to be fitted).
 #' @slot vt a v-transform object of the udp package; its parameter values are
 #'   the known values or the starting values.
@@ -65,15 +65,15 @@ vt_build <- function(name, p) {
 # Check the base process of a vtscop; returns NULL if acceptable, else a message.
 vt_check_base <- function(base) {
   if (is(base, "arfactcop")) return(NULL)
-  if (is(base, "dvinecop")) {
-    if (base@mode != "tied") return("a dvinecop base must be a tied model")
+  if (is(base, "sdvinecop")) {
+    if (base@mode != "tied") return("a sdvinecop base must be a tied model")
     if (!is(base@kpacf, "arfactcop")) {
-      return("the kpacf of a dvinecop base must be an arfactcop (non-negative Kendall partial autocorrelations)")
+      return("the kpacf of a sdvinecop base must be an arfactcop (non-negative Kendall partial autocorrelations)")
     }
-    if (dv_has_ivt(base)) return("a dvinecop base cannot contain inverse-v-transformed pair copulas")
+    if (dv_has_ivt(base)) return("a sdvinecop base cannot contain inverse-v-transformed pair copulas")
     return(NULL)
   }
-  "the base must be an arfactcop or a tied dvinecop with an arfactcop kpacf"
+  "the base must be an arfactcop or a tied sdvinecop with an arfactcop kpacf"
 }
 
 setValidity("vtscop", function(object) {
@@ -90,7 +90,7 @@ setValidity("vtscop", function(object) {
 #' Constructor for process-level v-transform copula processes
 #'
 #' @param base the base copula process: an [arfactcop-class] model, or a tied
-#'   [dvinecop-class] model whose kpacf is an `arfactcop` and which has no
+#'   [sdvinecop-class] model whose kpacf is an `arfactcop` and which has no
 #'   inverse-v-transformed pair copula; specified, or a structure to be fitted.
 #' @param vt a v-transform from the udp package: `udp::vsymmetric()`,
 #'   `udp::vlinear(delta)`, `udp::v2p(delta, kappa)`, `udp::v2b(delta, kappa)`,
@@ -108,7 +108,7 @@ setValidity("vtscop", function(object) {
 #' # VT-ARMA-type model: one AR factor plus noise, asymmetric v-transform
 #' vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::v2p(delta = 0.45, kappa = 0.8))
 #' # a d-vine base with a Gumbel copula at lag 1
-#' vtscop(dvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))),
+#' vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))),
 #'        udp::vlinear(0.5))
 #' # a model structure to be fitted, with the fulcrum fixed
 #' vtscop(arfactcop(order = 2), udp::v2p(0.5, 1), vtfix = "fulcrum")
@@ -117,7 +117,7 @@ vtscop <- function(base, vt, vtfix = character(0)) {
   if (!is.null(msg)) stop(msg)
   if (!is(vt, "vtransform")) stop("'vt' must be a v-transform of the udp package (vlinear(), v2p(), ...)")
   vtfix <- as.character(vtfix)
-  bname <- if (is(base, "dvinecop")) "d-vine" else base@name
+  bname <- if (is(base, "sdvinecop")) "d-vine" else base@name
   name <- paste0("VT(", vt@name, ", ", bname, ")")
   new("vtscop", name = name, base = base, vt = vt, vtfix = vtfix)
 }

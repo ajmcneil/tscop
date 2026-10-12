@@ -97,7 +97,7 @@ test_that("simulation and Rosenblatt are inverse for IVT pairs with different fu
 test_that("first-order IVT d-vine simulation has the IVT pair copula as its lag-1 copula", {
   set.seed(6)
   d <- c(0.4, 0.6)
-  m <- dvinecop(armacop(ar = 0.6), pairs = list(pc("ivt", base = "joe")), vt = d)
+  m <- sdvinecop(armacop(ar = 0.6), pairs = list(pc("ivt", base = "joe")), vt = d)
   expect_equal(m@K, 1L)
   U <- dv_simulate(dv_resolve(m), matrix(runif(400 * 100), 400, 100))
   a <- as.numeric(U[-400, ])
@@ -111,41 +111,41 @@ test_that("first-order IVT d-vine simulation has the IVT pair copula as its lag-
   expect_gt(ks.test(a[1:5000], "punif")$p.value, 0.001)
 })
 
-test_that("dvinecop constructor handles the v-transform parameters", {
-  m <- dvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.6))
+test_that("sdvinecop constructor handles the v-transform parameters", {
+  m <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.6))
   expect_equal(unname(m@vt), c(0.4, 0.6))
   expect_equal(names(m@vt), c("fulcrum1", "fulcrum2"))
   expect_equal(names(coef(m)), c("lambda1", "w1", "fulcrum1", "fulcrum2"))
   expect_output(show(m), "v-transform fulcrums: 0.4, 0.6")
   expect_output(show(m), "tail family: ivt with base ast")
   # default fulcrums
-  m0 <- dvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("ivt", base = "joe")))
+  m0 <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("ivt", base = "joe")))
   expect_equal(unname(m0@vt), c(0.5, 0.5))
   # common and fixed
-  mc <- dvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.4), vtpar = "common")
+  mc <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.4), vtpar = "common")
   expect_equal(names(coef(mc)), c("lambda1", "w1", "fulcrum"))
-  mn <- dvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vtpar = "none")
+  mn <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vtpar = "none")
   expect_equal(names(coef(mn)), c("lambda1", "w1"))
   expect_output(show(mn), "\\(fixed\\)")
-  expect_error(dvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.5), vtpar = "common"), "equal")
-  expect_error(dvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0, 0.5)), "\\(0, 1\\)")
-  expect_error(dvinecop(arfactcop(lambda = 0.9, w = 0.6), vt = c(0.4, 0.6)), "only used")
-  expect_error(dvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = 0.5), "two fulcrums")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.5), vtpar = "common"), "equal")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0, 0.5)), "\\(0, 1\\)")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), vt = c(0.4, 0.6)), "only used")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = 0.5), "two fulcrums")
 })
 
 test_that("a kpacf with negative values is infeasible for an IVT pair copula", {
-  m <- dvinecop(armacop(ar = c(0.5, -0.4)), pairs = list(pc("gumbel"), pc("ivt", base = "joe")))
+  m <- sdvinecop(armacop(ar = c(0.5, -0.4)), pairs = list(pc("gumbel"), pc("ivt", base = "joe")))
   expect_null(dv_resolve(m))
   expect_equal(dv_model_loglik(m, runif(50)), -Inf)
   expect_error(tssim(m, 20), "infeasible")
-  mt <- dvinecop(armacop(ar = c(0.5, -0.4)), tail = pc("ivt", base = "joe"))
+  mt <- sdvinecop(armacop(ar = c(0.5, -0.4)), tail = pc("ivt", base = "joe"))
   expect_null(dv_resolve(mt))
   # non-negative kpacf is fine
-  expect_false(is.null(dv_resolve(dvinecop(armacop(ar = 0.5), tail = pc("ivt", base = "joe")))))
+  expect_false(is.null(dv_resolve(sdvinecop(armacop(ar = 0.5), tail = pc("ivt", base = "joe")))))
 })
 
 test_that("ktau reports the kpacf (the base copulas' tau)", {
-  m <- dvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.6))
+  m <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.6))
   expect_equal(ktau(m, 5), gc_tau(m@kpacf, 5))
   pr <- dv_resolve(m)
   expect_equal(dv_pair_ktau(pr[[1]]), gc_tau(m@kpacf, 1), tolerance = 1e-6)
@@ -153,7 +153,7 @@ test_that("ktau reports the kpacf (the base copulas' tau)", {
 
 test_that("residuals and prediction are consistent for an IVT d-vine", {
   set.seed(7)
-  m <- dvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("ivt", base = "joe")),
+  m <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("ivt", base = "joe")),
                 tail = pc("ivt", base = "joe"), vt = c(0.4, 0.6), tautol = 1e-3)
   u <- tssim(m, 120)
   r <- resid(m, u)
@@ -168,10 +168,10 @@ test_that("residuals and prediction are consistent for an IVT d-vine", {
 
 test_that("tsfit recovers the fulcrums and the kpacf of an IVT d-vine", {
   set.seed(8)
-  truth <- dvinecop(arfactcop(lambda = 0.85, w = 0.6), tail = pc("ivt", base = "joe"),
+  truth <- sdvinecop(arfactcop(lambda = 0.85, w = 0.6), tail = pc("ivt", base = "joe"),
                     vt = c(0.4, 0.6), tautol = 1e-3)
   u <- tssim(truth, 1500)
-  spec <- dvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3)
+  spec <- sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3)
   f <- tsfit(u, spec, pseudo = FALSE)
   expect_equal(names(coef(f)), c("lambda1", "w1", "fulcrum1", "fulcrum2"))
   expect_equal(unname(coef(f)[3:4]), c(0.4, 0.6), tolerance = 0.2)
@@ -179,16 +179,16 @@ test_that("tsfit recovers the fulcrums and the kpacf of an IVT d-vine", {
   expect_equal(f@npar, 4L)
   expect_equal(unname(f@model@vt), unname(coef(f)[3:4]))
   # a Gaussian-tail fit is much worse
-  fg <- tsfit(u, dvinecop(arfactcop(order = 1), tautol = 1e-3), pseudo = FALSE)
+  fg <- tsfit(u, sdvinecop(arfactcop(order = 1), tautol = 1e-3), pseudo = FALSE)
   expect_gt(f@loglik, fg@loglik + 20)
   # common and fixed fulcrums
-  fc <- tsfit(u, dvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3, vtpar = "common"),
+  fc <- tsfit(u, sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3, vtpar = "common"),
               pseudo = FALSE)
   expect_equal(names(coef(fc)), c("lambda1", "w1", "fulcrum"))
   expect_equal(fc@npar, 3L)
   expect_equal(unname(fc@model@vt[1]), unname(fc@model@vt[2]))
   expect_lte(fc@loglik, f@loglik + 1e-6)
-  fn <- tsfit(u, dvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3, vt = c(0.5, 0.5),
+  fn <- tsfit(u, sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3, vt = c(0.5, 0.5),
                           vtpar = "none"), pseudo = FALSE)
   expect_equal(fn@npar, 2L)
   expect_lte(fn@loglik, fc@loglik + 1e-6)
@@ -201,17 +201,17 @@ test_that("tsfit recovers the fulcrums and the kpacf of an IVT d-vine", {
 
 test_that("an ast base works in a fit and with an ARMA kpacf in its non-negative region", {
   set.seed(9)
-  truth <- dvinecop(armacop(ar = 0.8, ma = -0.5), tail = pc("ivt", base = "ast"), vt = c(0.45, 0.55), tautol = 1e-2)
+  truth <- sdvinecop(armacop(ar = 0.8, ma = -0.5), tail = pc("ivt", base = "ast"), vt = c(0.45, 0.55), tautol = 1e-2)
   u <- tssim(truth, 700)
-  f <- tsfit(u, dvinecop(armacop(order = c(1, 1)), tail = pc("ivt", base = "ast"), tautol = 1e-2), pseudo = FALSE)
-  expect_s4_class(f, "dvinecopfit")
+  f <- tsfit(u, sdvinecop(armacop(order = c(1, 1)), tail = pc("ivt", base = "ast"), tautol = 1e-2), pseudo = FALSE)
+  expect_s4_class(f, "sdvinecopfit")
   expect_equal(f@npar, 4L)
   expect_true(all(f@model@vt > 0 & f@model@vt < 1))
 })
 
 test_that("the fit and the IVT likelihood agree with udp-based evaluation at the estimates", {
   set.seed(10)
-  truth <- dvinecop(arfactcop(lambda = 0.8, w = 0.5), tail = pc("ivt", base = "gumbel"),
+  truth <- sdvinecop(arfactcop(lambda = 0.8, w = 0.5), tail = pc("ivt", base = "gumbel"),
                     vt = c(0.45, 0.55), tautol = 1e-2)
   u <- tssim(truth, 200)
   pr <- dv_resolve(truth)

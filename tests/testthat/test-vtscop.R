@@ -3,7 +3,7 @@ test_that("vtscop validates its base and v-transform", {
   expect_error(vtscop(armacop(ar = 0.5), udp::vlinear(0.5)), "base")
   expect_error(vtscop(arfactcop(order = 1), "x"), "v-transform")
   expect_error(vtscop(arfactcop(order = 1), udp::vlinear(0.5), vtfix = "kappa"), "vtfix")
-  expect_error(vtscop(dvinecop(armacop(ar = 0.5), pairs = list(pc("gumbel"))), udp::vlinear(0.5)), "arfactcop")
+  expect_error(vtscop(sdvinecop(armacop(ar = 0.5), pairs = list(pc("gumbel"))), udp::vlinear(0.5)), "arfactcop")
 })
 
 test_that("log-likelihood is the base log-likelihood at V(u)", {
@@ -47,9 +47,9 @@ test_that("tsfit recovers parameters and gives standard errors", {
 test_that("tsfit works with a d-vine base and bootstrap standard errors", {
   skip_on_cran()
   set.seed(3)
-  m <- vtscop(dvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))), udp::vlinear(0.5))
+  m <- vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))), udp::vlinear(0.5))
   u <- tssim(m, 800)
-  f <- tsfit(u, vtscop(dvinecop(arfactcop(order = 1), pairs = list(pc("gumbel"))), udp::vlinear(0.5)),
+  f <- tsfit(u, vtscop(sdvinecop(arfactcop(order = 1), pairs = list(pc("gumbel"))), udp::vlinear(0.5)),
              pseudo = FALSE, se = "bootstrap", B = 10)
   expect_equal(f@se_method, "bootstrap")
   expect_equal(names(coef(f)), c("lambda1", "w1", "fulcrum"))
@@ -63,7 +63,7 @@ test_that("predict: df, qf and dens are consistent", {
   for (m in list(vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::vlinear(0.4)),
                  vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::v2p(0.45, 0.8)),
                  vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::v3b(0.45, 0.8, 1.3)),
-                 vtscop(dvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))),
+                 vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))),
                         udp::v2p(0.45, 0.8)))) {
     u <- tssim(m, 100)
     df <- predict(m, u, type = "df", x = x)
@@ -74,7 +74,7 @@ test_that("predict: df, qf and dens are consistent", {
     expect_equal(predict(m, u, type = "df", x = x, nodes = 150), df, tolerance = 1e-4)
   }
   expect_error(predict(vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::vlinear(0.4)), u, x = 1.2), "inside")
-  md <- vtscop(dvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))), udp::vlinear(0.4))
+  md <- vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))), udp::vlinear(0.4))
   expect_error(predict(md, tssim(md, 50), h = 2, x = 0.5), "h = 1")
 })
 
@@ -91,7 +91,7 @@ test_that("residuals and predictive PITs are uniform", {
   expect_gt(stats::ks.test(resid(m, u), "punif")$p.value, 0.001)
   expect_equal(resid(m, u, scale = "normal"), qnorm(resid(m, u)))
   # d-vine base: linear closed form agrees with the per-step loop result's definition
-  md <- vtscop(dvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))), udp::vlinear(0.4))
+  md <- vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))), udp::vlinear(0.4))
   ud <- tssim(md, 1000)
   rd <- resid(md, ud)
   expect_gt(stats::ks.test(rd, "punif")$p.value, 0.001)

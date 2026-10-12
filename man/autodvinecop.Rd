@@ -28,7 +28,7 @@ autodvinecop(
 
 \item{start}{the starting model: an \link[=armacop-class]{armacop} model or fit (the
 Gaussian d-vine with this ARMA kpacf is fitted first), or a tied
-\link[=dvinecop-class]{dvinecop} model or fit (to continue a search).}
+\link[=sdvinecop-class]{sdvinecop} model or fit (to continue a search).}
 
 \item{nreplace}{the largest lag at which a substitution is examined (the
 search examines lags after any explicit pair copulas already present, up
@@ -68,7 +68,7 @@ against them.}
 \item{verbose}{logical: print a line per lag.}
 }
 \value{
-A \link[=dvinecopfit-class]{dvinecopfit} object for the selected model, with the
+A \link[=sdvinecopfit-class]{sdvinecopfit} object for the selected model, with the
 selection path in its \code{path} slot.
 }
 \description{
@@ -100,7 +100,7 @@ selected model (which ignores the uncertainty from the selection itself).
 \examples{
 \donttest{
 set.seed(1)
-truth <- dvinecop(armacop(ar = c(0.6, -0.2)), pairs = list(pc("gumbel"), pc("frank")))
+truth <- sdvinecop(armacop(ar = c(0.6, -0.2)), pairs = list(pc("gumbel"), pc("frank")))
 u <- tssim(truth, 800)
 gauss <- tsfit(u, armacop(order = c(2, 0)), pseudo = FALSE)
 autodvinecop(u, gauss, nreplace = 4, pseudo = FALSE)

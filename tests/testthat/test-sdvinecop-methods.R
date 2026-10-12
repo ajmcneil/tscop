@@ -3,7 +3,7 @@ mixed_pairs <- function() {
        pair("frank", 0, -2), pair("gauss", 0, 0.2), pair("bb1", 270, c(0.3, 1.3)))
 }
 mixed_model <- function() {
-  dvinecop(armacop(ar = -0.5, ma = 0.3),
+  sdvinecop(armacop(ar = -0.5, ma = 0.3),
            pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270), pc("t", aux = 5),
                         pc("frank"), pc("gumbel", pos = 180)), tautol = 1e-3)
 }
@@ -87,15 +87,15 @@ test_that("tssim returns copula data and is reproducible", {
   expect_equal(a, b)
   expect_length(a, 60)
   expect_true(all(a > 0 & a < 1))
-  expect_length(tssim(dvinecop(armacop(ar = 0.5)), 1), 1)
+  expect_length(tssim(sdvinecop(armacop(ar = 0.5)), 1), 1)
   expect_error(tssim(m, 0), "positive")
-  expect_error(tssim(dvinecop(armacop(order = c(1, 0)), pairs = list(pc("gumbel"))), 10), "unspecified")
-  expect_error(tssim(dvinecop(armacop(ar = 0.3), pairs = list(pc("bb1", aux = 3))), 10), "infeasible")
+  expect_error(tssim(sdvinecop(armacop(order = c(1, 0)), pairs = list(pc("gumbel"))), 10), "unspecified")
+  expect_error(tssim(sdvinecop(armacop(ar = 0.3), pairs = list(pc("bb1", aux = 3))), 10), "infeasible")
 })
 
 test_that("a Gaussian d-vine simulates the ARMA autocorrelation", {
   set.seed(7)
-  m <- dvinecop(armacop(ar = 0.6, ma = 0.3), tautol = 1e-6)
+  m <- sdvinecop(armacop(ar = 0.6, ma = 0.3), tautol = 1e-6)
   e <- arma_coef_expanded(m@kpacf)
   x <- qnorm(tssim(m, 1500))
   expect_equal(as.numeric(acf(x, lag.max = 3, plot = FALSE)$acf[-1]),
@@ -107,7 +107,7 @@ test_that("a Gaussian d-vine simulates the ARMA autocorrelation", {
 test_that("resid agrees with armacop for a finite-order Gaussian model", {
   set.seed(8)
   arma <- armacop(ar = c(0.5, 0.3))
-  m <- dvinecop(arma)
+  m <- sdvinecop(arma)
   u <- tssim(arma, 80)
   expect_equal(resid(m, u, scale = "normal"), resid(arma, u, scale = "normal"), tolerance = 1e-8)
   expect_equal(resid(m, u), resid(arma, u), tolerance = 1e-8)
@@ -117,7 +117,7 @@ test_that("resid agrees with armacop for a finite-order Gaussian model", {
 test_that("resid is close to armacop for an ARMA copula at a small tolerance", {
   set.seed(9)
   arma <- armacop(ar = 0.5, ma = 0.4)
-  m <- dvinecop(arma, tautol = 1e-10)
+  m <- sdvinecop(arma, tautol = 1e-10)
   u <- tssim(arma, 80)
   expect_equal(resid(m, u, scale = "normal"), resid(arma, u, scale = "normal"), tolerance = 1e-6)
 })
@@ -134,7 +134,7 @@ test_that("resid handles scale, attributes and invalid data", {
   u2[5] <- NA
   expect_error(resid(m, u2), "complete")
   expect_error(resid(m, c(0, u[-1])), "boundaryadjust")
-  expect_error(resid(dvinecop(armacop(order = c(1, 0)), pairs = list(pc("gumbel"))), u), "unspecified")
+  expect_error(resid(sdvinecop(armacop(order = c(1, 0)), pairs = list(pc("gumbel"))), u), "unspecified")
 })
 
 # ---- prediction ----------------------------------------------------------
@@ -168,7 +168,7 @@ test_that("predictive df, qf and dens are mutually consistent", {
 test_that("predictions use the last K values and agree with armacop for a finite-order Gaussian model", {
   set.seed(13)
   arma <- armacop(ar = c(0.5, 0.3))
-  m <- dvinecop(arma)
+  m <- sdvinecop(arma)
   u <- tssim(arma, 50)
   x <- c(0.1, 0.5, 0.9)
   for (type in c("df", "qf", "dens")) {
@@ -196,7 +196,7 @@ test_that("predict agrees with tscopula for a Gaussian-tail model", {
   skip_if_no_oracle()
   set.seed(14)
   arma <- armacop(ar = 0.5, ma = 0.4)
-  m <- dvinecop(arma, tautol = 1e-8)
+  m <- sdvinecop(arma, tautol = 1e-8)
   u <- tssim(arma, 80)
   old <- tscopula::armacopula(list(ar = 0.5, ma = 0.4))
   x <- c(0.1, 0.5, 0.9)
@@ -223,12 +223,12 @@ test_that("ktau returns the ARMA kpacf up to K and zero beyond", {
 
 test_that("ktau in free mode uses the Kendall's tau of each copula", {
   b <- list(rvinecopulib::bicop_dist("gumbel", 90, 2), rvinecopulib::bicop_dist("clayton", 0, 1))
-  m <- dvinecop(pairs = b)
+  m <- sdvinecop(pairs = b)
   expect_equal(ktau(m, 4), c(-0.5, 1 / 3, 0, 0))
 })
 
 test_that("ktau of a Gaussian d-vine equals ktau of the armacop", {
   arma <- armacop(ar = 0.7, ma = 0.3)
-  m <- dvinecop(arma, tautol = 1e-12)
+  m <- sdvinecop(arma, tautol = 1e-12)
   expect_equal(ktau(m, 10), ktau(arma, 10), tolerance = 1e-8)
 })

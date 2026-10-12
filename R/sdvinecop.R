@@ -48,8 +48,8 @@
 #'   (internal limit on the lags examined) or `"none"` (free mode without an
 #'   ARMA tail).
 #'
-#' @exportClass dvinecop
-setClass("dvinecop", slots = c(
+#' @exportClass sdvinecop
+setClass("sdvinecop", slots = c(
   name = "character", mode = "character", kpacf = "gausscopOrNULL",
   pairs = "list", tail = "pcOrNULL", tautol = "numeric", maxlag = "numeric",
   K = "integer", Klimit = "character", vt = "numeric", vtpar = "character"
@@ -61,7 +61,7 @@ dv_has_ivt <- function(object) {
     (!is.null(object@tail) && object@tail@family == "ivt")
 }
 
-setValidity("dvinecop", function(object) {
+setValidity("sdvinecop", function(object) {
   if (!(object@mode %in% c("tied", "free"))) return("'mode' must be \"tied\" or \"free\"")
   if (length(object@tautol) != 1L || !(object@tautol > 0)) return("'tautol' must be a positive number")
   if (length(object@maxlag) != 1L || is.na(object@maxlag) || object@maxlag < 1) {
@@ -101,7 +101,7 @@ setValidity("dvinecop", function(object) {
 
 #' Constructor for stationary d-vine copula processes
 #'
-#' Creates a [dvinecop-class] object in tied mode (`pairs` are
+#' Creates a [sdvinecop-class] object in tied mode (`pairs` are
 #' [pc()] specifications) or free mode (`pairs` are
 #' [rvinecopulib::bicop_dist()] objects).
 #'
@@ -129,15 +129,15 @@ setValidity("dvinecop", function(object) {
 #'   effective lag.
 #' @param maxlag cap on the effective lag (`Inf` for none).
 #'
-#' @return An object of class [dvinecop-class].
+#' @return An object of class [sdvinecop-class].
 #' @export
 #'
 #' @examples
 #' # Gaussian ARMA copula with Gumbel at lag 1 and Clayton at lag 2
-#' dvinecop(armacop(ar = 0.7, ma = 0.3), pairs = list(pc("gumbel"), pc("clayton")))
+#' sdvinecop(armacop(ar = 0.7, ma = 0.3), pairs = list(pc("gumbel"), pc("clayton")))
 #' # AR(2) with a t copula at lag 1: a finite-order d-vine
-#' dvinecop(armacop(ar = c(0.5, 0.2)), pairs = list(pc("t", aux = 6)))
-dvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
+#' sdvinecop(armacop(ar = c(0.5, 0.2)), pairs = list(pc("t", aux = 6)))
+sdvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
                      tautol = 1e-4, maxlag = Inf, vt = NULL, vtpar = "both") {
   if (!is.null(kpacf) && !is(kpacf, "gausscop")) {
     stop("'kpacf' must be a Gaussian copula process (an armacop or arfactcop object)")
@@ -191,7 +191,7 @@ dvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
     if (!is.null(vt)) stop("'vt' is only used with inverse-v-transformed pair copulas (pc(\"ivt\", ...))")
     vt <- numeric(0)
   }
-  new("dvinecop", name = name, mode = mode, kpacf = kpacf, pairs = pairs, tail = tailspec,
+  new("sdvinecop", name = name, mode = mode, kpacf = kpacf, pairs = pairs, tail = tailspec,
       tautol = as.numeric(tautol), maxlag = as.numeric(maxlag), K = as.integer(K),
       Klimit = limit, vt = vt, vtpar = vtpar)
 }
@@ -240,12 +240,12 @@ dv_model_loglik <- function(object, u) {
   dv_loglik(u, pairs)
 }
 
-#' @describeIn dvinecop-class Coefficients: the ARMA coefficients followed by
+#' @describeIn sdvinecop-class Coefficients: the ARMA coefficients followed by
 #'   the auxiliary parameters (`nu<lag>` for t copulas, `delta<lag>` for BB1
 #'   copulas) of the explicit specifications (tied mode).
-#' @param object a [dvinecop-class] object.
+#' @param object a [sdvinecop-class] object.
 #' @export
-setMethod("coef", "dvinecop", function(object) {
+setMethod("coef", "sdvinecop", function(object) {
   out <- if (is.null(object@kpacf)) numeric(0) else coef(object@kpacf)
   if (object@mode == "tied") {
     for (j in seq_along(object@pairs)) {
@@ -284,10 +284,10 @@ dv_explicit_labels <- function(object) {
   }, character(1))
 }
 
-#' @describeIn dvinecop-class Show method.
+#' @describeIn sdvinecop-class Show method.
 #' @export
-setMethod("show", "dvinecop", function(object) {
-  cat("object class: dvinecop (", object@mode, " mode)\n", sep = "")
+setMethod("show", "sdvinecop", function(object) {
+  cat("object class: sdvinecop (", object@mode, " mode)\n", sep = "")
   if (!is.null(object@kpacf)) cat("kpacf: ", gc_describe(object@kpacf), "\n", sep = "")
   lab <- dv_explicit_labels(object)
   if (length(lab) > 0L) cat(length(lab), " explicit pair copulas: ", paste(lab, collapse = ", "), "\n", sep = "")
@@ -335,11 +335,11 @@ dv_pairs_or_stop <- function(object) {
 }
 
 #' @describeIn tssim Exact stationary simulation from a known
-#'   [dvinecop-class] model, by the inverse Rosenblatt transform with the
+#'   [sdvinecop-class] model, by the inverse Rosenblatt transform with the
 #'   backward variables carried from step to step (cost O(nK)). `n` defaults
 #'   to 1000.
 #' @export
-setMethod("tssim", "dvinecop", function(object, n, ...) {
+setMethod("tssim", "sdvinecop", function(object, n, ...) {
   if (missing(n)) n <- 1000
   if (!is.numeric(n) || length(n) != 1L || n < 1 || n != round(n)) {
     stop("'n' must be a positive whole number")
@@ -348,11 +348,11 @@ setMethod("tssim", "dvinecop", function(object, n, ...) {
   as.numeric(dv_simulate(pairs, matrix(stats::runif(n), n, 1L)))
 })
 
-#' @describeIn ktau Kendall's tau of the pair copulas of a [dvinecop-class]
+#' @describeIn ktau Kendall's tau of the pair copulas of a [sdvinecop-class]
 #'   model at lags `1, ..., lagmax` (default 20); zero beyond the effective
 #'   lag `K`. In tied mode the values are the ARMA kpacf.
 #' @export
-setMethod("ktau", "dvinecop", function(object, lagmax, ...) {
+setMethod("ktau", "sdvinecop", function(object, lagmax, ...) {
   if (missing(lagmax)) lagmax <- 20
   if (!is.numeric(lagmax) || length(lagmax) != 1L || lagmax < 1 || lagmax != round(lagmax)) {
     stop("'lagmax' must be a positive whole number")
@@ -387,26 +387,26 @@ dv_resid <- function(model, data, scale) {
 #' complete. If the data are a `ts`, `zoo` or `xts` object the time index is
 #' restored.
 #'
-#' @param object a [dvinecop-class] model with known coefficients.
+#' @param object a [sdvinecop-class] model with known coefficients.
 #' @param data copula data in (0, 1).
 #' @param scale `"uniform"` (default) or `"normal"` (the `qnorm` of the
 #'   uniform residuals).
 #' @param ... not used.
 #'
 #' @return A numeric vector the length of the data.
-#' @name resid-dvinecop
-#' @aliases resid,dvinecop-method residuals,dvinecop-method
+#' @name resid-sdvinecop
+#' @aliases resid,sdvinecop-method residuals,sdvinecop-method
 NULL
 
-#' @rdname resid-dvinecop
+#' @rdname resid-sdvinecop
 #' @export
-setMethod("resid", "dvinecop", function(object, data, scale = "uniform", ...) {
+setMethod("resid", "sdvinecop", function(object, data, scale = "uniform", ...) {
   dv_resid(object, data, scale)
 })
 
-#' @rdname resid-dvinecop
+#' @rdname resid-sdvinecop
 #' @export
-setMethod("residuals", "dvinecop", function(object, data, scale = "uniform", ...) {
+setMethod("residuals", "sdvinecop", function(object, data, scale = "uniform", ...) {
   dv_resid(object, data, scale)
 })
 
@@ -417,7 +417,7 @@ setMethod("residuals", "dvinecop", function(object, data, scale = "uniform", ...
 #' quantile function (`type = "qf"`) or density (`type = "dens"`) evaluated at
 #' `x`, from the forward Rosenblatt functions and their inverses.
 #'
-#' @param object a [dvinecop-class] model with known coefficients.
+#' @param object a [sdvinecop-class] model with known coefficients.
 #' @param data past copula data in (0, 1), complete.
 #' @param h horizon; only `h = 1` is implemented.
 #' @param type `"df"`, `"qf"` or `"dens"`.
@@ -426,8 +426,8 @@ setMethod("residuals", "dvinecop", function(object, data, scale = "uniform", ...
 #' @param ... not used.
 #'
 #' @return A numeric vector the length of `x`.
-#' @name predict-dvinecop
-#' @aliases predict,dvinecop-method
+#' @name predict-sdvinecop
+#' @aliases predict,sdvinecop-method
 NULL
 
 dv_predict <- function(model, data, h, type, x) {
@@ -440,8 +440,8 @@ dv_predict <- function(model, data, h, type, x) {
   dv_predictive(dv_pairs_or_stop(model), u, as.numeric(x), type)
 }
 
-#' @rdname predict-dvinecop
+#' @rdname predict-sdvinecop
 #' @export
-setMethod("predict", "dvinecop", function(object, data, h = 1, type = "df", x = NULL, ...) {
+setMethod("predict", "sdvinecop", function(object, data, h = 1, type = "df", x = NULL, ...) {
   dv_predict(object, data, h, type, x)
 })
