@@ -2,6 +2,19 @@
 
 A ground-up rebuild of the `tscopula` package for time series copula models, built on [udp](https://github.com/ajmcneil/udp). Under development; the legacy `tscopula` package is left untouched.
 
+## Installation
+
+```r
+# install.packages("remotes")
+remotes::install_github("ajmcneil/tscop")
+```
+
+The [udp](https://github.com/ajmcneil/udp) package, which is installed from GitHub, is pulled in automatically through the `Remotes` field of `DESCRIPTION`.
+
+## License
+
+GPL-3; see `LICENSE`.
+
 ## Background and references
 
 The package implements and extends models from the following papers (BibTeX entries in `inst/REFERENCES.bib`):
