@@ -19,7 +19,9 @@ Description: Tools for the analysis of time series using copula models, built
     <doi:10.3390/risks9010014>) and non-Gaussian d-vine base processes (Bladt
     and McNeil (2022) <doi:10.1016/j.ecosta.2021.07.004>), and
     inverse-v-transformed pair copulas for stochastic volatility (Dias, Han
-    and McNeil (2027) <doi:10.1016/j.jmva.2026.105695>). Under development.
+    and McNeil (2027) <doi:10.1016/j.jmva.2026.105695>), and parametric marginal distributions (Gaussian,
+    Laplace, Student t, skew t, Johnson SU, generalised hyperbolic and its special
+    cases) with automatic selection. Under development.
 License: GPL-3
 Depends:
     R (>= 3.5.0)

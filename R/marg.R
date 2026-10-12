@@ -5,7 +5,8 @@
 #' standard deviation) and shape parameters depending on the family. The
 #' families are `"gauss"` (Gaussian), `"laplace"`, `"slaplace"` (skew
 #' Laplace), `"st"` (Student t, `df` degrees of freedom), `"sst"` (skew
-#' Student t), `"jsu"` (Johnson SU) and `"nig"` (normal inverse Gaussian). The skew families use the Fernandez-Steel construction with the
+#' Student t), `"jsu"` (Johnson SU), `"nig"` (normal inverse Gaussian), `"hyp"`
+#' (hyperbolic) and `"gh"` (generalised hyperbolic). The skew families use the Fernandez-Steel construction with the
 #' skewing parameter `gamma` (`gamma = 1` is symmetric; `mu` is then the mode of
 #' the distribution): the density of the standardised variable is
 #' \eqn{2/(\gamma + 1/\gamma) f_0(\gamma z)} for \eqn{z < 0} and
@@ -22,7 +23,11 @@
 #' and its variance is `1 + skew^2 / shape`; the Gaussian is the limit as `shape`
 #' tends to infinity). This is the `alpha.bar` parameterisation of the `ghyp`
 #' package with the skewness `gamma` of that package equal to `sigma * skew`,
-#' so that `sigma` is a pure scale parameter.
+#' so that `sigma` is a pure scale parameter. The generalised hyperbolic
+#' distribution has the same representation with \eqn{W} generalised inverse
+#' Gaussian of mean one, order `lambda` (any real number) and
+#' shape parameter `shape` (its `alpha.bar`); `"nig"` is the case `lambda` = −1/2
+#' and `"hyp"` the hyperbolic distribution, `lambda` = 1.
 #'
 #' Parameters named in `fix` are held fixed at their values in `pars` when the
 #' model is fitted with [tsfit()]; for example
@@ -64,7 +69,7 @@ setValidity("marg", function(object) {
 #' Constructor for parametric margins
 #'
 #' @param family one of `"gauss"`, `"laplace"`, `"slaplace"`, `"st"`, `"sst"`,
-#'   `"jsu"`, `"nig"`.
+#'   `"jsu"`, `"nig"`, `"hyp"`, `"gh"`.
 #' @param pars named numeric vector (or list) of parameter values; parameters
 #'   that are omitted are unspecified (`NA`), giving a model structure to be
 #'   fitted. See [marg-class] for the parameters of each family.

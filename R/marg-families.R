@@ -79,6 +79,67 @@ mg_nig <- list(
   }
 )
 
+# Generalised hyperbolic family in the ghyp alpha.bar parameterisation with a
+# scale-free skewness: z = skew * W + sqrt(W) * N, W ~ GIG(lambda, chi, psi) with
+# psi = shape K_{lambda+1}(shape) / K_lambda(shape) and
+# chi = shape K_lambda(shape) / K_{lambda+1}(shape), so that E[W] = 1 and
+# chi psi = shape^2. With delta = sqrt(chi), kappa = sqrt(psi), alpha = sqrt(psi + skew^2) the
+# density of z is
+#   (kappa / delta)^lambda alpha^(1/2 - lambda) / (sqrt(2 pi) K_lambda(shape))
+#     * K_{lambda - 1/2}(alpha sqrt(delta^2 + z^2)) (delta^2 + z^2)^((lambda - 1/2) / 2) exp(skew z).
+# lambda = -1/2 is the NIG, lambda = 1 the hyperbolic distribution.
+mg_logk <- function(x, nu) log(besselK(x, nu, expon.scaled = TRUE)) - x
+
+mg_gh_chipsi <- function(shape, lambda) {
+  r <- besselK(shape, lambda + 1, expon.scaled = TRUE) / besselK(shape, lambda, expon.scaled = TRUE)
+  c(chi = shape / r, psi = shape * r)
+}
+
+mg_gh_ld_lambda <- function(z, a, r, lambda) {
+  cp <- mg_gh_chipsi(a, lambda)
+  delta <- sqrt(cp[["chi"]])
+  kappa <- sqrt(cp[["psi"]])
+  alpha <- sqrt(cp[["psi"]] + r^2)
+  d2 <- cp[["chi"]] + z^2
+  x <- alpha * sqrt(d2)
+  lambda * log(kappa / delta) + (0.5 - lambda) * log(alpha) - 0.5 * log(2 * pi) - mg_logk(a, lambda) +
+    mg_logk(x, lambda - 0.5) + 0.5 * (lambda - 0.5) * log(d2) + r * z
+}
+
+mg_gh_base <- function(lambda_of) {
+  centre <- function(s) s[["skew"]]
+  w0 <- function(s) min(1, sqrt(mg_gh_chipsi(s[["shape"]], lambda_of(s))[["chi"]]))
+  ld <- function(z, s) mg_gh_ld_lambda(z, s[["shape"]], s[["skew"]], lambda_of(s))
+  list(
+    ld = ld,
+    p = function(z, s, lt) mg_dens_cdf(function(t) exp(ld(t, s)), z, lt, centre(s), w0(s)),
+    q = function(u, s, lt) {
+      dens <- function(t) exp(ld(t, s))
+      mg_dens_quantile(function(t, l) mg_dens_cdf(dens, t, l, centre(s), w0(s)), dens, u, lt, centre(s), w0(s))
+    }
+  )
+}
+
+# variance of W (mean one) for the GH with order lambda: K_l K_{l+2} / K_{l+1}^2 - 1
+mg_gh_varw <- function(a, lambda) {
+  besselK(a, lambda, expon.scaled = TRUE) * besselK(a, lambda + 2, expon.scaled = TRUE) /
+    besselK(a, lambda + 1, expon.scaled = TRUE)^2 - 1
+}
+
+# moment-matching start for a generalised hyperbolic family of order lambda
+mg_gh_start <- function(x, lambda) {
+  m <- mean(x)
+  sd <- stats::sd(x)
+  zc <- (x - m) / sd
+  ek <- max(mean(zc^4) - 3, 0.05)
+  f <- function(la) 3 * mg_gh_varw(exp(la), lambda) - ek
+  shape <- tryCatch(exp(stats::uniroot(f, c(log(1e-2), log(1e3)))$root), error = function(e) if (ek > 3) 0.05 else 50)
+  vw <- max(mg_gh_varw(shape, lambda), 1e-6)
+  skew <- max(min(mean(zc^3) / (3 * vw), 2), -2)
+  sg <- sd / sqrt(1 + skew^2 * vw)
+  c(mu = m - sg * skew, sigma = sg, shape = shape, skew = skew)
+}
+
 # Fernandez-Steel skewing of a symmetric standardised family with skewing
 # parameter gamma > 0 (gamma = 1 is the symmetric case; the mode is at 0):
 #   f(z) = 2 / (gamma + 1 / gamma) * f0(gamma z) for z < 0, f0(z / gamma) for z >= 0.
@@ -193,6 +254,15 @@ mg_robust <- function(x) {
       c(mu = m - sd * skew / sqrt(1 + skew^2 / shape), sigma = sd / sqrt(1 + skew^2 / shape), shape = shape, skew = skew)
     },
     description = "normal inverse Gaussian"),
+  hyp = mg_fam("hyp", c("mu", "sigma", "shape", "skew"), c("real", "pos", "pos", "real"),
+    mg_gh_base(function(s) 1),
+    start = function(x) mg_gh_start(x, 1),
+    description = "hyperbolic"),
+  gh = mg_fam("gh", c("mu", "sigma", "lambda", "shape", "skew"), c("real", "pos", "real", "pos", "real"),
+    mg_gh_base(function(s) s[["lambda"]]),
+    start = function(x) c(mg_gh_start(x, -0.5), lambda = -0.5)[c("mu", "sigma", "lambda", "shape", "skew")],
+    parent = "nig", from_parent = function(th) c(th, lambda = -0.5),
+    description = "generalised hyperbolic"),
   sst = mg_fam("sst", c("mu", "sigma", "df", "gamma"), c("real", "pos", "df", "pos"),
     mg_skew(mg_st),
     start = function(x) {

@@ -10,7 +10,8 @@ family \eqn{x = \mu + \sigma z}, with \code{sigma} a pure scale parameter (not t
 standard deviation) and shape parameters depending on the family. The
 families are \code{"gauss"} (Gaussian), \code{"laplace"}, \code{"slaplace"} (skew
 Laplace), \code{"st"} (Student t, \code{df} degrees of freedom), \code{"sst"} (skew
-Student t), \code{"jsu"} (Johnson SU) and \code{"nig"} (normal inverse Gaussian). The skew families use the Fernandez-Steel construction with the
+Student t), \code{"jsu"} (Johnson SU), \code{"nig"} (normal inverse Gaussian), \code{"hyp"}
+(hyperbolic) and \code{"gh"} (generalised hyperbolic). The skew families use the Fernandez-Steel construction with the
 skewing parameter \code{gamma} (\code{gamma = 1} is symmetric; \code{mu} is then the mode of
 the distribution): the density of the standardised variable is
 \eqn{2/(\gamma + 1/\gamma) f_0(\gamma z)} for \eqn{z < 0} and
@@ -27,7 +28,11 @@ normal, and \code{skew} = \eqn{\rho} a scale-free skewness parameter
 and its variance is \code{1 + skew^2 / shape}; the Gaussian is the limit as \code{shape}
 tends to infinity). This is the \code{alpha.bar} parameterisation of the \code{ghyp}
 package with the skewness \code{gamma} of that package equal to \code{sigma * skew},
-so that \code{sigma} is a pure scale parameter.
+so that \code{sigma} is a pure scale parameter. The generalised hyperbolic
+distribution has the same representation with \eqn{W} generalised inverse
+Gaussian of mean one, order \code{lambda} (any real number) and
+shape parameter \code{shape} (its \code{alpha.bar}); \code{"nig"} is the case \code{lambda} = −1/2
+and \code{"hyp"} the hyperbolic distribution, \code{lambda} = 1.
 }
 \details{
 Parameters named in \code{fix} are held fixed at their values in \code{pars} when the

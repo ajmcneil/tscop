@@ -8,7 +8,8 @@ test_that("tsfit recovers the parameters of every family", {
     st = c(mu = 0.5, sigma = 0.9, df = 4.5),
     sst = c(mu = -0.3, sigma = 1.1, df = 6, gamma = 1.4),
     jsu = c(mu = 0.2, sigma = 1.5, delta = 2.2, gamma = -0.6),
-    nig = c(mu = 0.2, sigma = 1.5, shape = 1.2, skew = -0.5)
+    nig = c(mu = 0.2, sigma = 1.5, shape = 1.2, skew = -0.5),
+    hyp = c(mu = -0.1, sigma = 0.9, shape = 0.8, skew = 0.6)
   )
   for (fam in names(truths)) {
     x <- tssim(marg(fam, truths[[fam]]), 6000)
@@ -58,4 +59,17 @@ test_that("init, bootstrap standard errors and input checks", {
   expect_equal(length(tssim(f, 50)), 50)
   expect_equal(length(resid(f)), length(x))
   expect_gt(stats::ks.test(resid(f), "punif")$p.value, 0.001)
+})
+
+test_that("the generalised hyperbolic fit is at least as good as the truth, and recovers the well-identified parameters", {
+  skip_on_cran()
+  set.seed(7)
+  th <- c(mu = 0.1, sigma = 1.2, lambda = 1.5, shape = 0.8, skew = 0.4)
+  x <- tssim(marg("gh", th), 5000)
+  f <- tsfit(x, marg("gh"))
+  expect_equal(f@convergence, 0L)
+  expect_gte(as.numeric(logLik(f)), sum(mdens(marg("gh", th), x, log = TRUE)) - 1e-3)
+  expect_equal(unname(coef(f)[c("mu", "sigma", "skew")]), unname(th[c("mu", "sigma", "skew")]), tolerance = 0.25)
+  # starts from the NIG fit, so it can never be worse than the NIG
+  expect_gte(as.numeric(logLik(f)), as.numeric(logLik(tsfit(x, marg("nig")))) - 1e-3)
 })

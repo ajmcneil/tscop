@@ -5,7 +5,9 @@ mpars <- list(
   st = c(mu = 0.5, sigma = 0.9, df = 4.5),
   sst = c(mu = -0.3, sigma = 1.1, df = 6, gamma = 1.4),
   jsu = c(mu = 0.2, sigma = 1.5, delta = 2.2, gamma = -0.6),
-  nig = c(mu = 0.2, sigma = 1.5, shape = 1.2, skew = -0.5)
+  nig = c(mu = 0.2, sigma = 1.5, shape = 1.2, skew = -0.5),
+  hyp = c(mu = -0.1, sigma = 0.9, shape = 0.8, skew = 0.6),
+  gh = c(mu = 0.1, sigma = 1.2, lambda = 1.5, shape = 0.8, skew = 0.4)
 )
 
 test_that("marg validates its arguments", {
@@ -69,6 +71,11 @@ test_that("nested families coincide", {
   expect_equal(mdf(marg("nig", c(mu = 0.2, sigma = 1.3, shape = 1e4, skew = 0)), x),
                pnorm(x, 0.2, 1.3), tolerance = 1e-4)
   expect_error(marg("nig", c(mu = 0, sigma = 1, shape = 0, skew = 0)), "shape")
+  # gh contains the NIG (lambda = -1/2) and the hyperbolic distribution (lambda = 1)
+  th <- c(mu = 0.2, sigma = 1.3, shape = 1.4, skew = 0.5)
+  expect_equal(mdens(marg("gh", c(th[1:2], lambda = -0.5, th[3:4])), x), mdens(marg("nig", th), x), tolerance = 1e-9)
+  expect_equal(mdens(marg("gh", c(th[1:2], lambda = 1, th[3:4])), x), mdens(marg("hyp", th), x), tolerance = 1e-9)
+  expect_equal(mdf(marg("gh", c(th[1:2], lambda = -0.5, th[3:4])), x), mdf(marg("nig", th), x), tolerance = 1e-7)
   # the skew parameter moves mass to the right for gamma > 1
   expect_gt(mdf(marg("sst", c(mu = 0, sigma = 1, df = 6, gamma = 1.5)), 0, lower.tail = FALSE),
             mdf(marg("sst", c(mu = 0, sigma = 1, df = 6, gamma = 0.7)), 0, lower.tail = FALSE))
@@ -108,6 +115,22 @@ test_that("the NIG agrees with the ghyp package (gamma = sigma * skew)", {
   expect_equal(mdens(m, x), ghyp::dghyp(x, o), tolerance = 1e-9)
   expect_equal(mdf(m, x), ghyp::pghyp(x, o), tolerance = 1e-7)
   expect_equal(mqf(m, p), ghyp::qghyp(p, o), tolerance = 1e-5)
+})
+
+test_that("hyp and gh agree with the ghyp package (gamma = sigma * skew)", {
+  skip_if_not_installed("ghyp")
+  p <- c(1e-8, 1e-3, 0.05, 0.5, 0.9, 0.999, 1 - 1e-6)
+  x <- seq(-9, 9, length.out = 31)
+  for (fam in c("hyp", "gh")) {
+    th <- mpars[[fam]]
+    lam <- if (fam == "gh") th[["lambda"]] else 1
+    o <- ghyp::ghyp(lambda = lam, alpha.bar = th[["shape"]], mu = th[["mu"]], sigma = th[["sigma"]],
+                    gamma = th[["sigma"]] * th[["skew"]])
+    m <- marg(fam, th)
+    expect_equal(mdens(m, x), ghyp::dghyp(x, o), tolerance = 1e-9, info = fam)
+    expect_equal(mdf(m, x), ghyp::pghyp(x, o), tolerance = 1e-6, info = fam)
+    expect_equal(mqf(m, p), ghyp::qghyp(p, o), tolerance = 1e-4, info = fam)
+  }
 })
 
 test_that("margins agree with the legacy tscopula distribution functions", {

@@ -8,7 +8,7 @@ marg(family, pars = NULL, fix = character(0))
 }
 \arguments{
 \item{family}{one of \code{"gauss"}, \code{"laplace"}, \code{"slaplace"}, \code{"st"}, \code{"sst"},
-\code{"jsu"}, \code{"nig"}.}
+\code{"jsu"}, \code{"nig"}, \code{"hyp"}, \code{"gh"}.}
 
 \item{pars}{named numeric vector (or list) of parameter values; parameters
 that are omitted are unspecified (\code{NA}), giving a model structure to be

@@ -19,7 +19,7 @@ automarg(
 dropped).}
 
 \item{families}{character vector of families to try; by default all the
-available families (\code{"gauss"}, \code{"laplace"}, \code{"slaplace"}, \code{"st"}, \code{"sst"}, \code{"jsu"}, \code{"nig"}).}
+available families (\code{"gauss"}, \code{"laplace"}, \code{"slaplace"}, \code{"st"}, \code{"sst"}, \code{"jsu"}, \code{"nig"}, \code{"hyp"}, \code{"gh"}).}
 
 \item{fix}{a named numeric vector of parameter values held fixed in every
 family that has the parameter, for example \code{c(mu = 0)} for zero-mean
@@ -45,7 +45,7 @@ criterion used.
 Fits several parametric margin families to the data and ranks them by AIC or
 BIC. The families are fitted in order of nesting, and each fit starts from the
 estimates of its nested parent family when that is among the families
-(Gaussian -> Student t -> skew Student t; Gaussian -> Johnson SU; Laplace -> skew Laplace), which makes
+(Gaussian -> Student t -> skew Student t; Gaussian -> Johnson SU; NIG -> generalised hyperbolic; Laplace -> skew Laplace), which makes
 the larger families easier to estimate. Families that fail to fit are
 reported, not fatal.
 }
