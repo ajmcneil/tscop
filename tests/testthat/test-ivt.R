@@ -230,3 +230,25 @@ test_that("the fit and the IVT likelihood agree with udp-based evaluation at the
   }
   expect_equal(dv_model_loglik(truth, u), ref, tolerance = 1e-7)
 })
+
+test_that("the base-scale recursion of IVT runs equals the u-scale recursion (asymmetric deltas, mixed pair lists)", {
+  set.seed(8)
+  u <- runif(120)
+  u[40:60] <- runif(21, 0.4, 0.6)   # a quiet stretch, to put values on both sides of the fulcrums
+  for (base in c("ast", "joe", "gumbel", "clayton180")) {
+    for (d in list(c(0.5, 0.5), c(0.3, 0.7), c(0.62, 0.41))) {
+      taus <- c(0.3, 0.2, 0.12, 0.07, 0.04, 0.02)
+      ivt <- lapply(taus, function(t) dv_ivt_pair(base, t, d))
+      expect_equal(dv_loglik(u, ivt), dv_loglik_uscale(u, ivt), tolerance = 1e-7,
+                   info = paste(base, d[1], d[2]))
+      # an IVT run, a Gaussian pair, then another IVT run, then a plain Gumbel pair
+      mixed <- list(ivt[[1]], ivt[[2]], pair("gaussian", 0, 0.2), ivt[[4]], ivt[[5]],
+                    pair("gumbel", 0, 1.3), ivt[[6]])
+      expect_equal(dv_loglik(u, mixed), dv_loglik_uscale(u, mixed), tolerance = 1e-7,
+                   info = paste("mixed", base, d[1], d[2]))
+      # an IVT pair first, then plain pairs only
+      lead <- list(ivt[[1]], pair("gaussian", 0, 0.25), pair("gaussian", 0, 0.1))
+      expect_equal(dv_loglik(u, lead), dv_loglik_uscale(u, lead), tolerance = 1e-7)
+    }
+  }
+})

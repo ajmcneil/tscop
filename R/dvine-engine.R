@@ -262,9 +262,16 @@ dv_loglik <- function(u, pairs) {
   A <- u[-n] # earlier variable of each consecutive pair
   B <- u[-1L] # later variable
   zscale <- FALSE
+  bs <- FALSE # is the recursion on the base scale of a run of IVT levels?
   ll <- 0
   for (j in seq_len(K)) {
     pr <- pairs[[j]]
+    if (bs && !dv_is_ivt(pr)) {
+      # leave the base scale: u-scale values from the base-scale ones
+      A <- dv_clamp(d1 - sA * x)
+      B <- dv_clamp(d2 - sB * y)
+      bs <- FALSE
+    }
     if (dv_is_gauss(pr)) {
       if (!zscale) {
         A <- stats::qnorm(A)
@@ -283,24 +290,36 @@ dv_loglik <- function(u, pairs) {
         B <- Bnew
       }
     } else if (dv_is_ivt(pr)) {
-      # the v-transformed arguments and scale factors are computed once per
-      # level and shared by the density and the two h-functions
-      if (zscale) {
-        A <- stats::pnorm(A)
-        B <- stats::pnorm(B)
-        zscale <- FALSE
+      # IVT pairs: by (S10) of the supplement of Dias, Han and McNeil,
+      # V(h(a, b)) = h*(V(a), V(b)), so a run of IVT levels is evaluated on the
+      # base scale throughout: the data are v-transformed once on entry, the
+      # density at each level is the base density at (x, y), and the next
+      # level's arguments are the base h-functions. The branch factors sA, sB of
+      # the u-scale values (preserved by the h-functions) are carried so that
+      # the u-scale values can be recovered on exit.
+      if (!bs) {
+        if (zscale) {
+          A <- stats::pnorm(A)
+          B <- stats::pnorm(B)
+          zscale <- FALSE
+        }
+        d1 <- pr$delta[1L]
+        d2 <- pr$delta[2L]
+        x <- dv_vlin(A, d1)
+        y <- dv_vlin(B, d2)
+        sA <- dv_alin(A, d1)
+        sB <- dv_alin(B, d2)
+        bs <- TRUE
       }
-      d1 <- pr$delta[1L]
-      d2 <- pr$delta[2L]
-      x <- dv_vlin(A, d1)
-      y <- dv_vlin(B, d2)
       ll <- ll + sum(log(dv_dens(pr$base, x, y)))
       if (j < K) {
-        m <- length(A)
-        Anew <- dv_clamp(d1 - dv_alin(A[-m], d1) * dv_h(pr$base, x[-m], y[-m], 2L))
-        Bnew <- dv_clamp(d2 - dv_alin(B[-1L], d2) * dv_h(pr$base, x[-1L], y[-1L], 1L))
-        A <- Anew
-        B <- Bnew
+        m <- length(x)
+        xn <- dv_h(pr$base, x[-m], y[-m], 2L)
+        yn <- dv_h(pr$base, x[-1L], y[-1L], 1L)
+        sA <- sA[-m]
+        sB <- sB[-1L]
+        x <- xn
+        y <- yn
       }
     } else if (dv_is_ast(pr)) {
       if (zscale) {

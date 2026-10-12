@@ -42,3 +42,24 @@ dv_loglik_vinecop <- function(u, pairs) {
 pair <- function(family, rotation = 0, parameters) {
   list(family = family, rotation = rotation, parameters = parameters)
 }
+
+# Reference log-density through the pair-level functions on the u scale only
+# (no normal-score or base-scale shortcuts); works for every pair type.
+dv_loglik_uscale <- function(u, pairs) {
+  n <- length(u)
+  K <- min(length(pairs), n - 1L)
+  A <- u[-n]
+  B <- u[-1]
+  ll <- 0
+  for (j in seq_len(K)) {
+    ll <- ll + sum(log(dv_dens(pairs[[j]], A, B)))
+    if (j < K) {
+      m <- length(A)
+      Anew <- dv_h(pairs[[j]], A[-m], B[-m], 2L)
+      Bnew <- dv_h(pairs[[j]], A[-1], B[-1], 1L)
+      A <- Anew
+      B <- Bnew
+    }
+  }
+  ll
+}
