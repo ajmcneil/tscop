@@ -57,13 +57,13 @@ vt_pars_from_free <- function(zv, L) {
   p <- L$vt_pars
   for (i in seq_along(L$free)) {
     nm <- L$free[i]
-    p[[nm]] <- if (nm == "fulcrum") stats::plogis(zv[i]) else exp(zv[i])
+    p[[nm]] <- if (nm == "delta") stats::plogis(zv[i]) else exp(zv[i])
   }
   p
 }
 
 vt_pars_to_free <- function(p, free) {
-  vapply(free, function(nm) if (nm == "fulcrum") stats::qlogis(min(max(p[[nm]], 1e-3), 1 - 1e-3)) else log(p[[nm]]),
+  vapply(free, function(nm) if (nm == "delta") stats::qlogis(min(max(p[[nm]], 1e-3), 1 - 1e-3)) else log(p[[nm]]),
          numeric(1), USE.NAMES = FALSE)
 }
 

@@ -35,13 +35,13 @@ non-Gaussian dependence, without inverse-v-transformed pair copulas).
 The v-transform is any of the families of the udp package: \code{vsymmetric()}
 (fixed fulcrum 0.5), \code{vlinear(delta)}, \code{v2p(delta, kappa)},
 \code{v2b(delta, kappa)}, \code{v3p(delta, kappa, xi)} and \code{v3b(delta, kappa, xi)}.
-Its fulcrum is called \code{fulcrum} in the coefficients (as in the
-pairwise inverse-v-transformed models, where there are two fulcrums).
+Its fulcrum \code{delta} appears in the coefficients under that name (\code{delta1}
+and \code{delta2} in the pairwise inverse-v-transformed models).
 }
 \section{Functions}{
 \itemize{
 \item \code{coef(vtscop)}: Coefficients: those of the base process, then the
-free parameters of the v-transform (\code{fulcrum}, \code{kappa}, \code{xi}).
+free parameters of the v-transform (\code{delta}, \code{kappa}, \code{xi}).
 
 \item \code{show(vtscop)}: Show method.
 
@@ -57,7 +57,7 @@ object (specified or a structure to be fitted).}
 \item{\code{vt}}{a v-transform object of the udp package; its parameter values are
 the known values or the starting values.}
 
-\item{\code{vtfix}}{names of v-transform parameters (\code{"fulcrum"}, \code{"kappa"},
+\item{\code{vtfix}}{names of v-transform parameters (\code{"delta"}, \code{"kappa"},
 \code{"xi"}) held fixed in fitting.}
 }}
 

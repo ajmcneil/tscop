@@ -18,7 +18,7 @@ test_that("vtscop fits and log-likelihoods agree with tscopula::vtscopula", {
   u <- tssim(vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::v2p(0.5, 0.8)), 1500)
   g <- tscopula::fit(tscopula::vtscopula(tscopula::armacopula(list(ar = 0.5, ma = -0.2)),
                                          tscopula::V2p(0.5, 1)), u)
-  f <- tsfit(u, vtscop(arfactcop(order = 1), udp::v2p(0.5, 1), vtfix = "fulcrum"), pseudo = FALSE)
+  f <- tsfit(u, vtscop(arfactcop(order = 1), udp::v2p(0.5, 1), vtfix = "delta"), pseudo = FALSE)
   # same maximised likelihood and parameters (via the ARMA(1,1) representation)
   expect_equal(as.numeric(logLik(f)), as.numeric(logLik(g)), tolerance = 1e-4)
   a <- coef(arfact2arma(f@model@base))

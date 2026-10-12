@@ -194,7 +194,7 @@ dv_ivt_base_pair <- function(base, tau) {
   )
 }
 
-# Resolved IVT pair copula: the base pair copula and the two fulcrums.
+# Resolved IVT pair copula: the base pair copula and the two deltas.
 dv_ivt_pair <- function(base, tau, vt) {
   list(family = "ivt", rotation = 0, parameters = numeric(0),
        base = dv_ivt_base_pair(base, tau), delta = as.numeric(vt))

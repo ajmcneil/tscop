@@ -35,9 +35,9 @@
 #'   or `bicop_dist` objects (free mode).
 #' @slot tail the tail family: a [pc-class] object (tied mode), or `NULL`.
 #' @slot tautol,maxlag the tolerance and cap defining the effective lag.
-#' @slot vt the fulcrums `c(fulcrum1, fulcrum2)` of the linear v-transforms
+#' @slot vt the fulcrums `c(delta1, delta2)` of the linear v-transforms
 #'   of the inverse-v-transformed (`"ivt"`) pair copulas, shared by all of them
-#'   (`fulcrum1` applies to the earlier and `fulcrum2` to the later variable of
+#'   (`delta1` applies to the earlier and `delta2` to the later variable of
 #'   a pair); empty if the model has no such pair copula.
 #' @slot vtpar which fulcrums are parameters: `"both"`, `"common"` (one
 #'   parameter, equal fulcrums) or `"none"` (fixed).
@@ -88,10 +88,10 @@ setValidity("sdvinecop", function(object) {
   }
   if (dv_has_ivt(object)) {
     if (length(object@vt) != 2L || anyNA(object@vt) || any(object@vt <= 0 | object@vt >= 1)) {
-      return("the v-transform fulcrums 'vt' must be two numbers in (0, 1)")
+      return("the v-transform deltas 'vt' must be two numbers in (0, 1)")
     }
     if (object@vtpar == "common" && object@vt[1L] != object@vt[2L]) {
-      return("with vtpar = \"common\" the two fulcrums must be equal")
+      return("with vtpar = \"common\" the two deltas must be equal")
     }
   } else if (length(object@vt) > 0L) {
     return("'vt' is only used with inverse-v-transformed pair copulas")
@@ -184,9 +184,9 @@ sdvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
     (!is.null(tailspec) && tailspec@family == "ivt")
   if (has_ivt) {
     if (is.null(vt)) vt <- c(0.5, 0.5)
-    if (!is.numeric(vt) || length(vt) != 2L) stop("'vt' must be two fulcrums in (0, 1)")
+    if (!is.numeric(vt) || length(vt) != 2L) stop("'vt' must be two deltas in (0, 1)")
     vt <- as.numeric(vt)
-    names(vt) <- c("fulcrum1", "fulcrum2")
+    names(vt) <- c("delta1", "delta2")
   } else {
     if (!is.null(vt)) stop("'vt' is only used with inverse-v-transformed pair copulas (pc(\"ivt\", ...))")
     vt <- numeric(0)
@@ -257,7 +257,7 @@ setMethod("coef", "sdvinecop", function(object) {
       }
     }
     if (length(object@vt) > 0L && object@vtpar != "none") {
-      out <- c(out, if (object@vtpar == "common") c(fulcrum = object@vt[[1L]]) else object@vt)
+      out <- c(out, if (object@vtpar == "common") c(delta = object@vt[[1L]]) else object@vt)
     }
   }
   out
@@ -309,7 +309,7 @@ setMethod("show", "sdvinecop", function(object) {
     cat("effective lag K = ", object@K, " (", basis, ")\n", sep = "")
   }
   if (length(object@vt) > 0L) {
-    cat("v-transform fulcrums: ", paste(format(object@vt, digits = 4), collapse = ", "),
+    cat("v-transform deltas: ", paste(format(object@vt, digits = 4), collapse = ", "),
         switch(object@vtpar, both = "", common = " (common)", none = " (fixed)"), "\n", sep = "")
   }
   cf <- coef(object)

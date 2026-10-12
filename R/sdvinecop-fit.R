@@ -240,7 +240,7 @@ dv_build_model <- function(object, z, lay, K, limit) {
     pairs[[lay$aux_lags[i]]] <- pc(sp@family, sp@pos, sp@neg, aux[i])
   }
   vt <- dv_vt_from_free(z, lay)
-  if (!is.null(vt)) names(vt) <- c("fulcrum1", "fulcrum2")
+  if (!is.null(vt)) names(vt) <- c("delta1", "delta2")
   m <- sdvinecop(kp, pairs = pairs, tail = object@tail, tautol = object@tautol,
                 maxlag = object@maxlag, vt = vt, vtpar = object@vtpar)
   m@K <- as.integer(K)

@@ -10,7 +10,7 @@ test_that("pc specifications are validated", {
   expect_error(pc("gumbel", neg = 180), "neg")
   expect_error(pc("gumbel", aux = 2), "auxiliary")
   expect_error(pc("t", aux = 1.5), "degrees")
-  expect_error(pc("bb1", aux = 0.5), "delta")
+  expect_error(pc("bb1", aux = 0.5), "BB1")
   expect_output(show(pc("gumbel")), "gumbel")
 })
 

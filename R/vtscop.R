@@ -19,15 +19,15 @@
 #' The v-transform is any of the families of the udp package: `vsymmetric()`
 #' (fixed fulcrum 0.5), `vlinear(delta)`, `v2p(delta, kappa)`,
 #' `v2b(delta, kappa)`, `v3p(delta, kappa, xi)` and `v3b(delta, kappa, xi)`.
-#' Its fulcrum is called `fulcrum` in the coefficients (as in the
-#' pairwise inverse-v-transformed models, where there are two fulcrums).
+#' Its fulcrum `delta` appears in the coefficients under that name (`delta1`
+#' and `delta2` in the pairwise inverse-v-transformed models).
 #'
 #' @slot name short description.
 #' @slot base the base process: an [arfactcop-class] or a tied [sdvinecop-class]
 #'   object (specified or a structure to be fitted).
 #' @slot vt a v-transform object of the udp package; its parameter values are
 #'   the known values or the starting values.
-#' @slot vtfix names of v-transform parameters (`"fulcrum"`, `"kappa"`,
+#' @slot vtfix names of v-transform parameters (`"delta"`, `"kappa"`,
 #'   `"xi"`) held fixed in fitting.
 #'
 #' @references McNeil, A. J. (2021). Modelling volatile time series with
@@ -40,24 +40,18 @@
 setClass("vtscop", slots = c(name = "character", base = "ANY", vt = "vtransform",
                              vtfix = "character"))
 
-.vt_tscop_names <- c(delta = "fulcrum", kappa = "kappa", xi = "xi")
-
-# Parameters of a udp v-transform under tscop's names (fulcrum, kappa, xi).
-vt_params <- function(vt) {
-  p <- vt@pars
-  if (length(p) > 0L) names(p) <- unname(.vt_tscop_names[names(p)])
-  p
-}
+# Parameters (delta, kappa, xi) of a udp v-transform.
+vt_params <- function(vt) vt@pars
 
 # A udp v-transform from its family name and tscop-named parameters.
 vt_build <- function(name, p) {
   switch(name,
     vsymmetric = udp::vsymmetric(),
-    vlinear = udp::vlinear(p[["fulcrum"]]),
-    v2p = udp::v2p(p[["fulcrum"]], p[["kappa"]]),
-    v2b = udp::v2b(p[["fulcrum"]], p[["kappa"]]),
-    v3p = udp::v3p(p[["fulcrum"]], p[["kappa"]], p[["xi"]]),
-    v3b = udp::v3b(p[["fulcrum"]], p[["kappa"]], p[["xi"]]),
+    vlinear = udp::vlinear(p[["delta"]]),
+    v2p = udp::v2p(p[["delta"]], p[["kappa"]]),
+    v2b = udp::v2b(p[["delta"]], p[["kappa"]]),
+    v3p = udp::v3p(p[["delta"]], p[["kappa"]], p[["xi"]]),
+    v3b = udp::v3b(p[["delta"]], p[["kappa"]], p[["xi"]]),
     stop("unsupported v-transform '", name, "'")
   )
 }
@@ -97,7 +91,7 @@ setValidity("vtscop", function(object) {
 #'   `udp::v3p(delta, kappa, xi)` or `udp::v3b(delta, kappa, xi)`. The parameter
 #'   values are the known values, or starting values for fitting (`delta` is
 #'   the fulcrum).
-#' @param vtfix character vector of v-transform parameters (`"fulcrum"`,
+#' @param vtfix character vector of v-transform parameters (`"delta"`,
 #'   `"kappa"`, `"xi"`) that are held fixed at their values in `vt` when the
 #'   model is fitted.
 #'
@@ -111,7 +105,7 @@ setValidity("vtscop", function(object) {
 #' vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))),
 #'        udp::vlinear(0.5))
 #' # a model structure to be fitted, with the fulcrum fixed
-#' vtscop(arfactcop(order = 2), udp::v2p(0.5, 1), vtfix = "fulcrum")
+#' vtscop(arfactcop(order = 2), udp::v2p(0.5, 1), vtfix = "delta")
 vtscop <- function(base, vt, vtfix = character(0)) {
   msg <- vt_check_base(base)
   if (!is.null(msg)) stop(msg)
@@ -155,7 +149,7 @@ vt_loglik <- function(object, u) {
 }
 
 #' @describeIn vtscop-class Coefficients: those of the base process, then the
-#'   free parameters of the v-transform (`fulcrum`, `kappa`, `xi`).
+#'   free parameters of the v-transform (`delta`, `kappa`, `xi`).
 #' @param object an object of class [vtscop-class].
 #' @export
 setMethod("coef", "vtscop", function(object) {

@@ -45,7 +45,7 @@ evaluate than the \code{rvinecopulib} families).}
 and \code{"clayton180"} (survival Clayton); \code{NA} otherwise.}
 
 \item{\code{aux}}{auxiliary parameter: degrees of freedom for \code{"t"} (at least 2)
-or \code{delta} for \code{"bb1"} (at least 1); \code{NA} for other families, and \code{NA}
+or the second parameter (\code{delta} in rvinecopulib) for \code{"bb1"} (at least 1); \code{NA} for other families, and \code{NA}
 for \code{"t"}/\code{"bb1"} if it has not been given yet (a starting value is then
 chosen when the model is fitted).}
 }}

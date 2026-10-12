@@ -16,7 +16,7 @@ non-negative. Ignored for radially symmetric families (Gauss, t, Frank).}
 \item{neg}{rotation (90 or 270) used when Kendall's tau at the lag is
 negative. Ignored for radially symmetric families.}
 
-\item{aux}{auxiliary parameter: degrees of freedom for \code{"t"}, \code{delta} for
+\item{aux}{auxiliary parameter: degrees of freedom for \code{"t"}, the second BB1 parameter (\code{delta} in rvinecopulib) for
 \code{"bb1"}; \code{NULL} for the other families.}
 
 \item{base}{for \code{family = "ivt"} the base copula: \code{"ast"}, \code{"joe"},

@@ -114,23 +114,23 @@ test_that("first-order IVT d-vine simulation has the IVT pair copula as its lag-
 test_that("sdvinecop constructor handles the v-transform parameters", {
   m <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.6))
   expect_equal(unname(m@vt), c(0.4, 0.6))
-  expect_equal(names(m@vt), c("fulcrum1", "fulcrum2"))
-  expect_equal(names(coef(m)), c("lambda1", "w1", "fulcrum1", "fulcrum2"))
-  expect_output(show(m), "v-transform fulcrums: 0.4, 0.6")
+  expect_equal(names(m@vt), c("delta1", "delta2"))
+  expect_equal(names(coef(m)), c("lambda1", "w1", "delta1", "delta2"))
+  expect_output(show(m), "v-transform deltas: 0.4, 0.6")
   expect_output(show(m), "tail family: ivt with base ast")
   # default fulcrums
   m0 <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("ivt", base = "joe")))
   expect_equal(unname(m0@vt), c(0.5, 0.5))
   # common and fixed
   mc <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.4), vtpar = "common")
-  expect_equal(names(coef(mc)), c("lambda1", "w1", "fulcrum"))
+  expect_equal(names(coef(mc)), c("lambda1", "w1", "delta"))
   mn <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vtpar = "none")
   expect_equal(names(coef(mn)), c("lambda1", "w1"))
   expect_output(show(mn), "\\(fixed\\)")
   expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.5), vtpar = "common"), "equal")
   expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0, 0.5)), "\\(0, 1\\)")
   expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), vt = c(0.4, 0.6)), "only used")
-  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = 0.5), "two fulcrums")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = 0.5), "two deltas")
 })
 
 test_that("a kpacf with negative values is infeasible for an IVT pair copula", {
@@ -173,7 +173,7 @@ test_that("tsfit recovers the fulcrums and the kpacf of an IVT d-vine", {
   u <- tssim(truth, 1500)
   spec <- sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3)
   f <- tsfit(u, spec, pseudo = FALSE)
-  expect_equal(names(coef(f)), c("lambda1", "w1", "fulcrum1", "fulcrum2"))
+  expect_equal(names(coef(f)), c("lambda1", "w1", "delta1", "delta2"))
   expect_equal(unname(coef(f)[3:4]), c(0.4, 0.6), tolerance = 0.2)
   expect_equal(unname(coef(f)[1]), 0.85, tolerance = 0.15)
   expect_equal(f@npar, 4L)
@@ -184,7 +184,7 @@ test_that("tsfit recovers the fulcrums and the kpacf of an IVT d-vine", {
   # common and fixed fulcrums
   fc <- tsfit(u, sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3, vtpar = "common"),
               pseudo = FALSE)
-  expect_equal(names(coef(fc)), c("lambda1", "w1", "fulcrum"))
+  expect_equal(names(coef(fc)), c("lambda1", "w1", "delta"))
   expect_equal(fc@npar, 3L)
   expect_equal(unname(fc@model@vt[1]), unname(fc@model@vt[2]))
   expect_lte(fc@loglik, f@loglik + 1e-6)

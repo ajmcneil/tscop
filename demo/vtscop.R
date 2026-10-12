@@ -29,7 +29,7 @@ fit <- tsfit(u, vtscop(arfactcop(order = 1), udp::v2p(0.5, 1)), pseudo = FALSE, 
 fit
 rbind(true = coef(m), estimate = coef(fit))
 # Fixing the fulcrum at its true value
-fit2 <- tsfit(u, vtscop(arfactcop(order = 1), udp::v2p(0.45, 1), vtfix = "fulcrum"), pseudo = FALSE)
+fit2 <- tsfit(u, vtscop(arfactcop(order = 1), udp::v2p(0.45, 1), vtfix = "delta"), pseudo = FALSE)
 coef(fit2)
 
 section("3. Residuals and prediction")

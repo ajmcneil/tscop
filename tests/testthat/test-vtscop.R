@@ -39,7 +39,7 @@ test_that("tsfit recovers parameters and gives standard errors", {
   expect_true(all(is.finite(f@se)) && all(f@se > 0))
   expect_s3_class(logLik(f), "logLik")
   # fixed fulcrum
-  g <- tsfit(u, vtscop(arfactcop(order = 1), udp::v2p(0.45, 1), vtfix = "fulcrum"), pseudo = FALSE)
+  g <- tsfit(u, vtscop(arfactcop(order = 1), udp::v2p(0.45, 1), vtfix = "delta"), pseudo = FALSE)
   expect_equal(names(coef(g)), c("lambda1", "w1", "kappa"))
   expect_equal(g@model@vt@pars[["delta"]], 0.45)
 })
@@ -52,7 +52,7 @@ test_that("tsfit works with a d-vine base and bootstrap standard errors", {
   f <- tsfit(u, vtscop(sdvinecop(arfactcop(order = 1), pairs = list(pc("gumbel"))), udp::vlinear(0.5)),
              pseudo = FALSE, se = "bootstrap", B = 10)
   expect_equal(f@se_method, "bootstrap")
-  expect_equal(names(coef(f)), c("lambda1", "w1", "fulcrum"))
+  expect_equal(names(coef(f)), c("lambda1", "w1", "delta"))
   expect_true(all(is.finite(f@se)))
 })
 

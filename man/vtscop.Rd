@@ -17,7 +17,7 @@ inverse-v-transformed pair copula; specified, or a structure to be fitted.}
 values are the known values, or starting values for fitting (\code{delta} is
 the fulcrum).}
 
-\item{vtfix}{character vector of v-transform parameters (\code{"fulcrum"},
+\item{vtfix}{character vector of v-transform parameters (\code{"delta"},
 \code{"kappa"}, \code{"xi"}) that are held fixed at their values in \code{vt} when the
 model is fitted.}
 }
@@ -34,5 +34,5 @@ vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::v2p(delta = 0.45, kappa = 0.8))
 vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))),
        udp::vlinear(0.5))
 # a model structure to be fitted, with the fulcrum fixed
-vtscop(arfactcop(order = 2), udp::v2p(0.5, 1), vtfix = "fulcrum")
+vtscop(arfactcop(order = 2), udp::v2p(0.5, 1), vtfix = "delta")
 }

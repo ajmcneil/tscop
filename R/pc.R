@@ -35,7 +35,7 @@
 #' @slot base for `"ivt"`: the base copula, one of `"ast"`, `"joe"`, `"gumbel"`
 #'   and `"clayton180"` (survival Clayton); `NA` otherwise.
 #' @slot aux auxiliary parameter: degrees of freedom for `"t"` (at least 2)
-#'   or `delta` for `"bb1"` (at least 1); `NA` for other families, and `NA`
+#'   or the second parameter (`delta` in rvinecopulib) for `"bb1"` (at least 1); `NA` for other families, and `NA`
 #'   for `"t"`/`"bb1"` if it has not been given yet (a starting value is then
 #'   chosen when the model is fitted).
 #'
@@ -67,7 +67,7 @@ setValidity("pc", function(object) {
   if (object@family %in% .pc_aux_families) {
     if (!is.na(object@aux)) {
       if (object@family == "t" && object@aux < 2) return("degrees of freedom must be at least 2")
-      if (object@family == "bb1" && object@aux < 1) return("'delta' must be at least 1")
+      if (object@family == "bb1" && object@aux < 1) return("the second BB1 parameter 'aux' must be at least 1")
     }
   } else if (!is.na(object@aux)) {
     return(paste0("family '", object@family, "' has no auxiliary parameter"))
@@ -83,7 +83,7 @@ setValidity("pc", function(object) {
 #'   non-negative. Ignored for radially symmetric families (Gauss, t, Frank).
 #' @param neg rotation (90 or 270) used when Kendall's tau at the lag is
 #'   negative. Ignored for radially symmetric families.
-#' @param aux auxiliary parameter: degrees of freedom for `"t"`, `delta` for
+#' @param aux auxiliary parameter: degrees of freedom for `"t"`, the second BB1 parameter (`delta` in rvinecopulib) for
 #'   `"bb1"`; `NULL` for the other families.
 #' @param base for `family = "ivt"` the base copula: `"ast"`, `"joe"`,
 #'   `"gumbel"` or `"clayton180"` (the survival Clayton copula); `NULL` for

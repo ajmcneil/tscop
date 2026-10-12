@@ -69,9 +69,9 @@ or \code{bicop_dist} objects (free mode).}
 
 \item{\code{tautol,maxlag}}{the tolerance and cap defining the effective lag.}
 
-\item{\code{vt}}{the fulcrums \code{c(fulcrum1, fulcrum2)} of the linear v-transforms
+\item{\code{vt}}{the fulcrums \code{c(delta1, delta2)} of the linear v-transforms
 of the inverse-v-transformed (\code{"ivt"}) pair copulas, shared by all of them
-(\code{fulcrum1} applies to the earlier and \code{fulcrum2} to the later variable of
+(\code{delta1} applies to the earlier and \code{delta2} to the later variable of
 a pair); empty if the model has no such pair copula.}
 
 \item{\code{vtpar}}{which fulcrums are parameters: \code{"both"}, \code{"common"} (one
