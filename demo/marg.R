@@ -3,7 +3,8 @@
 # by Fernandez-Steel skewing (gamma = 1 symmetric, mu the mode). Simulation,
 # fitting by maximum likelihood with standard errors, fixed parameters,
 # residuals (probability integral transforms) and automatic selection among the
-# nested families (automarg).
+# nested families (automarg), and the empirical margin (emarg) for the
+# semiparametric approach.
 # Run with demo("marg", package = "tscop") or
 #   devtools::load_all(); source("demo/marg.R", echo = TRUE)
 
@@ -52,4 +53,14 @@ hist(r, main = "PITs of the selected model", xlab = "u")
 qqnorm(resid(a, scale = "normal")); abline(0, 1)
 par(op)
 ks.test(r, "punif")$p.value
+section("6. The empirical margin")
+# A nonparametric margin: the scaled empirical distribution function (pseudo-
+# observations rank / (n + 1)) with a kernel density, or the fully smoothed kernel margin.
+e <- emarg(x)
+e
+head(resid(e))                                 # pseudo-observations
+c(edf = mdf(e, 1), parametric = mdf(a@best, 1), true = mdf(m, 1))
+mqf(e, c(0.01, 0.5, 0.99))                     # empirical quantiles
+ek <- emarg(x, "kernel")                       # smoothed margin
+c(kernel = mdens(ek, 0), parametric = mdens(a@best, 0), true = mdens(m, 0))
 cat("\nEnd of demo.\n")
