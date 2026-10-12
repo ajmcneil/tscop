@@ -1,5 +1,5 @@
-# Parametric margins (marg): Gaussian, Laplace, skew Laplace, Student t and
-# skew Student t, with sigma a pure scale parameter and the skew families built
+# Parametric margins (marg): Gaussian, Laplace, skew Laplace, Student t, skew
+# Student t and Johnson SU, with sigma a pure scale parameter and the skew families built
 # by Fernandez-Steel skewing (gamma = 1 symmetric, mu the mode). Simulation,
 # fitting by maximum likelihood with standard errors, fixed parameters,
 # residuals (probability integral transforms) and automatic selection among the

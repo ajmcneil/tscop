@@ -3,14 +3,14 @@
 #' Fits several parametric margin families to the data and ranks them by AIC or
 #' BIC. The families are fitted in order of nesting, and each fit starts from the
 #' estimates of its nested parent family when that is among the families
-#' (Gaussian -> Student t -> skew Student t; Laplace -> skew Laplace), which makes
+#' (Gaussian -> Student t -> skew Student t; Gaussian -> Johnson SU; Laplace -> skew Laplace), which makes
 #' the larger families easier to estimate. Families that fail to fit are
 #' reported, not fatal.
 #'
 #' @param x numeric data (the raw observations; non-finite values are
 #'   dropped).
 #' @param families character vector of families to try; by default all the
-#'   available families (`"gauss"`, `"laplace"`, `"slaplace"`, `"st"`, `"sst"`).
+#'   available families (`"gauss"`, `"laplace"`, `"slaplace"`, `"st"`, `"sst"`, `"jsu"`).
 #' @param fix a named numeric vector of parameter values held fixed in every
 #'   family that has the parameter, for example `c(mu = 0)` for zero-mean
 #'   margins.
@@ -41,7 +41,7 @@ automarg <- function(x, families = names(.marg_families), fix = NULL, criterion 
   if (length(families) < 1L) stop("'families' must name at least one family", call. = FALSE)
   for (f in families) mg_family(f) # errors for unknown names
   if (!is.null(fix)) {
-    if (!is.numeric(fix) || is.null(names(fix)) || any(!(names(fix) %in% c("mu", "sigma", "df", "gamma")))) {
+    if (!is.numeric(fix) || is.null(names(fix)) || any(!(names(fix) %in% c("mu", "sigma", "df", "gamma", "delta")))) {
       stop("'fix' must be a named numeric vector of parameter values", call. = FALSE)
     }
   }

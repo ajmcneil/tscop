@@ -33,6 +33,18 @@ mg_st <- list(
   q = function(u, s, lt) stats::qt(u, s[["df"]], lower.tail = lt)
 )
 
+# Johnson SU: y = (x - mu) / sigma satisfies gamma + delta asinh(y) ~ N(0, 1),
+# with delta > 0 (tail weight: smaller is heavier) and gamma real (skewness).
+mg_jsu <- list(
+  ld = function(y, s) {
+    g <- s[["gamma"]]
+    d <- s[["delta"]]
+    log(d) - 0.5 * log1p(y^2) - 0.5 * log(2 * pi) - 0.5 * (g + d * asinh(y))^2
+  },
+  p = function(y, s, lt) stats::pnorm(s[["gamma"]] + s[["delta"]] * asinh(y), lower.tail = lt),
+  q = function(u, s, lt) sinh((stats::qnorm(u, lower.tail = lt) - s[["gamma"]]) / s[["delta"]])
+)
+
 # Fernandez-Steel skewing of a symmetric standardised family with skewing
 # parameter gamma > 0 (gamma = 1 is the symmetric case; the mode is at 0):
 #   f(z) = 2 / (gamma + 1 / gamma) * f0(gamma z) for z < 0, f0(z / gamma) for z >= 0.
@@ -122,6 +134,19 @@ mg_robust <- function(x) {
     },
     parent = "gauss", from_parent = function(th) c(th, df = 8),
     description = "Student t"),
+  jsu = mg_fam("jsu", c("mu", "sigma", "delta", "gamma"), c("real", "pos", "pos", "real"), mg_jsu,
+    start = function(x) {
+      d <- 2
+      v <- 0.5 * (exp(1 / d^2) - 1) * (exp(1 / d^2) + 1) # variance of sinh(Z / d)
+      c(mu = stats::median(x), sigma = stats::sd(x) / sqrt(v), delta = d, gamma = 0)
+    },
+    parent = "gauss",
+    from_parent = function(th) {
+      d <- 2
+      v <- 0.5 * (exp(1 / d^2) - 1) * (exp(1 / d^2) + 1)
+      c(mu = th[["mu"]], sigma = th[["sigma"]] / sqrt(v), delta = d, gamma = 0)
+    },
+    description = "Johnson SU"),
   sst = mg_fam("sst", c("mu", "sigma", "df", "gamma"), c("real", "pos", "df", "pos"),
     mg_skew(mg_st),
     start = function(x) {

@@ -9,13 +9,17 @@ A parametric marginal distribution for a time series: a location-scale
 family \eqn{x = \mu + \sigma z}, with \code{sigma} a pure scale parameter (not the
 standard deviation) and shape parameters depending on the family. The
 families are \code{"gauss"} (Gaussian), \code{"laplace"}, \code{"slaplace"} (skew
-Laplace), \code{"st"} (Student t, \code{df} degrees of freedom) and \code{"sst"} (skew
-Student t). The skew families use the Fernandez-Steel construction with the
+Laplace), \code{"st"} (Student t, \code{df} degrees of freedom), \code{"sst"} (skew
+Student t) and \code{"jsu"} (Johnson SU). The skew families use the Fernandez-Steel construction with the
 skewing parameter \code{gamma} (\code{gamma = 1} is symmetric; \code{mu} is then the mode of
 the distribution): the density of the standardised variable is
 \eqn{2/(\gamma + 1/\gamma) f_0(\gamma z)} for \eqn{z < 0} and
 \eqn{2/(\gamma + 1/\gamma) f_0(z/\gamma)} for \eqn{z \ge 0}, where \eqn{f_0}
-is the symmetric base density.
+is the symmetric base density. The Johnson SU distribution is defined by
+\eqn{\gamma + \delta\,\mathrm{asinh}((x - \mu)/\sigma) \sim N(0, 1)}
+with \code{delta} > 0 (smaller values give heavier tails; the Gaussian is the
+limit as \code{delta} tends to infinity with \code{sigma} proportional to \code{delta}) and
+\code{gamma} real (skewness; zero is symmetric about \code{mu}).
 }
 \details{
 Parameters named in \code{fix} are held fixed at their values in \code{pars} when the

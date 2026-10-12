@@ -179,7 +179,8 @@ accepted for compatibility: bootstrap refits start from the fitted values
 \code{U} (here the raw observations, not copula data). The starting values come
 from \code{init} (a \link[=marg-class]{marg} model or a named parameter vector), otherwise
 from the ladder: the nested parent family is fitted first (Gaussian for
-the Student t, Student t for the skew t, Laplace for the skew Laplace) and
+the Student t and the Johnson SU, Student t for the skew t, Laplace for the
+skew Laplace) and
 its estimates start the fit; parameters specified in \code{object} (and those in
 \code{fix}) are used as given. \code{se} is \code{"hessian"} or \code{"bootstrap"} (parametric
 bootstrap with refits from the fitted values), or \code{FALSE}.

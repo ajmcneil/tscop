@@ -3,7 +3,8 @@ mpars <- list(
   laplace = c(mu = -0.2, sigma = 0.8),
   slaplace = c(mu = 0.1, sigma = 1.2, gamma = 0.7),
   st = c(mu = 0.5, sigma = 0.9, df = 4.5),
-  sst = c(mu = -0.3, sigma = 1.1, df = 6, gamma = 1.4)
+  sst = c(mu = -0.3, sigma = 1.1, df = 6, gamma = 1.4),
+  jsu = c(mu = 0.2, sigma = 1.5, delta = 2.2, gamma = -0.6)
 )
 
 test_that("marg validates its arguments", {
@@ -58,6 +59,11 @@ test_that("nested families coincide", {
   expect_equal(mdens(marg("gauss", c(mu = 0.2, sigma = 1.3)), x), dnorm(x, 0.2, 1.3), tolerance = 1e-12)
   expect_equal(mdens(marg("st", c(mu = 0.2, sigma = 1.3, df = 4)), x), dt((x - 0.2) / 1.3, 4) / 1.3, tolerance = 1e-12)
   expect_equal(mdf(marg("st", c(mu = 0, sigma = 1, df = 1e6)), x), pnorm(x), tolerance = 1e-5)
+  # Johnson SU tends to the Gaussian as delta grows with sigma = delta * s
+  expect_equal(mdf(marg("jsu", c(mu = 0.2, sigma = 1e3 * 1.3, delta = 1e3, gamma = 0)), x),
+               pnorm(x, 0.2, 1.3), tolerance = 1e-5)
+  expect_equal(mdf(marg("jsu", c(mu = 0, sigma = 1, delta = 2, gamma = 0)), 0), 0.5)
+  expect_error(marg("jsu", c(mu = 0, sigma = 1, delta = -1, gamma = 0)), "delta")
   # the skew parameter moves mass to the right for gamma > 1
   expect_gt(mdf(marg("sst", c(mu = 0, sigma = 1, df = 6, gamma = 1.5)), 0, lower.tail = FALSE),
             mdf(marg("sst", c(mu = 0, sigma = 1, df = 6, gamma = 0.7)), 0, lower.tail = FALSE))
@@ -93,6 +99,11 @@ test_that("margins agree with the legacy tscopula distribution functions", {
   th <- mpars$laplace
   expect_equal(mdens(marg("laplace", th), x), tscopula::dlaplace(x, mu = th[["mu"]], scale = th[["sigma"]]), tolerance = 1e-10)
   expect_equal(mdf(marg("laplace", th), x), tscopula::plaplace(x, mu = th[["mu"]], scale = th[["sigma"]]), tolerance = 1e-10)
+  th <- mpars$jsu
+  mj <- marg("jsu", th)
+  expect_equal(mdens(mj, x), tscopula::djsu(x, delta = th[["delta"]], mu = th[["mu"]], sigma = th[["sigma"]], gamma = th[["gamma"]]), tolerance = 1e-10)
+  expect_equal(mdf(mj, x), tscopula::pjsu(x, delta = th[["delta"]], mu = th[["mu"]], sigma = th[["sigma"]], gamma = th[["gamma"]]), tolerance = 1e-10)
+  expect_equal(mqf(mj, p), tscopula::qjsu(p, delta = th[["delta"]], mu = th[["mu"]], sigma = th[["sigma"]], gamma = th[["gamma"]]), tolerance = 1e-8)
   th <- mpars$slaplace
   expect_equal(mdens(marg("slaplace", th), x), tscopula::dslaplace(x, mu = th[["mu"]], scale = th[["sigma"]], gamma = th[["gamma"]]), tolerance = 1e-8)
   expect_equal(mdf(marg("slaplace", th), x), tscopula::pslaplace(x, mu = th[["mu"]], scale = th[["sigma"]], gamma = th[["gamma"]]), tolerance = 1e-8)

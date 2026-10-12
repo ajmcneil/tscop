@@ -4,13 +4,17 @@
 #' family \eqn{x = \mu + \sigma z}, with `sigma` a pure scale parameter (not the
 #' standard deviation) and shape parameters depending on the family. The
 #' families are `"gauss"` (Gaussian), `"laplace"`, `"slaplace"` (skew
-#' Laplace), `"st"` (Student t, `df` degrees of freedom) and `"sst"` (skew
-#' Student t). The skew families use the Fernandez-Steel construction with the
+#' Laplace), `"st"` (Student t, `df` degrees of freedom), `"sst"` (skew
+#' Student t) and `"jsu"` (Johnson SU). The skew families use the Fernandez-Steel construction with the
 #' skewing parameter `gamma` (`gamma = 1` is symmetric; `mu` is then the mode of
 #' the distribution): the density of the standardised variable is
 #' \eqn{2/(\gamma + 1/\gamma) f_0(\gamma z)} for \eqn{z < 0} and
 #' \eqn{2/(\gamma + 1/\gamma) f_0(z/\gamma)} for \eqn{z \ge 0}, where \eqn{f_0}
-#' is the symmetric base density.
+#' is the symmetric base density. The Johnson SU distribution is defined by
+#' \eqn{\gamma + \delta\,\mathrm{asinh}((x - \mu)/\sigma) \sim N(0, 1)}
+#' with `delta` > 0 (smaller values give heavier tails; the Gaussian is the
+#' limit as `delta` tends to infinity with `sigma` proportional to `delta`) and
+#' `gamma` real (skewness; zero is symmetric about `mu`).
 #'
 #' Parameters named in `fix` are held fixed at their values in `pars` when the
 #' model is fitted with [tsfit()]; for example
@@ -29,7 +33,8 @@ mg_bounds_ok <- function(fam, pars) {
   th <- pars[!is.na(pars)]
   if ("sigma" %in% names(th) && th[["sigma"]] <= 0) return("'sigma' must be positive")
   if ("df" %in% names(th) && th[["df"]] <= 1) return("'df' must exceed 1")
-  if ("gamma" %in% names(th) && th[["gamma"]] <= 0) return("'gamma' must be positive")
+  if ("gamma" %in% names(th) && fam$types[["gamma"]] == "pos" && th[["gamma"]] <= 0) return("'gamma' must be positive")
+  if ("delta" %in% names(th) && th[["delta"]] <= 0) return("'delta' must be positive")
   if (any(!is.finite(th))) return("parameters must be finite")
   NULL
 }
@@ -49,7 +54,8 @@ setValidity("marg", function(object) {
 
 #' Constructor for parametric margins
 #'
-#' @param family one of `"gauss"`, `"laplace"`, `"slaplace"`, `"st"`, `"sst"`.
+#' @param family one of `"gauss"`, `"laplace"`, `"slaplace"`, `"st"`, `"sst"`,
+#'   `"jsu"`.
 #' @param pars named numeric vector (or list) of parameter values; parameters
 #'   that are omitted are unspecified (`NA`), giving a model structure to be
 #'   fitted. See [marg-class] for the parameters of each family.

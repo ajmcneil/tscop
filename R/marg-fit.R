@@ -86,7 +86,8 @@ mg_start <- function(x, fam, th_user, fix, control) {
 #'   `U` (here the raw observations, not copula data). The starting values come
 #'   from `init` (a [marg-class] model or a named parameter vector), otherwise
 #'   from the ladder: the nested parent family is fitted first (Gaussian for
-#'   the Student t, Student t for the skew t, Laplace for the skew Laplace) and
+#'   the Student t and the Johnson SU, Student t for the skew t, Laplace for the
+#'   skew Laplace) and
 #'   its estimates start the fit; parameters specified in `object` (and those in
 #'   `fix`) are used as given. `se` is `"hessian"` or `"bootstrap"` (parametric
 #'   bootstrap with refits from the fitted values), or `FALSE`.
