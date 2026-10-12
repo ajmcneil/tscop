@@ -60,4 +60,5 @@ Collate:
     'marg-families.R'
     'marg.R'
     'marg-fit.R'
+    'automarg.R'
     'tscop-package.R'

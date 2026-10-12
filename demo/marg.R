@@ -2,7 +2,8 @@
 # skew Student t, with sigma a pure scale parameter and the skew families built
 # by Fernandez-Steel skewing (gamma = 1 symmetric, mu the mode). Simulation,
 # fitting by maximum likelihood with standard errors, fixed parameters,
-# residuals (probability integral transforms) and comparison of nested families.
+# residuals (probability integral transforms) and automatic selection among the
+# nested families (automarg).
 # Run with demo("marg", package = "tscop") or
 #   devtools::load_all(); source("demo/marg.R", echo = TRUE)
 
@@ -38,18 +39,17 @@ zt <- tsfit(x, marg("st", c(mu = 0), fix = "mu"))
 zt
 c(npar = attr(logLik(zt), "df"))
 
-section("4. Comparing nested families")
-fits <- list(gauss = tsfit(x, marg("gauss")), laplace = tsfit(x, marg("laplace")),
-             slaplace = tsfit(x, marg("slaplace")), st = tsfit(x, marg("st")),
-             sst = fit)
-aic <- sapply(fits, AIC)
-round(aic - min(aic), 1)                      # sst, the true family, should be best
+section("4. Comparing nested families: automarg")
+a <- automarg(x)                              # fits all the families, ranked by AIC
+a                                             # sst, the true family, should be at or near the top
+automarg(x, fix = c(mu = 0), criterion = "BIC")@table[, 1:6]   # zero-mean margins, ranked by BIC
+a@best                                        # the selected fit
 
 section("5. Residuals")
-r <- resid(fit)                               # probability integral transforms
+r <- resid(a)                                 # PITs of the selected model
 par(mfrow = c(1, 2))
-hist(r, main = "PITs of the fitted sst", xlab = "u")
-qqnorm(resid(fit, scale = "normal")); abline(0, 1)
+hist(r, main = "PITs of the selected model", xlab = "u")
+qqnorm(resid(a, scale = "normal")); abline(0, 1)
 par(op)
 ks.test(r, "punif")$p.value
 cat("\nEnd of demo.\n")

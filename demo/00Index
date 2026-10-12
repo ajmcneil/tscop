@@ -3,4 +3,4 @@ sdvinecop   Stationary d-vine copula processes with an ARMA kpacf: pair copula s
 arfactcop  Gaussian copula processes made of independent AR(1) factors plus noise: kpacf, simulation, exact likelihood, fitting, diagnostics, use in d-vines
 ivt        Inverse-v-transformed pair copulas in d-vines for stochastic volatility (the Dias-Han-McNeil models): simulation, fitting, fulcrums, diagnostics, prediction
 vtscop     Process-level v-transform copula processes: any udp v-transform on an arfactcop or d-vine base, simulation, fitting with standard errors, residuals, prediction
-marg       Parametric margins: gauss, laplace, slaplace, st, sst; simulation, fitting with standard errors, fixed parameters, residuals, comparison of nested families
+marg       Parametric margins: gauss, laplace, slaplace, st, sst; simulation, fitting with standard errors, fixed parameters, residuals, automatic selection among the families (automarg)

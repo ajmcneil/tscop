@@ -112,6 +112,7 @@ setMethod("tsfit", signature(U = "ANY", object = "marg"),
       th_user[names(iv)] <- iv
     }
     fix <- object@fix
+    th_user[fix] <- object@pars[fix] # fixed parameters keep their values whatever 'init' says
     th0 <- if (!is.null(init) && !anyNA(th_user)) th_user else mg_start(x, fam, th_user, fix, control)
     if (anyNA(th0)) stop("could not determine starting values", call. = FALSE)
     fit <- mg_fit_core(x, fam, th0, fix, control)
