@@ -90,7 +90,7 @@ setGeneric("ktau", function(object, lagmax = 20, ...) standardGeneric("ktau"),
 #' @param ... not used.
 #'
 #' @return A numeric vector the length of the data.
-#' @name resid-tscop
+#' @name resid-method
 NULL
 
 #' Prediction for time series copula models
@@ -131,7 +131,7 @@ NULL
 #'
 #' @return A data frame (`type = "moments"`) or a numeric vector the length of
 #'   `x`.
-#' @name predict-tscop
+#' @name predict-method
 NULL
 
 #' Common methods for time series copula models

@@ -409,13 +409,13 @@ dv_resid <- function(model, data, scale) {
   restore_attrs(out, data)
 }
 
-#' @rdname resid-tscop
+#' @rdname resid-method
 #' @export
 setMethod("resid", "sdvinecop", function(object, data, scale = "uniform", ...) {
   dv_resid(object, data, scale)
 })
 
-#' @rdname resid-tscop
+#' @rdname resid-method
 #' @export
 setMethod("residuals", "sdvinecop", function(object, data, scale = "uniform", ...) {
   dv_resid(object, data, scale)
@@ -431,7 +431,7 @@ dv_predict <- function(model, data, h, type, x) {
   dv_predictive(dv_pairs_or_stop(model), u, as.numeric(x), type)
 }
 
-#' @rdname predict-tscop
+#' @rdname predict-method
 #' @export
 setMethod("predict", "sdvinecop", function(object, data, h = 1, type = "df", x = NULL, ...) {
   dv_predict(object, data, h, type, x)

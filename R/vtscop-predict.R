@@ -157,13 +157,13 @@ vt_resid <- function(model, data, scale, nodes) {
   restore_attrs(if (scale == "uniform") r else stats::qnorm(r), data)
 }
 
-#' @rdname resid-tscop
+#' @rdname resid-method
 #' @export
 setMethod("resid", "vtscop", function(object, data, scale = "uniform", nodes = 64, ...) {
   vt_resid(object, data, scale, nodes)
 })
 
-#' @rdname resid-tscop
+#' @rdname resid-method
 #' @export
 setMethod("residuals", "vtscop", function(object, data, scale = "uniform", nodes = 64, ...) {
   vt_resid(object, data, scale, nodes)
@@ -171,28 +171,28 @@ setMethod("residuals", "vtscop", function(object, data, scale = "uniform", nodes
 
 vt_fit_data <- function(object) if (is.null(object@template)) object@data else object@template
 
-#' @rdname resid-tscop
+#' @rdname resid-method
 #' @export
 setMethod("resid", "vtscopfit", function(object, data, scale = "uniform", nodes = 64, ...) {
   if (missing(data)) data <- vt_fit_data(object)
   vt_resid(object@model, data, scale, nodes)
 })
 
-#' @rdname resid-tscop
+#' @rdname resid-method
 #' @export
 setMethod("residuals", "vtscopfit", function(object, data, scale = "uniform", nodes = 64, ...) {
   if (missing(data)) data <- vt_fit_data(object)
   vt_resid(object@model, data, scale, nodes)
 })
 
-#' @rdname predict-tscop
+#' @rdname predict-method
 #' @export
 setMethod("predict", "vtscop", function(object, data, h = 1, type = "df", x = NULL,
                                         nodes = 64, ...) {
   vt_predict(object, data, h, type, x, nodes)
 })
 
-#' @rdname predict-tscop
+#' @rdname predict-method
 #' @export
 setMethod("predict", "vtscopfit", function(object, data, h = 1, type = "df", x = NULL,
                                            nodes = 64, ...) {

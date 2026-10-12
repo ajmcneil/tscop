@@ -283,13 +283,13 @@ armacop_resid <- function(model, data, scale) {
   restore_attrs(out, data)
 }
 
-#' @rdname resid-tscop
+#' @rdname resid-method
 #' @export
 setMethod("resid", "armacop", function(object, data, scale = "uniform", ...) {
   armacop_resid(object, data, scale)
 })
 
-#' @rdname resid-tscop
+#' @rdname resid-method
 #' @export
 setMethod("residuals", "armacop", function(object, data, scale = "uniform", ...) {
   armacop_resid(object, data, scale)
@@ -344,7 +344,7 @@ armacop_predict <- function(model, data, h, type, x) {
   gauss_predict_result(mu, v, h, type, x)
 }
 
-#' @rdname predict-tscop
+#' @rdname predict-method
 #' @export
 setMethod("predict", "armacop", function(object, data, h = 1, type = "moments",
                                          x = NULL, ...) {
