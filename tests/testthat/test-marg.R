@@ -4,7 +4,8 @@ mpars <- list(
   slaplace = c(mu = 0.1, sigma = 1.2, gamma = 0.7),
   st = c(mu = 0.5, sigma = 0.9, df = 4.5),
   sst = c(mu = -0.3, sigma = 1.1, df = 6, gamma = 1.4),
-  jsu = c(mu = 0.2, sigma = 1.5, delta = 2.2, gamma = -0.6)
+  jsu = c(mu = 0.2, sigma = 1.5, delta = 2.2, gamma = -0.6),
+  nig = c(mu = 0.2, sigma = 1.5, shape = 1.2, skew = -0.5)
 )
 
 test_that("marg validates its arguments", {
@@ -64,6 +65,10 @@ test_that("nested families coincide", {
                pnorm(x, 0.2, 1.3), tolerance = 1e-5)
   expect_equal(mdf(marg("jsu", c(mu = 0, sigma = 1, delta = 2, gamma = 0)), 0), 0.5)
   expect_error(marg("jsu", c(mu = 0, sigma = 1, delta = -1, gamma = 0)), "delta")
+  # NIG tends to the Gaussian as shape grows
+  expect_equal(mdf(marg("nig", c(mu = 0.2, sigma = 1.3, shape = 1e4, skew = 0)), x),
+               pnorm(x, 0.2, 1.3), tolerance = 1e-4)
+  expect_error(marg("nig", c(mu = 0, sigma = 1, shape = 0, skew = 0)), "shape")
   # the skew parameter moves mass to the right for gamma > 1
   expect_gt(mdf(marg("sst", c(mu = 0, sigma = 1, df = 6, gamma = 1.5)), 0, lower.tail = FALSE),
             mdf(marg("sst", c(mu = 0, sigma = 1, df = 6, gamma = 0.7)), 0, lower.tail = FALSE))
@@ -82,6 +87,27 @@ test_that("random draws follow the distribution and tssim/resid work", {
   }
   xs <- ts(rnorm(30))
   expect_s3_class(resid(marg("gauss", c(mu = 0, sigma = 1)), xs), "ts")
+})
+
+test_that("the NIG random draws have the right mean and variance, and simulation is exact", {
+  set.seed(2)
+  th <- c(mu = 0.2, sigma = 1.3, shape = 1.5, skew = 0.4)
+  x <- tssim(marg("nig", th), 2e5)
+  expect_equal(mean(x), th[["mu"]] + th[["sigma"]] * th[["skew"]], tolerance = 0.01)
+  expect_equal(var(x), th[["sigma"]]^2 * (1 + th[["skew"]]^2 / th[["shape"]]), tolerance = 0.03)
+  expect_gt(stats::ks.test(mdf(marg("nig", th), x[1:5000]), "punif")$p.value, 0.001)
+})
+
+test_that("the NIG agrees with the ghyp package (gamma = sigma * skew)", {
+  skip_if_not_installed("ghyp")
+  th <- mpars$nig
+  o <- ghyp::NIG(alpha.bar = th[["shape"]], mu = th[["mu"]], sigma = th[["sigma"]], gamma = th[["sigma"]] * th[["skew"]])
+  m <- marg("nig", th)
+  x <- seq(-9, 9, length.out = 31)
+  p <- c(1e-8, 1e-3, 0.05, 0.5, 0.9, 0.999, 1 - 1e-6)
+  expect_equal(mdens(m, x), ghyp::dghyp(x, o), tolerance = 1e-9)
+  expect_equal(mdf(m, x), ghyp::pghyp(x, o), tolerance = 1e-7)
+  expect_equal(mqf(m, p), ghyp::qghyp(p, o), tolerance = 1e-5)
 })
 
 test_that("margins agree with the legacy tscopula distribution functions", {

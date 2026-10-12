@@ -19,7 +19,7 @@ automarg(
 dropped).}
 
 \item{families}{character vector of families to try; by default all the
-available families (\code{"gauss"}, \code{"laplace"}, \code{"slaplace"}, \code{"st"}, \code{"sst"}, \code{"jsu"}).}
+available families (\code{"gauss"}, \code{"laplace"}, \code{"slaplace"}, \code{"st"}, \code{"sst"}, \code{"jsu"}, \code{"nig"}).}
 
 \item{fix}{a named numeric vector of parameter values held fixed in every
 family that has the parameter, for example \code{c(mu = 0)} for zero-mean

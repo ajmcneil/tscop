@@ -7,7 +7,8 @@ test_that("tsfit recovers the parameters of every family", {
     slaplace = c(mu = 0.1, sigma = 1.2, gamma = 0.7),
     st = c(mu = 0.5, sigma = 0.9, df = 4.5),
     sst = c(mu = -0.3, sigma = 1.1, df = 6, gamma = 1.4),
-    jsu = c(mu = 0.2, sigma = 1.5, delta = 2.2, gamma = -0.6)
+    jsu = c(mu = 0.2, sigma = 1.5, delta = 2.2, gamma = -0.6),
+    nig = c(mu = 0.2, sigma = 1.5, shape = 1.2, skew = -0.5)
   )
   for (fam in names(truths)) {
     x <- tssim(marg(fam, truths[[fam]]), 6000)

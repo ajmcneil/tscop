@@ -45,6 +45,40 @@ mg_jsu <- list(
   q = function(u, s, lt) sinh((stats::qnorm(u, lower.tail = lt) - s[["gamma"]]) / s[["delta"]])
 )
 
+# Normal inverse Gaussian: z = skew * W + sqrt(W) * N with W inverse Gaussian of
+# mean 1 and shape `shape`, so that, with a = shape and r = skew, the density of z is
+#   sqrt(a (a + r^2)) / pi * exp(a + r z) K_1(sqrt((a + r^2)(a + z^2))) / sqrt(a + z^2)
+# (the NIG density with alpha = sqrt(a + r^2), beta = r, delta = sqrt(a)).
+# mu and sigma are then a pure location and scale; the mean of z is r and its
+# variance 1 + r^2 / a. This is the ghyp alpha.bar parameterisation with the
+# skewness gamma / sigma.
+mg_nig_ld <- function(z, s) {
+  a <- s[["shape"]]
+  r <- s[["skew"]]
+  x <- sqrt((a + r^2) * (a + z^2))
+  0.5 * log(a + r^2) + 0.5 * log(a) - log(pi) + a + r * z - x +
+    log(besselK(x, 1, expon.scaled = TRUE)) - 0.5 * log(a + z^2)
+}
+mg_nig <- list(
+  ld = mg_nig_ld,
+  p = function(z, s, lt) {
+    mg_dens_cdf(function(t) exp(mg_nig_ld(t, s)), z, lt, s[["skew"]], min(1, sqrt(s[["shape"]])))
+  },
+  q = function(u, s, lt) {
+    w0 <- min(1, sqrt(s[["shape"]]))
+    dens <- function(t) exp(mg_nig_ld(t, s))
+    mg_dens_quantile(function(t, l) mg_dens_cdf(dens, t, l, s[["skew"]], w0), dens, u, lt, s[["skew"]], w0)
+  },
+  r = function(n, s) {
+    a <- s[["shape"]]
+    # inverse Gaussian of mean 1 and shape a (Michael, Schucany and Haas, 1976)
+    y <- stats::rnorm(n)^2
+    w <- 1 + y / (2 * a) - sqrt(4 * a * y + y^2) / (2 * a)
+    w <- ifelse(stats::runif(n) <= 1 / (1 + w), w, 1 / w)
+    s[["skew"]] * w + sqrt(w) * stats::rnorm(n)
+  }
+)
+
 # Fernandez-Steel skewing of a symmetric standardised family with skewing
 # parameter gamma > 0 (gamma = 1 is the symmetric case; the mode is at 0):
 #   f(z) = 2 / (gamma + 1 / gamma) * f0(gamma z) for z < 0, f0(z / gamma) for z >= 0.
@@ -147,6 +181,18 @@ mg_robust <- function(x) {
       c(mu = th[["mu"]], sigma = th[["sigma"]] / sqrt(v), delta = d, gamma = 0)
     },
     description = "Johnson SU"),
+  nig = mg_fam("nig", c("mu", "sigma", "shape", "skew"), c("real", "pos", "pos", "real"), mg_nig,
+    start = function(x) {
+      m <- mean(x)
+      sd <- stats::sd(x)
+      zc <- (x - m) / sd
+      ek <- max(mean(zc^4) - 3, 0.1)       # excess kurtosis 3 / shape for the symmetric NIG
+      shape <- min(max(3 / ek, 0.1), 20)
+      sk <- mean(zc^3)                     # skewness is approximately 3 skew / shape / sd(z)
+      skew <- max(min(sk * shape / 3, 2), -2)
+      c(mu = m - sd * skew / sqrt(1 + skew^2 / shape), sigma = sd / sqrt(1 + skew^2 / shape), shape = shape, skew = skew)
+    },
+    description = "normal inverse Gaussian"),
   sst = mg_fam("sst", c("mu", "sigma", "df", "gamma"), c("real", "pos", "df", "pos"),
     mg_skew(mg_st),
     start = function(x) {
@@ -185,6 +231,14 @@ mg_from_free <- function(z, types) {
 }
 
 # ---- functions of the original variable -----------------------------------------
+
+mg_rand <- function(fam, th, n) {
+  if (!is.null(fam$base$r)) {
+    th[["mu"]] + th[["sigma"]] * fam$base$r(n, mg_shapes(fam, th))
+  } else {
+    mg_qf(fam, th, stats::runif(n))
+  }
+}
 
 mg_shapes <- function(fam, th) th[setdiff(fam$pars, c("mu", "sigma"))]
 

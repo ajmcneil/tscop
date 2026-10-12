@@ -30,6 +30,7 @@ Imports:
     utils,
     udp
 Suggests:
+    ghyp,
     testthat (>= 3.0.0),
     tscopula,
     zoo
@@ -57,6 +58,7 @@ Collate:
     'vtscop.R'
     'vtscop-fit.R'
     'vtscop-predict.R'
+    'marg-numerics.R'
     'marg-families.R'
     'marg.R'
     'marg-fit.R'

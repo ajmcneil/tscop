@@ -10,7 +10,7 @@ family \eqn{x = \mu + \sigma z}, with \code{sigma} a pure scale parameter (not t
 standard deviation) and shape parameters depending on the family. The
 families are \code{"gauss"} (Gaussian), \code{"laplace"}, \code{"slaplace"} (skew
 Laplace), \code{"st"} (Student t, \code{df} degrees of freedom), \code{"sst"} (skew
-Student t) and \code{"jsu"} (Johnson SU). The skew families use the Fernandez-Steel construction with the
+Student t), \code{"jsu"} (Johnson SU) and \code{"nig"} (normal inverse Gaussian). The skew families use the Fernandez-Steel construction with the
 skewing parameter \code{gamma} (\code{gamma = 1} is symmetric; \code{mu} is then the mode of
 the distribution): the density of the standardised variable is
 \eqn{2/(\gamma + 1/\gamma) f_0(\gamma z)} for \eqn{z < 0} and
@@ -19,7 +19,15 @@ is the symmetric base density. The Johnson SU distribution is defined by
 \eqn{\gamma + \delta\,\mathrm{asinh}((x - \mu)/\sigma) \sim N(0, 1)}
 with \code{delta} > 0 (smaller values give heavier tails; the Gaussian is the
 limit as \code{delta} tends to infinity with \code{sigma} proportional to \code{delta}) and
-\code{gamma} real (skewness; zero is symmetric about \code{mu}).
+\code{gamma} real (skewness; zero is symmetric about \code{mu}). The normal inverse
+Gaussian distribution is \eqn{x = \mu + \sigma(\rho W + \sqrt{W} N)} with
+\eqn{W} inverse Gaussian of mean one and shape \code{shape} and \eqn{N} standard
+normal, and \code{skew} = \eqn{\rho} a scale-free skewness parameter
+(\code{skew} = 0 is symmetric; the mean of the standardised variable is \code{skew}
+and its variance is \code{1 + skew^2 / shape}; the Gaussian is the limit as \code{shape}
+tends to infinity). This is the \code{alpha.bar} parameterisation of the \code{ghyp}
+package with the skewness \code{gamma} of that package equal to \code{sigma * skew},
+so that \code{sigma} is a pure scale parameter.
 }
 \details{
 Parameters named in \code{fix} are held fixed at their values in \code{pars} when the

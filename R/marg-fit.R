@@ -141,7 +141,7 @@ setMethod("tsfit", signature(U = "ANY", object = "marg"),
     } else if (identical(se, "bootstrap") && npar > 0L) {
       boot <- matrix(NA_real_, B, npar, dimnames = list(NULL, free))
       for (b in seq_len(B)) {
-        xb <- mg_qf(fam, fit$th, stats::runif(length(x)))
+        xb <- mg_rand(fam, fit$th, length(x))
         fb <- tryCatch(suppressWarnings(mg_fit_core(x = xb, fam = fam, th0 = fit$th, fix = fix, control = control)),
                        error = function(e) NULL)
         if (!is.null(fb) && fb$convergence == 0L) boot[b, ] <- fb$th[free]

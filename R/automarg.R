@@ -10,7 +10,7 @@
 #' @param x numeric data (the raw observations; non-finite values are
 #'   dropped).
 #' @param families character vector of families to try; by default all the
-#'   available families (`"gauss"`, `"laplace"`, `"slaplace"`, `"st"`, `"sst"`, `"jsu"`).
+#'   available families (`"gauss"`, `"laplace"`, `"slaplace"`, `"st"`, `"sst"`, `"jsu"`, `"nig"`).
 #' @param fix a named numeric vector of parameter values held fixed in every
 #'   family that has the parameter, for example `c(mu = 0)` for zero-mean
 #'   margins.
@@ -41,7 +41,7 @@ automarg <- function(x, families = names(.marg_families), fix = NULL, criterion 
   if (length(families) < 1L) stop("'families' must name at least one family", call. = FALSE)
   for (f in families) mg_family(f) # errors for unknown names
   if (!is.null(fix)) {
-    if (!is.numeric(fix) || is.null(names(fix)) || any(!(names(fix) %in% c("mu", "sigma", "df", "gamma", "delta")))) {
+    if (!is.numeric(fix) || is.null(names(fix)) || any(!(names(fix) %in% c("mu", "sigma", "df", "gamma", "delta", "shape", "skew")))) {
       stop("'fix' must be a named numeric vector of parameter values", call. = FALSE)
     }
   }
