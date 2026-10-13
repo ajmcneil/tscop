@@ -165,3 +165,20 @@ test_that("log-likelihood agrees with the legacy sdvinecopula objective", {
         list(pc("gumbel"), pc("clayton", pos = 180, neg = 270), pc("joe")))
   check(0.6, -0.5, c("frank", "gumbel"), c(0, 0), c(0, 90), NA, list(pc("frank"), pc("gumbel")))
 })
+
+test_that("rep repeats a pc specification and pairs accepts a single pc", {
+  r <- rep(pc("ivt", base = "ast"), 3)
+  expect_type(r, "list")
+  expect_length(r, 3L)
+  expect_true(all(vapply(r, is, logical(1), "pc")))
+  expect_equal(length(rep(pc("gumbel"), times = 2, each = 2)), 4L)
+  expect_equal(length(rep(pc("gumbel"), length.out = 5)), 5L)
+  kp <- armacop(ar = 0.5, ma = 0.4)
+  expect_equal(coef(sdvinecop(kp, pairs = rep(pc("gumbel"), 2))),
+               coef(sdvinecop(kp, pairs = list(pc("gumbel"), pc("gumbel")))))
+  m1 <- sdvinecop(kp, pairs = pc("gumbel"))
+  expect_equal(length(m1@pairs), 1L)
+  mixed <- sdvinecop(kp, pairs = c(rep(pc("gumbel"), 2), rep(pc("gauss"), 2)))
+  expect_equal(length(mixed@pairs), 4L)
+  expect_error(sdvinecop(kp, pairs = "gumbel"), "list")
+})

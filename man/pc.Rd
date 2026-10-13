@@ -2,9 +2,12 @@
 % Please edit documentation in R/pc.R
 \name{pc}
 \alias{pc}
+\alias{rep,pc-method}
 \title{Constructor for pair copula specifications}
 \usage{
 pc(family, pos = 0, neg = 90, aux = NULL, base = NULL)
+
+\S4method{rep}{pc}(x, ...)
 }
 \arguments{
 \item{family}{family name (case-insensitive): \code{"gauss"}, \code{"t"},
@@ -24,6 +27,10 @@ negative. Ignored for radially symmetric families.}
 (the Gaussian copula, whose inverse-v-transformed version has a
 cross-shaped density; cheap to evaluate, so useful for the weakly
 dependent high lags); \code{NULL} for the other families.}
+
+\item{x}{a \link[=pc-class]{pc} specification, for \code{rep}.}
+
+\item{...}{arguments of \code{\link[base:rep]{base::rep()}} (\code{times}, \code{each}, \code{length.out}) for \code{rep}.}
 }
 \value{
 An object of class \link[=pc-class]{pc}.
@@ -37,12 +44,17 @@ decided by the sign of Kendall's tau at the current parameter values, so
 the user does not need to know the sign in advance. The rotation
 convention is that of \code{\link[rvinecopulib:bicop_dist]{rvinecopulib::bicop_dist()}} applied to the pair
 (earlier variable, later variable).
+
+\code{rep(x, ...)} repeats a specification and returns a list of
+\link[=pc-class]{pc} objects, the form taken by the \code{pairs} argument of \code{\link[=sdvinecop]{sdvinecop()}}.
 }
 \examples{
 pc("gumbel")
 pc("clayton", pos = 180, neg = 270)
 pc("t", aux = 6)
 pc("ivt", base = "ast")
+rep(pc("ivt", base = "ast"), 3)   # the same specification at three lags
+c(rep(pc("ivt", base = "ast"), 3), rep(pc("gauss"), 2))
 }
 \references{
 Dias, A., Han, J. and McNeil, A. J. (2027). GARCH copulas, v-transforms and

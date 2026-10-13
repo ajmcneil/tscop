@@ -127,7 +127,9 @@ setValidity("sdvinecop", function(object) {
 #'   autocorrelations calibrate every pair copula; it may be a model structure
 #'   (`armacop(order = ...)`) if the model is only to be passed to a fitting
 #'   function. In free mode it is optional and supplies a Gaussian tail.
-#' @param pairs list of explicit pair copulas for lags `1, ..., length(pairs)`:
+#' @param pairs list of explicit pair copulas for lags `1, ..., length(pairs)`
+#'   (a single [pc()] specification is the list of length one; `rep(pc(...), 3)`
+#'   repeats one specification over three lags):
 #'   all [pc()] specifications (tied mode) or all `bicop_dist` objects (free
 #'   mode). A `pc("gauss")` entry keeps a lag Gaussian.
 #' @param tail the family used for all lags beyond `pairs` in tied mode:
@@ -179,6 +181,7 @@ sdvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
   if (!is.null(kpacf) && !is(kpacf, "gausscop")) {
     stop("'kpacf' must be a Gaussian copula process (an armacop or arfactcop object)")
   }
+  if (is(pairs, "pc")) pairs <- list(pairs)
   if (!is.list(pairs)) stop("'pairs' must be a list")
   if (is(pairs, "bicop_dist")) pairs <- list(pairs)
   isbic <- vapply(pairs, is, logical(1), "bicop_dist")

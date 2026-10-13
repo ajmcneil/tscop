@@ -115,6 +115,8 @@ setValidity("pc", function(object) {
 #' pc("clayton", pos = 180, neg = 270)
 #' pc("t", aux = 6)
 #' pc("ivt", base = "ast")
+#' rep(pc("ivt", base = "ast"), 3)   # the same specification at three lags
+#' c(rep(pc("ivt", base = "ast"), 3), rep(pc("gauss"), 2))
 pc <- function(family, pos = 0, neg = 90, aux = NULL, base = NULL) {
   if (!is.character(family) || length(family) != 1L) stop("'family' must be a single name")
   family <- tolower(family)
@@ -158,3 +160,11 @@ setMethod("show", "pc", function(object) {
   cat("pair copula specification: ", object@family, rot, aux, "\n", sep = "")
   invisible(object)
 })
+
+#' @rdname pc
+#' @param x a [pc-class] specification, for `rep`.
+#' @param ... arguments of [base::rep()] (`times`, `each`, `length.out`) for `rep`.
+#' @details `rep(x, ...)` repeats a specification and returns a list of
+#'   [pc-class] objects, the form taken by the `pairs` argument of [sdvinecop()].
+#' @export
+setMethod("rep", "pc", function(x, ...) base::rep(list(x), ...))

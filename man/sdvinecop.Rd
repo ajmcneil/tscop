@@ -21,7 +21,9 @@ autocorrelations calibrate every pair copula; it may be a model structure
 (\code{armacop(order = ...)}) if the model is only to be passed to a fitting
 function. In free mode it is optional and supplies a Gaussian tail.}
 
-\item{pairs}{list of explicit pair copulas for lags \verb{1, ..., length(pairs)}:
+\item{pairs}{list of explicit pair copulas for lags \verb{1, ..., length(pairs)}
+(a single \code{\link[=pc]{pc()}} specification is the list of length one; \code{rep(pc(...), 3)}
+repeats one specification over three lags):
 all \code{\link[=pc]{pc()}} specifications (tied mode) or all \code{bicop_dist} objects (free
 mode). A \code{pc("gauss")} entry keeps a lag Gaussian.}
 
