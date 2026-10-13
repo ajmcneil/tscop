@@ -131,10 +131,13 @@ setValidity("sdvinecop", function(object) {
 #'   all [pc()] specifications (tied mode) or all `bicop_dist` objects (free
 #'   mode). A `pc("gauss")` entry keeps a lag Gaussian.
 #' @param tail the family used for all lags beyond `pairs` in tied mode:
-#'   `"gauss"` (default), `"frank"`, `"clayton"`, `"gumbel"` or `"joe"`, or a
-#'   [pc()] specification of one of these. Families whose Kendall's tau cannot
-#'   tend to zero with their auxiliary parameters fixed (`"t"`, `"bb1"`) are
-#'   rejected. Free mode has a Gaussian tail.
+#'   `"gauss"` (default), `"frank"`, `"clayton"`, `"gumbel"`, `"joe"` or
+#'   `"ast"`, or a [pc()] specification of one of these, or of an `"ivt"`
+#'   pair copula (`pc("ivt", base = ...)`, with base `"ast"`, `"joe"`,
+#'   `"gumbel"`, `"clayton180"` or `"gauss"`; it uses the fulcrums `vt` of the
+#'   model). Families whose Kendall's tau cannot tend to zero with their
+#'   auxiliary parameters fixed (`"t"`, `"bb1"`) are rejected. Free mode has a
+#'   Gaussian tail.
 #' @param vt the fulcrums of the linear v-transforms of the `"ivt"` pair
 #'   copulas, two numbers in (0, 1) (default `c(0.5, 0.5)` when the model has an
 #'   `"ivt"` pair copula; an error otherwise). They are starting values when

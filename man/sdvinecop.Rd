@@ -26,10 +26,13 @@ all \code{\link[=pc]{pc()}} specifications (tied mode) or all \code{bicop_dist} 
 mode). A \code{pc("gauss")} entry keeps a lag Gaussian.}
 
 \item{tail}{the family used for all lags beyond \code{pairs} in tied mode:
-\code{"gauss"} (default), \code{"frank"}, \code{"clayton"}, \code{"gumbel"} or \code{"joe"}, or a
-\code{\link[=pc]{pc()}} specification of one of these. Families whose Kendall's tau cannot
-tend to zero with their auxiliary parameters fixed (\code{"t"}, \code{"bb1"}) are
-rejected. Free mode has a Gaussian tail.}
+\code{"gauss"} (default), \code{"frank"}, \code{"clayton"}, \code{"gumbel"}, \code{"joe"} or
+\code{"ast"}, or a \code{\link[=pc]{pc()}} specification of one of these, or of an \code{"ivt"}
+pair copula (\code{pc("ivt", base = ...)}, with base \code{"ast"}, \code{"joe"},
+\code{"gumbel"}, \code{"clayton180"} or \code{"gauss"}; it uses the fulcrums \code{vt} of the
+model). Families whose Kendall's tau cannot tend to zero with their
+auxiliary parameters fixed (\code{"t"}, \code{"bb1"}) are rejected. Free mode has a
+Gaussian tail.}
 
 \item{tautol}{tolerance on the absolute Kendall's tau defining the
 effective lag.}
