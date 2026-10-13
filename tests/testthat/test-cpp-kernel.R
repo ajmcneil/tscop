@@ -99,3 +99,94 @@ test_that("models fitted with the kernel agree with fits by the R implementation
   expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-4)
   expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-7)
 })
+
+# ---- exact gradients -------------------------------------------------------
+
+test_that("the kernel gradient with respect to the level parameters and fulcrums matches finite differences", {
+  set.seed(6)
+  K <- 8L
+  kp <- arfactcop(lambda = 0.95, w = 0.5)
+  for (b in c("gumbel", "clayton180", "gauss")) {
+    m <- sdvinecop(kp, tail = pc("ivt", base = b), vt = c(0.4, 0.6), maxlag = K, tautol = 1e-8)
+    m@K <- K
+    u <- tssim(m, 500)
+    e <- dv_encode(dv_resolve(m))
+    P <- K + 2L
+    dpar <- dbp <- matrix(0, K, P)
+    for (j in seq_len(K)) dbp[j, j] <- 1
+    dd1 <- dd2 <- numeric(P)
+    dd1[K + 1L] <- 1
+    dd2[K + 2L] <- 1
+    g <- dv_loglik_grad_cpp(u, e$fam, e$rot, e$par, dpar, e$ivt, e$bfam, e$brot, e$bpar, dbp, e$d1, e$d2, dd1, dd2)
+    f <- function(bpar, d1, d2) dv_loglik_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, bpar, d1, d2)
+    expect_equal(g$value, f(e$bpar, e$d1, e$d2), tolerance = 1e-12)
+    h <- 1e-7
+    fd <- numeric(P)
+    for (j in seq_len(K)) {
+      bp <- e$bpar; bp[j] <- bp[j] + h; a <- f(bp, e$d1, e$d2)
+      bp <- e$bpar; bp[j] <- bp[j] - h; fd[j] <- (a - f(bp, e$d1, e$d2)) / (2 * h)
+    }
+    fd[K + 1L] <- (f(e$bpar, e$d1 + h, e$d2) - f(e$bpar, e$d1 - h, e$d2)) / (2 * h)
+    fd[K + 2L] <- (f(e$bpar, e$d1, e$d2 + h) - f(e$bpar, e$d1, e$d2 - h)) / (2 * h)
+    expect_lt(max(abs(g$gradient - fd) / pmax(abs(fd), 1)), 2e-4)
+  }
+  # plain families, with rotations (the first three lags: a Frank pair at tau near zero has a
+  # parameter of order 1e-10, which a finite-difference step of 1e-7 would cross)
+  m <- sdvinecop(armacop(ar = c(0.5, -0.3)), pairs = list(pc("gumbel"), pc("clayton"), pc("joe")),
+                 tail = pc("gumbel"), maxlag = K, tautol = 1e-3)
+  m@K <- 3L
+  K <- 3L
+  u <- tssim(m, 500)
+  e <- dv_encode(dv_resolve(m))
+  P <- K
+  dpar <- diag(K)
+  dbp <- matrix(0, K, P)
+  z <- numeric(P)
+  g <- dv_loglik_grad_cpp(u, e$fam, e$rot, e$par, dpar, e$ivt, e$bfam, e$brot, e$bpar, dbp, e$d1, e$d2, z, z)
+  f <- function(p) dv_loglik_cpp(u, e$fam, e$rot, p, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2)
+  h <- 1e-7
+  fd <- vapply(seq_len(K), function(j) { p <- e$par; p[j] <- p[j] + h; a <- f(p); p[j] <- p[j] - 2 * h; (a - f(p)) / (2 * h) }, 1)
+  expect_lt(max(abs(g$gradient - fd) / pmax(abs(fd), 1)), 2e-4)
+})
+
+test_that("dv_negll_grad equals finite differences of dv_negll on the free scale", {
+  set.seed(7)
+  n <- 700
+  K <- 20L
+  cases <- list(
+    sdvinecop(arfactcop(lambda = 0.95, w = 0.5), tail = pc("ivt", base = "gumbel"), vt = c(0.4, 0.6), maxlag = K, tautol = 1e-6),
+    sdvinecop(arfactcop(lambda = 0.95, w = 0.5), tail = pc("ivt", base = "clayton180"), vt = c(0.4, 0.4),
+              vtpar = "common", maxlag = K, tautol = 1e-6),
+    sdvinecop(arfactcop(lambda = c(0.98, 0.6), w = c(0.3, 0.3)), tail = pc("ivt", base = "gauss"), vt = c(0.5, 0.5),
+              maxlag = K, tautol = 1e-6),
+    sdvinecop(armacop(ar = 0.7, ma = 0.2), pairs = list(pc("gumbel")), tail = pc("clayton"), maxlag = K, tautol = 1e-6)
+  )
+  for (m in cases) {
+    m@K <- K
+    u <- tssim(m, n)
+    lay <- dv_layout(m)
+    z <- dv_start(m, NULL, u, list())$z0 + rnorm(length(dv_start(m, NULL, u, list())$z0), 0, 0.05)
+    g <- dv_negll_grad(z, lay, K, u)
+    expect_false(is.null(g))
+    fd <- vapply(seq_along(z), function(k) {
+      h <- 1e-6
+      zp <- z; zp[k] <- zp[k] + h
+      zm <- z; zm[k] <- zm[k] - h
+      (dv_negll(zp, lay, K, u) - dv_negll(zm, lay, K, u)) / (2 * h)
+    }, 1)
+    expect_lt(max(abs(g - fd) / pmax(abs(fd), 1)), 1e-4)
+  }
+})
+
+test_that("dv_negll_grad declines unsupported models and dv_negll_gr then falls back to differences", {
+  set.seed(8)
+  m <- sdvinecop(arfactcop(lambda = 0.9, w = 0.5), pairs = list(pc("t", aux = 6)), tail = "gauss", maxlag = 6)
+  m@K <- 6L
+  u <- tssim(m, 300)
+  lay <- dv_layout(m)
+  z <- dv_start(m, NULL, u, list())$z0
+  expect_null(dv_negll_grad(z, lay, 6L, u))
+  gr <- dv_negll_gr(z, lay, 6L, u)
+  expect_length(gr, length(z))
+  expect_true(all(is.finite(gr)))
+})

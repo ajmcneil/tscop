@@ -93,7 +93,12 @@ dv_make_pairs <- function(z, lay, K) {
   na <- lay$nk
   tau <- (2 / pi) * asin(lay$ops$pacf(z[seq_len(na)], K))
   aux <- dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam)
-  vt <- dv_vt_from_free(z, lay)
+  dv_make_pairs_tau(tau, aux, dv_vt_from_free(z, lay), lay, K)
+}
+
+# The same from the Kendall's tau values of lags 1..K (and the auxiliary
+# parameters and fulcrums).
+dv_make_pairs_tau <- function(tau, aux, vt, lay, K) {
   K0 <- lay$K0
   pairs <- vector("list", K)
   for (j in seq_len(min(K0, K))) {
@@ -126,6 +131,88 @@ dv_negll <- function(z, lay, K, u) {
   if (is.null(pairs)) return(1e10)
   ll <- tryCatch(dv_loglik(u, pairs), error = function(e) -Inf)
   if (is.finite(ll)) -ll else 1e10
+}
+
+# Gradient of dv_negll with respect to the free vector z from the C++ kernel
+# (forward-mode derivatives with respect to the pair copula parameters and the
+# fulcrums, chained to z through the free-scale maps). The maps from z to the
+# Kendall's tau values and from tau to the copula parameters are differentiated
+# by central differences (cheap, deterministic, smooth), so the whole data
+# recursion is differentiated exactly. NULL when the kernel does not apply:
+# unsupported families, an infeasible point, more than 12 free parameters, or a
+# rotation that changes within the difference step; the caller then uses
+# finite differences of dv_negll.
+dv_negll_grad <- function(z, lay, K, u) {
+  if (!isTRUE(getOption("tscop.cpp", TRUE)) || !isTRUE(getOption("tscop.cppgrad", TRUE))) return(NULL)
+  na <- lay$nk
+  P <- length(z)
+  if (P < 1L || P > 12L || length(lay$aux_lags) > 0L) return(NULL)
+  if (any(!is.finite(z)) || (na > 0L && any(abs(z[seq_len(na)]) > lay$ops$zbound)) ||
+      (lay$nvt > 0L && any(abs(z[dv_vt_index(lay)]) > 6))) return(NULL)
+  zk <- z[seq_len(na)]
+  tau_of <- function(zz) (2 / pi) * asin(lay$ops$pacf(zz, K))
+  tau <- tau_of(zk)
+  vt <- dv_vt_from_free(z, lay)
+  pairs <- dv_make_pairs_tau(tau, numeric(0), vt, lay, K)
+  if (is.null(pairs)) return(NULL)
+  e <- dv_encode(pairs)
+  if (is.null(e)) return(NULL)
+  # d tau / d z (K x na)
+  dtau <- matrix(0, K, P)
+  for (k in seq_len(na)) {
+    h <- 1e-6 * max(1, abs(zk[k]))
+    zp <- zk; zp[k] <- zp[k] + h
+    zm <- zk; zm[k] <- zm[k] - h
+    dtau[, k] <- (tau_of(zp) - tau_of(zm)) / (2 * h)
+  }
+  # d parameter / d tau, lag by lag
+  # (the numerical inverse of rvinecopulib for Joe and Frank has noise of about
+  # 3e-10 in tau, so the step is 1e-4, giving a relative slope error of about 1e-5
+  # at worst, and the truncation error of the central difference is far smaller)
+  ht <- pmin(1e-4, 0.5 * abs(tau), 0.5 * (1 - abs(tau)))
+  ht[ht < 1e-12] <- 1e-12
+  pp <- dv_make_pairs_tau(tau + ht, numeric(0), vt, lay, K)
+  pm <- dv_make_pairs_tau(tau - ht, numeric(0), vt, lay, K)
+  if (is.null(pp) || is.null(pm)) return(NULL)
+  ep <- dv_encode(pp)
+  em <- dv_encode(pm)
+  if (is.null(ep) || is.null(em)) return(NULL)
+  # lags whose rotation or family changes within the step have |tau| < 2e-12: their
+  # derivative is set to zero (their dependence on the parameters is negligible)
+  same <- ep$rot == e$rot & em$rot == e$rot & ep$fam == e$fam & em$fam == e$fam &
+    ep$brot == e$brot & em$brot == e$brot & ep$bfam == e$bfam & em$bfam == e$bfam
+  dpar_dtau <- ifelse(same, (ep$par - em$par) / (2 * ht), 0)
+  dbpar_dtau <- ifelse(same, (ep$bpar - em$bpar) / (2 * ht), 0)
+  dpar <- dtau * dpar_dtau
+  dbpar <- dtau * dbpar_dtau
+  dd1 <- dd2 <- numeric(P)
+  if (lay$nvt > 0L) {
+    iv <- dv_vt_index(lay)
+    if (lay$vtpar == "both") {
+      dd1[iv[1L]] <- e$d1 * (1 - e$d1)
+      dd2[iv[2L]] <- e$d2 * (1 - e$d2)
+    } else {  # common
+      dd1[iv[1L]] <- e$d1 * (1 - e$d1)
+      dd2[iv[1L]] <- e$d2 * (1 - e$d2)
+    }
+  }
+  g <- dv_loglik_grad_cpp(u, e$fam, e$rot, e$par, dpar, e$ivt, e$bfam, e$brot, e$bpar, dbpar,
+                          e$d1, e$d2, dd1, dd2)
+  if (!is.finite(g$value) || any(!is.finite(g$gradient))) return(NULL)
+  -g$gradient
+}
+
+# Gradient for optim(): the exact gradient where available, otherwise central
+# finite differences of dv_negll.
+dv_negll_gr <- function(z, lay, K, u) {
+  g <- dv_negll_grad(z, lay, K, u)
+  if (!is.null(g)) return(g)
+  vapply(seq_along(z), function(k) {
+    h <- 1e-6
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    (dv_negll(zp, lay, K, u) - dv_negll(zm, lay, K, u)) / (2 * h)
+  }, numeric(1))
 }
 
 # Effective lag at the free vector z.
@@ -269,7 +356,7 @@ dv_fit_all <- function(u, object, init, control) {
     npar <- length(z)
     if (npar == 0L) return(list(z = z, value = dv_negll(z, lay, K, u), convergence = 0L, message = ""))
     c1 <- modifyList(ctrl, list(ndeps = rep(1e-6, npar), reltol = reltol))
-    opt <- stats::optim(z, dv_negll, lay = lay, K = K, u = u, method = "BFGS", control = c1)
+    opt <- stats::optim(z, dv_negll, gr = dv_negll_gr, lay = lay, K = K, u = u, method = "BFGS", control = c1)
     if (opt$convergence != 0L || opt$value >= 1e10) {
       alt <- stats::optim(opt$par, dv_negll, lay = lay, K = K, u = u, method = "Nelder-Mead",
                           control = list(maxit = 5000, reltol = 1e-10))
@@ -382,7 +469,7 @@ setMethod("tsfit", signature(U = "ANY", object = "sdvinecop"),
         est_b <- tryCatch(suppressWarnings({
           if (bootstart == "fitted") {
             ctrl <- modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, length(z))), control)
-            opt <- stats::optim(z, dv_negll, lay = lay, K = K, u = ub, method = "BFGS", control = ctrl)
+            opt <- stats::optim(z, dv_negll, gr = dv_negll_gr, lay = lay, K = K, u = ub, method = "BFGS", control = ctrl)
             if (opt$convergence != 0L || opt$value >= 1e10) stop("no convergence")
             dv_free_to_coef(opt$par, lay)
           } else {

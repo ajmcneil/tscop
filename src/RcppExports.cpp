@@ -30,9 +30,34 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// dv_loglik_grad_cpp
+List dv_loglik_grad_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par, NumericMatrix dpar, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, NumericMatrix dbpar, double d1, double d2, NumericVector dd1, NumericVector dd2);
+RcppExport SEXP _tscop_dv_loglik_grad_cpp(SEXP uSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP dparSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP dbparSEXP, SEXP d1SEXP, SEXP d2SEXP, SEXP dd1SEXP, SEXP dd2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type u(uSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type fam(famSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type rot(rotSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type par(parSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type dpar(dparSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type ivt(ivtSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type bfam(bfamSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type brot(brotSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type bpar(bparSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type dbpar(dbparSEXP);
+    Rcpp::traits::input_parameter< double >::type d1(d1SEXP);
+    Rcpp::traits::input_parameter< double >::type d2(d2SEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type dd1(dd1SEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type dd2(dd2SEXP);
+    rcpp_result_gen = Rcpp::wrap(dv_loglik_grad_cpp(u, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_tscop_dv_loglik_cpp", (DL_FUNC) &_tscop_dv_loglik_cpp, 10},
+    {"_tscop_dv_loglik_grad_cpp", (DL_FUNC) &_tscop_dv_loglik_grad_cpp, 14},
     {NULL, NULL, 0}
 };
 
