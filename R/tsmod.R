@@ -202,8 +202,13 @@ setClass("tsmodfit", slots = c(
 #'   selected family is kept in the refits. With `cores > 1` the refits run in
 #'   parallel (`parallel::mclapply`, not on Windows); the simulated series are
 #'   generated first, so the results do not depend on `cores`.
-#' @param method estimation method for a [tsmod-class] model; only `"twostage"`
-#'   so far.
+#' @param method estimation method for a [tsmod-class] model: `"twostage"`
+#'   (default) or `"joint"`, joint maximum likelihood of the margin and copula
+#'   parameters started at the two-stage estimates (parametric margins only;
+#'   the effective lag of a d-vine copula is held at its two-stage value);
+#'   `se = "hessian"` is then available.
+#' @param joint_control control list passed to [stats::optim()] for
+#'   `method = "joint"`.
 #' @param margin_control control list passed to the optimiser of the margin.
 #' @param automarg_args list of arguments of [automarg()] (`families`, `fix`,
 #'   `criterion`) used when the margin of a [tsmod-class] model is `"auto"`.
@@ -212,11 +217,16 @@ setClass("tsmodfit", slots = c(
 #' @export
 setMethod("tsfit", signature(U = "ANY", object = "tsmod"),
   function(U, object, method = "twostage", se = FALSE, B = 200, cores = 1L,
-           margin_control = list(), automarg_args = list(), ...) {
-    method <- match.arg(method, c("twostage"))
+           margin_control = list(), automarg_args = list(), joint_control = list(), ...) {
+    method <- match.arg(method, c("twostage", "joint"))
+    joint <- identical(method, "joint")
     if (isTRUE(se)) se <- "bootstrap"
-    if (!identical(se, FALSE) && !identical(se, "bootstrap")) {
-      stop("'se' must be FALSE or \"bootstrap\" (Hessian standard errors are not available for two-stage fits)", call. = FALSE)
+    if (!identical(se, FALSE) && !identical(se, "bootstrap") && !(joint && identical(se, "hessian"))) {
+      stop(if (joint) "'se' must be FALSE, \"hessian\" or \"bootstrap\""
+           else "'se' must be FALSE or \"bootstrap\" (Hessian standard errors are available for method = \"joint\" only)", call. = FALSE)
+    }
+    if (joint && is(object@margin, "emarg")) {
+      stop("joint maximum likelihood needs a parametric margin; an empirical margin is estimated by the semiparametric two-stage route", call. = FALSE)
     }
     if (identical(se, "bootstrap") && (!is.numeric(B) || length(B) != 1L || B < 10 || B != round(B))) {
       stop("'B' must be a whole number of at least 10", call. = FALSE)
@@ -244,13 +254,45 @@ setMethod("tsfit", signature(U = "ANY", object = "tsmod"),
     est <- tm_coef(mfit, cfit)
     npar <- length(est)
     ll <- as.numeric(logLik(cfit)) + if (is(mfit, "margfit")) as.numeric(logLik(mfit)) else 0
+    jt <- jfit <- NULL
+    if (joint) {
+      jt <- tm_joint_setup(mmodel, cfit@model, x)
+      jfit <- tm_joint_optim(jt, x, control = joint_control)
+      jm <- jt$build(jfit$theta)
+      mfit <- tm_joint_margfit(jt, jm$margin, x, mmodel, jfit$convergence, jfit$message)
+      cfit <- jm$copula
+      mmodel <- jm$margin
+      model <- new("tsmod", margin = mmodel, copula = jm$copula)
+      est <- jt$coefmap(jfit$theta)
+      ll <- -jfit$value
+      if (jfit$convergence != 0L) warning("the joint optimisation did not converge (code ", jfit$convergence, ")")
+    }
     V <- matrix(NA_real_, npar, npar, dimnames = list(names(est), names(est)))
     boot <- matrix(NA_real_, 0L, npar, dimnames = list(NULL, names(est)))
     se_method <- "none"
-    if (identical(se, "bootstrap") && npar > 0L) {
+    if (identical(se, "hessian") && npar > 0L) {
+      H <- num_hessian(function(th) jt$negll(th, x), jfit$theta)
+      Vz <- tryCatch(solve(H), error = function(e) NULL)
+      if (is.null(Vz) || any(!is.finite(Vz)) || any(diag(Vz) <= 0) ||
+          any(eigen(H, symmetric = TRUE, only.values = TRUE)$values <= 0)) {
+        warning("the information matrix is not positive definite; standard errors not available")
+      } else {
+        J <- num_jacobian(jt$coefmap, jfit$theta)
+        Vn <- J %*% Vz %*% t(J)
+        V[] <- (Vn + t(Vn)) / 2
+        se_method <- "hessian"
+      }
+    } else if (identical(se, "bootstrap") && npar > 0L) {
       n <- length(x)
       Xb <- lapply(seq_len(B), function(b) tssim(model, n))     # simulated in the main process
       refit <- function(xb) {
+        if (joint) {
+          return(tryCatch(suppressWarnings({
+            o <- tm_joint_optim(jt, xb, start = jfit$theta, control = joint_control)
+            if (o$convergence != 0L) stop("no convergence")
+            jt$coefmap(o$theta)
+          }), error = function(e) NULL))
+        }
         tryCatch(suppressWarnings({
           mfb <- if (is(mmodel, "marg")) tsfit(xb, mmodel, control = margin_control) else tm_emarg_like(mmodel, xb)
           mm <- if (is(mfb, "margfit")) mfb@model else mfb
@@ -332,7 +374,7 @@ setMethod("show", "tsmodfit", function(object) {
     print(cbind(estimate = object@estimate, se = object@se))
   }
   cat("loglik: ", format(object@loglik, digits = 7), "  npar: ", object@npar, "  nobs: ", object@nobs,
-      if (!is(object@margfit, "margfit")) "  (copula pseudo-likelihood)", "\n", sep = "")
+      if (is(object@margfit, "emarg")) "  (copula pseudo-likelihood)", "\n", sep = "")
   invisible(object)
 })
 

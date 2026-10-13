@@ -71,6 +71,7 @@ tsfit(U, object, ...)
   cores = 1L,
   margin_control = list(),
   automarg_args = list(),
+  joint_control = list(),
   ...
 )
 }
@@ -109,8 +110,11 @@ effective lag held fixed, which is much cheaper; \code{"user"} repeats the whole
 procedure from the original starting rules, including the effective-lag
 rule.}
 
-\item{method}{estimation method for a \link[=tsmod-class]{tsmod} model; only \code{"twostage"}
-so far.}
+\item{method}{estimation method for a \link[=tsmod-class]{tsmod} model: \code{"twostage"}
+(default) or \code{"joint"}, joint maximum likelihood of the margin and copula
+parameters started at the two-stage estimates (parametric margins only;
+the effective lag of a d-vine copula is held at its two-stage value);
+\code{se = "hessian"} is then available.}
 
 \item{cores}{number of processes for the bootstrap refits of a
 \link[=tsmod-class]{tsmod} model (default 1).}
@@ -119,6 +123,9 @@ so far.}
 
 \item{automarg_args}{list of arguments of \code{\link[=automarg]{automarg()}} (\code{families}, \code{fix},
 \code{criterion}) used when the margin of a \link[=tsmod-class]{tsmod} model is \code{"auto"}.}
+
+\item{joint_control}{control list passed to \code{\link[stats:optim]{stats::optim()}} for
+\code{method = "joint"}.}
 }
 \value{
 A fitted model object.
