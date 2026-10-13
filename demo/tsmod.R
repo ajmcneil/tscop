@@ -33,8 +33,10 @@ c(logLik = as.numeric(logLik(fit)), AIC = AIC(fit), BIC = BIC(fit))
 
 # Standard errors by the parametric bootstrap: B series are simulated from the fitted
 # model and both stages are refitted, so the estimation of the margin enters the
-# standard errors of the copula parameters (cores > 1 runs the refits in parallel).
-fitse <- tsfit(x, tsmod("sst", arfactcop(order = 1)), se = "bootstrap", B = 40)
+# standard errors of the copula parameters (cores > 1 runs the refits in parallel;
+# here all but one of the available cores are used, and one core on Windows).
+ncores <- if (.Platform$OS.type == "windows") 1L else max(1L, parallel::detectCores() - 1L)
+fitse <- tsfit(x, tsmod("sst", arfactcop(order = 1)), se = "bootstrap", B = 40, cores = ncores)
 round(cbind(estimate = fitse@estimate, se = fitse@se), 4)
 
 section("3. Residual diagnostics")
@@ -79,7 +81,7 @@ round(rbind(parametric = coef(fit)[c("copula.lambda1", "copula.w1")],
 section("6. A volatile series: process-level v-transform copula")
 vt_true <- tsmod(marg("st", c(mu = 0, sigma = 1, df = 8)),
                  vtscop(arfactcop(lambda = 0.95, w = 0.5), udp::v2p(0.45, 0.8)))
-xv <- tssim(vt_true, 2000)
+xv <- tssim(vt_true, 4000)
 par(mfrow = c(1, 2))
 plot(xv, type = "l", main = "series with volatility clustering", ylab = "x")
 acf(abs(xv), main = "ACF of absolute values")

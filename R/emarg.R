@@ -200,7 +200,8 @@ setMethod("residuals", "emarg", function(object, data, scale = "uniform", nodes 
 setMethod("show", "emarg", function(object) {
   cat("object class: emarg\n")
   cat("type: ", object@type, if (object@type == "edf") paste0(if (object@proper) " (proper)" else " (scaled)"), "\n", sep = "")
-  cat("observations: ", length(object@data), "   kernel bandwidth: ", format(object@bw, digits = 4),
+  cat("observations: ", length(object@data),
+      if (object@type == "kernel") paste0("   kernel bandwidth: ", format(object@bw, digits = 4)),
       "   quantile type: ", object@qtype, "\n", sep = "")
   invisible(object)
 })
