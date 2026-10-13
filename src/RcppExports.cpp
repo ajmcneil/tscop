@@ -54,6 +54,46 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// dv_simulate_cpp
+NumericMatrix dv_simulate_cpp(NumericMatrix w, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2);
+RcppExport SEXP _tscop_dv_simulate_cpp(SEXP wSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type w(wSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type fam(famSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type rot(rotSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type par(parSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type ivt(ivtSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type bfam(bfamSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type brot(brotSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type bpar(bparSEXP);
+    Rcpp::traits::input_parameter< double >::type d1(d1SEXP);
+    Rcpp::traits::input_parameter< double >::type d2(d2SEXP);
+    rcpp_result_gen = Rcpp::wrap(dv_simulate_cpp(w, fam, rot, par, ivt, bfam, brot, bpar, d1, d2));
+    return rcpp_result_gen;
+END_RCPP
+}
+// dv_rosenblatt_cpp
+NumericVector dv_rosenblatt_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2);
+RcppExport SEXP _tscop_dv_rosenblatt_cpp(SEXP uSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type u(uSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type fam(famSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type rot(rotSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type par(parSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type ivt(ivtSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type bfam(bfamSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type brot(brotSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type bpar(bparSEXP);
+    Rcpp::traits::input_parameter< double >::type d1(d1SEXP);
+    Rcpp::traits::input_parameter< double >::type d2(d2SEXP);
+    rcpp_result_gen = Rcpp::wrap(dv_rosenblatt_cpp(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2));
+    return rcpp_result_gen;
+END_RCPP
+}
 // joe_tau_cpp
 List joe_tau_cpp(NumericVector theta, NumericVector c);
 RcppExport SEXP _tscop_joe_tau_cpp(SEXP thetaSEXP, SEXP cSEXP) {
@@ -106,6 +146,8 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_tscop_dv_loglik_cpp", (DL_FUNC) &_tscop_dv_loglik_cpp, 10},
     {"_tscop_dv_loglik_grad_cpp", (DL_FUNC) &_tscop_dv_loglik_grad_cpp, 14},
+    {"_tscop_dv_simulate_cpp", (DL_FUNC) &_tscop_dv_simulate_cpp, 10},
+    {"_tscop_dv_rosenblatt_cpp", (DL_FUNC) &_tscop_dv_rosenblatt_cpp, 10},
     {"_tscop_joe_tau_cpp", (DL_FUNC) &_tscop_joe_tau_cpp, 2},
     {"_tscop_frank_tau_cpp", (DL_FUNC) &_tscop_frank_tau_cpp, 2},
     {"_tscop_joe_par_cpp", (DL_FUNC) &_tscop_joe_par_cpp, 2},

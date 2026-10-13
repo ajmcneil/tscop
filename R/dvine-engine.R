@@ -520,7 +520,7 @@ dv_dens <- function(pr, a, b) {
 # min(t - 1, K) values), iid U(0, 1) under the model. Uses the same level
 # recursion as dv_loglik; the first row of each level supplies the values at
 # t = 2, ..., K + 1 that the density recursion discards.
-dv_rosenblatt <- function(pairs, u) {
+dv_rosenblatt_r <- function(pairs, u) {
   n <- length(u)
   K <- min(length(pairs), n - 1L)
   r <- u
@@ -553,7 +553,7 @@ dv_rosenblatt <- function(pairs, u) {
 # carried from step to step, so the cost is O(nK) pair-copula calls
 # vectorised over replicates. dv_rosenblatt applied to a column of the result
 # returns the corresponding column of w.
-dv_simulate <- function(pairs, w) {
+dv_simulate_r <- function(pairs, w) {
   n <- nrow(w)
   nrep <- ncol(w)
   K <- length(pairs)
@@ -581,6 +581,24 @@ dv_simulate <- function(pairs, w) {
     Bprev <- Bnew
   }
   u
+}
+
+# Compiled versions where every pair copula is supported by the kernels (see
+# dv_encode); the R implementations above are the reference.
+dv_simulate <- function(pairs, w) {
+  if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
+    e <- dv_encode(pairs)
+    if (!is.null(e)) return(dv_simulate_cpp(w, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+  }
+  dv_simulate_r(pairs, w)
+}
+
+dv_rosenblatt <- function(pairs, u) {
+  if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
+    e <- dv_encode(pairs)
+    if (!is.null(e)) return(dv_rosenblatt_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+  }
+  dv_rosenblatt_r(pairs, u)
 }
 
 # ---- one-step predictive distribution ----------------------------------

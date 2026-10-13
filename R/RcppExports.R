@@ -9,6 +9,14 @@ dv_loglik_grad_cpp <- function(u, fam, rot, par, dpar, ivt, bfam, brot, bpar, db
     .Call(`_tscop_dv_loglik_grad_cpp`, u, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2)
 }
 
+dv_simulate_cpp <- function(w, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
+    .Call(`_tscop_dv_simulate_cpp`, w, fam, rot, par, ivt, bfam, brot, bpar, d1, d2)
+}
+
+dv_rosenblatt_cpp <- function(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
+    .Call(`_tscop_dv_rosenblatt_cpp`, u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2)
+}
+
 joe_tau_cpp <- function(theta, c) {
     .Call(`_tscop_joe_tau_cpp`, theta, c)
 }
