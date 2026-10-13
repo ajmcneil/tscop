@@ -4,6 +4,7 @@ udp_base <- function(base, tau) {
     joe = rvinecopulib::bicop_dist("joe", 0, as.numeric(rvinecopulib::ktau_to_par("joe", tau))),
     gumbel = rvinecopulib::bicop_dist("gumbel", 0, as.numeric(rvinecopulib::ktau_to_par("gumbel", tau))),
     clayton180 = rvinecopulib::bicop_dist("clayton", 180, as.numeric(rvinecopulib::ktau_to_par("clayton", tau))),
+    frank = rvinecopulib::bicop_dist("frank", 0, as.numeric(rvinecopulib::ktau_to_par("frank", tau))),
     gauss = rvinecopulib::bicop_dist("gaussian", 0, sin(pi * tau / 2))
   )
 }
@@ -14,7 +15,8 @@ test_that("pc accepts the ivt family with a base copula", {
   expect_equal(c(p@pos, p@neg), c(0, 0))
   expect_equal(pc("ivt", base = "Clayton180")@base, "clayton180")
   expect_error(pc("ivt"), "base copula")
-  expect_error(pc("ivt", base = "frank"), "base copula")
+  expect_error(pc("ivt", base = "t"), "base copula")
+  expect_equal(pc("ivt", base = "Frank")@base, "frank")
   expect_error(pc("gumbel", base = "ast"), "only the")
   expect_output(show(p), "ivt with base ast")
 })
@@ -23,7 +25,7 @@ test_that("IVT pair copula functions equal the udp stochastic-inversion copula (
   set.seed(1)
   a <- runif(40, 0.03, 0.97)
   b <- runif(40, 0.03, 0.97)
-  for (base in c("ast", "joe", "gumbel", "clayton180", "gauss")) {
+  for (base in c("ast", "joe", "gumbel", "clayton180", "frank", "gauss")) {
     for (d in list(c(0.5, 0.5), c(0.3, 0.7), c(0.62, 0.41))) {
       tau <- 0.35
       pr <- dv_ivt_pair(base, tau, d)
@@ -77,7 +79,7 @@ test_that("the d-vine log-likelihood equals a loop over the udp pair copulas", {
 test_that("with one common fulcrum the d-vine density is the base d-vine density at V(u)", {
   set.seed(4)
   u <- runif(80)
-  for (base in c("ast", "gumbel", "gauss")) {
+  for (base in c("ast", "gumbel", "frank", "gauss")) {
     for (delta in c(0.5, 0.35)) {
       taus <- c(0.3, 0.15, 0.07, 0.03)
       ivt <- lapply(taus, function(t) dv_ivt_pair(base, t, c(delta, delta)))
@@ -236,7 +238,7 @@ test_that("the base-scale recursion of IVT runs equals the u-scale recursion (as
   set.seed(8)
   u <- runif(120)
   u[40:60] <- runif(21, 0.4, 0.6)   # a quiet stretch, to put values on both sides of the fulcrums
-  for (base in c("ast", "joe", "gumbel", "clayton180", "gauss")) {
+  for (base in c("ast", "joe", "gumbel", "clayton180", "frank", "gauss")) {
     for (d in list(c(0.5, 0.5), c(0.3, 0.7), c(0.62, 0.41))) {
       taus <- c(0.3, 0.2, 0.12, 0.07, 0.04, 0.02)
       ivt <- lapply(taus, function(t) dv_ivt_pair(base, t, d))

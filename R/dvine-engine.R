@@ -190,6 +190,7 @@ dv_ivt_base_pair <- function(base, tau) {
     joe = list(family = "joe", rotation = 0, parameters = dv_ktau_to_par("joe", tau)),
     gumbel = list(family = "gumbel", rotation = 0, parameters = dv_ktau_to_par("gumbel", tau)),
     clayton180 = list(family = "clayton", rotation = 180, parameters = dv_ktau_to_par("clayton", tau)),
+    frank = list(family = "frank", rotation = 0, parameters = dv_ktau_to_par("frank", tau)),
     gauss = list(family = "gauss", rotation = 0, parameters = sin(pi * tau / 2)),
     stop("unknown base copula '", base, "'")
   )

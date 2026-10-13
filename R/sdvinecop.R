@@ -134,7 +134,7 @@ setValidity("sdvinecop", function(object) {
 #'   `"gauss"` (default), `"frank"`, `"clayton"`, `"gumbel"`, `"joe"` or
 #'   `"ast"`, or a [pc()] specification of one of these, or of an `"ivt"`
 #'   pair copula (`pc("ivt", base = ...)`, with base `"ast"`, `"joe"`,
-#'   `"gumbel"`, `"clayton180"` or `"gauss"`; it uses the fulcrums `vt` of the
+#'   `"gumbel"`, `"clayton180"`, `"frank"` or `"gauss"`; it uses the fulcrums `vt` of the
 #'   model). Families whose Kendall's tau cannot tend to zero with their
 #'   auxiliary parameters fixed (`"t"`, `"bb1"`) are rejected. Free mode has a
 #'   Gaussian tail.

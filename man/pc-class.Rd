@@ -30,8 +30,9 @@ evaluate than the \code{rvinecopulib} families).}
 \item{\code{neg}}{rotation (90 or 270) used when Kendall's tau is negative.}
 
 \item{\code{base}}{for \code{"ivt"}: the base copula, one of \code{"ast"}, \code{"joe"}, \code{"gumbel"},
-\code{"clayton180"} (survival Clayton) and \code{"gauss"} (Gaussian, a cheap base
-for weakly dependent high lags); \code{NA} otherwise.}
+\code{"clayton180"} (survival Clayton), \code{"frank"} (no tail dependence, cheaper
+than the tail-dependent bases) and \code{"gauss"} (Gaussian, the cheapest, a
+base for weakly dependent high lags); \code{NA} otherwise.}
 
 \item{\code{aux}}{auxiliary parameter: degrees of freedom for \code{"t"} (at least 2)
 or the second parameter (\code{delta} in rvinecopulib) for \code{"bb1"} (at least 1); \code{NA} for other families, and \code{NA}

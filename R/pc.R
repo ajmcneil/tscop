@@ -4,9 +4,9 @@
 # families without rotation arguments: radially symmetric ones, and the IVT
 # pair copula (positive dependence only, the base copula is fixed)
 .pc_radial <- c("gauss", "t", "frank", "ivt")
-# base copulas of an inverse-v-transformed pair copula: upper tail dependence
-# and a finite density at the origin ("clayton180" is the survival Clayton)
-.pc_ivt_bases <- c("ast", "joe", "gumbel", "clayton180", "gauss")
+# base copulas of an inverse-v-transformed pair copula: positive dependence and
+# a finite density at the origin ("clayton180" is the survival Clayton)
+.pc_ivt_bases <- c("ast", "joe", "gumbel", "clayton180", "frank", "gauss")
 .pc_aux_families <- c("t", "bb1")
 # families that tend to independence as Kendall's tau -> 0 with auxiliary
 # parameters fixed, hence admissible as the tail family
@@ -33,8 +33,9 @@
 #' @slot pos rotation (0 or 180) used when Kendall's tau is non-negative.
 #' @slot neg rotation (90 or 270) used when Kendall's tau is negative.
 #' @slot base for `"ivt"`: the base copula, one of `"ast"`, `"joe"`, `"gumbel"`,
-#'   `"clayton180"` (survival Clayton) and `"gauss"` (Gaussian, a cheap base
-#'   for weakly dependent high lags); `NA` otherwise.
+#'   `"clayton180"` (survival Clayton), `"frank"` (no tail dependence, cheaper
+#'   than the tail-dependent bases) and `"gauss"` (Gaussian, the cheapest, a
+#'   base for weakly dependent high lags); `NA` otherwise.
 #' @slot aux auxiliary parameter: degrees of freedom for `"t"` (at least 2)
 #'   or the second parameter (`delta` in rvinecopulib) for `"bb1"` (at least 1); `NA` for other families, and `NA`
 #'   for `"t"`/`"bb1"` if it has not been given yet (a starting value is then
@@ -91,7 +92,7 @@ setValidity("pc", function(object) {
 #' @param aux auxiliary parameter: degrees of freedom for `"t"`, the second BB1 parameter (`delta` in rvinecopulib) for
 #'   `"bb1"`; `NULL` for the other families.
 #' @param base for `family = "ivt"` the base copula: `"ast"`, `"joe"`,
-#'   `"gumbel"`, `"clayton180"` (the survival Clayton copula) or `"gauss"`
+#'   `"gumbel"`, `"clayton180"` (the survival Clayton copula), `"frank"` or `"gauss"`
 #'   (the Gaussian copula, whose inverse-v-transformed version has a
 #'   cross-shaped density; cheap to evaluate, so useful for the weakly
 #'   dependent high lags); `NULL` for the other families.
