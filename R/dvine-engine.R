@@ -128,12 +128,15 @@ dv_ast_closures <- function(pr) {
 }
 
 # Copula parameter of a one-parameter family at Kendall's tau (>= 0 for the
-# families without negative dependence). rvinecopulib::ktau_to_par is not
-# vectorised and returns a matrix, so closed forms are used where they exist.
+# families without negative dependence). rvinecopulib::ktau_to_par is a scalar
+# numerical inversion (noise of about 3e-10 in tau), so closed forms or the
+# accurate vectorised inverses of R/tau-inverse.R are used where they exist.
 dv_ktau_to_par <- function(family, tau) {
   switch(family,
     clayton = pmax(2 * tau / (1 - tau), 1e-10),
     gumbel = 1 / (1 - tau),
+    joe = joe_par_fast(tau),
+    frank = frank_par_fast(tau),
     vapply(tau, function(t) as.numeric(rvinecopulib::ktau_to_par(family, t)), numeric(1))
   )
 }

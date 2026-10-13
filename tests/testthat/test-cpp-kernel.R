@@ -159,13 +159,17 @@ test_that("dv_negll_grad equals finite differences of dv_negll on the free scale
               vtpar = "common", maxlag = K, tautol = 1e-6),
     sdvinecop(arfactcop(lambda = c(0.98, 0.6), w = c(0.3, 0.3)), tail = pc("ivt", base = "gauss"), vt = c(0.5, 0.5),
               maxlag = K, tautol = 1e-6),
-    sdvinecop(armacop(ar = 0.7, ma = 0.2), pairs = list(pc("gumbel")), tail = pc("clayton"), maxlag = K, tautol = 1e-6)
+    sdvinecop(armacop(ar = 0.7, ma = 0.2), pairs = list(pc("gumbel")), tail = pc("clayton"), maxlag = K, tautol = 1e-6),
+    sdvinecop(arfactcop(lambda = 0.95, w = 0.5), tail = pc("joe"), maxlag = K, tautol = 1e-6),
+    sdvinecop(arfactcop(lambda = 0.95, w = 0.5), tail = pc("ivt", base = "joe"), vt = c(0.4, 0.6), maxlag = K, tautol = 1e-6),
+    sdvinecop(arfactcop(lambda = 0.95, w = 0.5), tail = pc("ivt", base = "frank"), vt = c(0.45, 0.55), maxlag = K, tautol = 1e-6)
   )
   for (m in cases) {
     m@K <- K
     u <- tssim(m, n)
     lay <- dv_layout(m)
-    z <- dv_start(m, NULL, u, list())$z0 + rnorm(length(dv_start(m, NULL, u, list())$z0), 0, 0.05)
+    z0 <- dv_start(m, NULL, u, list())$z0
+    z <- z0 + rnorm(length(z0), 0, 0.05)
     g <- dv_negll_grad(z, lay, K, u)
     expect_false(is.null(g))
     fd <- vapply(seq_along(z), function(k) {
@@ -176,6 +180,28 @@ test_that("dv_negll_grad equals finite differences of dv_negll on the free scale
     }, 1)
     expect_lt(max(abs(g - fd) / pmax(abs(fd), 1)), 1e-4)
   }
+})
+
+test_that("dv_negll_grad is exact for a pure AR kpacf, whose deep lags have tau of order 1e-17", {
+  set.seed(7)
+  K <- 6L
+  m <- sdvinecop(armacop(ar = c(0.6, -0.3)), pairs = list(pc("joe"), pc("frank"), pc("joe")), tail = pc("frank"),
+                 maxlag = K, tautol = 1e-6)
+  m@K <- K
+  u <- tssim(m, 700)
+  lay <- dv_layout(m)
+  z <- dv_start(m, NULL, u, list())$z0 + c(0.03, -0.02)
+  g <- dv_negll_grad(z, lay, K, u)
+  expect_false(is.null(g))
+  # the lags beyond the AR order have tau of either sign, flipping the Frank parameter at 1e-10: a
+  # finite-difference step of 1e-4 is above that noise
+  fd <- vapply(seq_along(z), function(k) {
+    h <- 1e-4
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    (dv_negll(zp, lay, K, u) - dv_negll(zm, lay, K, u)) / (2 * h)
+  }, 1)
+  expect_lt(max(abs(g - fd) / pmax(abs(fd), 1)), 1e-5)
 })
 
 test_that("dv_negll_grad declines unsupported models and dv_negll_gr then falls back to differences", {

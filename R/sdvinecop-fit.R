@@ -133,6 +133,30 @@ dv_negll <- function(z, lay, K, u) {
   if (is.finite(ll)) -ll else 1e10
 }
 
+# d parameter / d tau of resolved pair copulas (family codes fam, rotations rot,
+# parameters par) at the signed Kendall's tau values tau: closed forms for
+# Clayton, Gumbel and Gauss, the inverse tau-derivative of the tau-parameter
+# relation for Joe and Frank. Rotated families (90, 270) are calibrated to
+# |tau|, which flips the sign of the derivative for negative tau. ivt = TRUE
+# for the base copulas of IVT levels (tau >= 0).
+dv_dpar_dtau <- function(fam, rot, par, tau, ivt = FALSE) {
+  a <- abs(tau)
+  out <- numeric(length(par))
+  i <- fam == 2L
+  out[i] <- 2 / (1 - a[i])^2
+  i <- fam == 3L
+  out[i] <- 1 / (1 - a[i])^2
+  i <- fam == 1L
+  out[i] <- (pi / 2) * cos(pi * tau[i] / 2)
+  i <- fam == 4L
+  if (any(i)) out[i] <- 1 / joe_tau_d(par[i])$dtau
+  i <- fam == 5L
+  if (any(i)) out[i] <- 1 / frank_tau_d(abs(par[i]))$dtau
+  flip <- !ivt & tau < 0 & (rot == 90L | rot == 270L) & fam %in% 2:4
+  out[flip] <- -out[flip]
+  out
+}
+
 # Gradient of dv_negll with respect to the free vector z from the C++ kernel
 # (forward-mode derivatives with respect to the pair copula parameters and the
 # fulcrums, chained to z through the free-scale maps). The maps from z to the
@@ -165,24 +189,11 @@ dv_negll_grad <- function(z, lay, K, u) {
     zm <- zk; zm[k] <- zm[k] - h
     dtau[, k] <- (tau_of(zp) - tau_of(zm)) / (2 * h)
   }
-  # d parameter / d tau, lag by lag
-  # (the numerical inverse of rvinecopulib for Joe and Frank has noise of about
-  # 3e-10 in tau, so the step is 1e-4, giving a relative slope error of about 1e-5
-  # at worst, and the truncation error of the central difference is far smaller)
-  ht <- pmin(1e-4, 0.5 * abs(tau), 0.5 * (1 - abs(tau)))
-  ht[ht < 1e-12] <- 1e-12
-  pp <- dv_make_pairs_tau(tau + ht, numeric(0), vt, lay, K)
-  pm <- dv_make_pairs_tau(tau - ht, numeric(0), vt, lay, K)
-  if (is.null(pp) || is.null(pm)) return(NULL)
-  ep <- dv_encode(pp)
-  em <- dv_encode(pm)
-  if (is.null(ep) || is.null(em)) return(NULL)
-  # lags whose rotation or family changes within the step have |tau| < 2e-12: their
-  # derivative is set to zero (their dependence on the parameters is negligible)
-  same <- ep$rot == e$rot & em$rot == e$rot & ep$fam == e$fam & em$fam == e$fam &
-    ep$brot == e$brot & em$brot == e$brot & ep$bfam == e$bfam & em$bfam == e$bfam
-  dpar_dtau <- ifelse(same, (ep$par - em$par) / (2 * ht), 0)
-  dbpar_dtau <- ifelse(same, (ep$bpar - em$bpar) / (2 * ht), 0)
+  # d parameter / d tau, lag by lag, analytically from the family's tau-parameter relation
+  dpar_dtau <- dv_dpar_dtau(e$fam, e$rot, e$par, tau, ivt = FALSE)
+  dbpar_dtau <- dv_dpar_dtau(e$bfam, e$brot, e$bpar, tau, ivt = TRUE)
+  dpar_dtau[e$ivt == 1L] <- 0
+  dbpar_dtau[e$ivt == 0L] <- 0
   dpar <- dtau * dpar_dtau
   dbpar <- dtau * dbpar_dtau
   dd1 <- dd2 <- numeric(P)

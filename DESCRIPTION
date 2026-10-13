@@ -57,6 +57,7 @@ Collate:
     'gausscop-armacop.R'
     'arfactcop.R'
     'arfactcop-fit.R'
+    'tau-inverse.R'
     'pc.R'
     'dvine-engine.R'
     'sdvinecop.R'

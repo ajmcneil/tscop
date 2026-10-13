@@ -9,3 +9,19 @@ dv_loglik_grad_cpp <- function(u, fam, rot, par, dpar, ivt, bfam, brot, bpar, db
     .Call(`_tscop_dv_loglik_grad_cpp`, u, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2)
 }
 
+joe_tau_cpp <- function(theta, c) {
+    .Call(`_tscop_joe_tau_cpp`, theta, c)
+}
+
+frank_tau_cpp <- function(theta, f) {
+    .Call(`_tscop_frank_tau_cpp`, theta, f)
+}
+
+joe_par_cpp <- function(tau, c) {
+    .Call(`_tscop_joe_par_cpp`, tau, c)
+}
+
+frank_par_cpp <- function(tau, f) {
+    .Call(`_tscop_frank_par_cpp`, tau, f)
+}
+

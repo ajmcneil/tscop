@@ -54,10 +54,62 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// joe_tau_cpp
+List joe_tau_cpp(NumericVector theta, NumericVector c);
+RcppExport SEXP _tscop_joe_tau_cpp(SEXP thetaSEXP, SEXP cSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type theta(thetaSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type c(cSEXP);
+    rcpp_result_gen = Rcpp::wrap(joe_tau_cpp(theta, c));
+    return rcpp_result_gen;
+END_RCPP
+}
+// frank_tau_cpp
+List frank_tau_cpp(NumericVector theta, NumericVector f);
+RcppExport SEXP _tscop_frank_tau_cpp(SEXP thetaSEXP, SEXP fSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type theta(thetaSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type f(fSEXP);
+    rcpp_result_gen = Rcpp::wrap(frank_tau_cpp(theta, f));
+    return rcpp_result_gen;
+END_RCPP
+}
+// joe_par_cpp
+NumericVector joe_par_cpp(NumericVector tau, NumericVector c);
+RcppExport SEXP _tscop_joe_par_cpp(SEXP tauSEXP, SEXP cSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type tau(tauSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type c(cSEXP);
+    rcpp_result_gen = Rcpp::wrap(joe_par_cpp(tau, c));
+    return rcpp_result_gen;
+END_RCPP
+}
+// frank_par_cpp
+NumericVector frank_par_cpp(NumericVector tau, NumericVector f);
+RcppExport SEXP _tscop_frank_par_cpp(SEXP tauSEXP, SEXP fSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type tau(tauSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type f(fSEXP);
+    rcpp_result_gen = Rcpp::wrap(frank_par_cpp(tau, f));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_tscop_dv_loglik_cpp", (DL_FUNC) &_tscop_dv_loglik_cpp, 10},
     {"_tscop_dv_loglik_grad_cpp", (DL_FUNC) &_tscop_dv_loglik_grad_cpp, 14},
+    {"_tscop_joe_tau_cpp", (DL_FUNC) &_tscop_joe_tau_cpp, 2},
+    {"_tscop_frank_tau_cpp", (DL_FUNC) &_tscop_frank_tau_cpp, 2},
+    {"_tscop_joe_par_cpp", (DL_FUNC) &_tscop_joe_par_cpp, 2},
+    {"_tscop_frank_par_cpp", (DL_FUNC) &_tscop_frank_par_cpp, 2},
     {NULL, NULL, 0}
 };
 
