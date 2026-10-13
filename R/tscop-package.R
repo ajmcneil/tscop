@@ -27,4 +27,6 @@
 #' @importFrom rvinecopulib bicop_dist dbicop hbicop ktau_to_par par_to_ktau
 #' @importFrom udp pcoincide
 #' @importFrom parallel mclapply
+#' @importFrom Rcpp sourceCpp
+#' @useDynLib tscop, .registration = TRUE
 NULL

@@ -29,10 +29,13 @@ Depends:
 Imports:
     methods,
     parallel,
+    Rcpp,
     rvinecopulib,
     stats,
     utils,
     udp
+LinkingTo:
+    Rcpp
 Suggests:
     ghyp,
     testthat (>= 3.0.0),
@@ -73,3 +76,4 @@ Collate:
     'tsmod-joint.R'
     'tsmod-predict.R'
     'tscop-package.R'
+    'RcppExports.R'

@@ -257,7 +257,7 @@ dv_pair_ktau <- function(pair) {
 # Gaussian pair copulas are evaluated on the normal-score scale, where the
 # h-functions are linear, so no pnorm/qnorm calls are needed between them.
 # Trees beyond n - 1 do not enter the density.
-dv_loglik <- function(u, pairs) {
+dv_loglik_r <- function(u, pairs) {
   n <- length(u)
   K <- min(length(pairs), n - 1L)
   if (K < 1L) return(0)
@@ -390,6 +390,56 @@ dv_loglik <- function(u, pairs) {
     }
   }
   if (is.finite(ll)) ll else -Inf
+}
+
+# ---- compiled likelihood ------------------------------------------------
+#
+# dv_loglik() evaluates the recursion in C++ (src/dvine_kernel.cpp) when every
+# pair copula is supported by the kernel (independence, Gauss, Clayton, Gumbel,
+# Joe, Frank with any rotation, and IVT pairs with one of these bases) and
+# otherwise falls back to the R reference implementation dv_loglik_r().
+# options(tscop.cpp = FALSE) forces the R implementation.
+
+.cpp_family_codes <- c(indep = 0L, gauss = 1L, gaussian = 1L, clayton = 2L, gumbel = 3L, joe = 4L, frank = 5L)
+
+# Integer/double vectors describing the resolved pair copulas for the kernel,
+# or NULL if some pair copula is not supported.
+dv_encode <- function(pairs) {
+  K <- length(pairs)
+  fam <- rot <- ivt <- bfam <- brot <- integer(K)
+  par <- bpar <- numeric(K)
+  d1 <- d2 <- 0.5
+  for (j in seq_len(K)) {
+    pr <- pairs[[j]]
+    if (identical(pr$family, "ivt")) {
+      b <- pr$base
+      code <- .cpp_family_codes[b$family]
+      if (is.na(code)) return(NULL)
+      ivt[j] <- 1L
+      bfam[j] <- code
+      brot[j] <- as.integer(b$rotation)
+      bpar[j] <- if (length(b$parameters)) b$parameters[1L] else 0
+      d1 <- pr$delta[1L]
+      d2 <- pr$delta[2L]
+    } else {
+      code <- .cpp_family_codes[pr$family]
+      if (is.na(code)) return(NULL)
+      fam[j] <- code
+      rot[j] <- as.integer(pr$rotation)
+      par[j] <- if (length(pr$parameters)) pr$parameters[1L] else 0
+    }
+  }
+  list(fam = fam, rot = rot, par = par, ivt = ivt, bfam = bfam, brot = brot, bpar = bpar, d1 = d1, d2 = d2)
+}
+
+dv_loglik <- function(u, pairs) {
+  if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
+    e <- dv_encode(pairs)
+    if (!is.null(e)) {
+      return(dv_loglik_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+    }
+  }
+  dv_loglik_r(u, pairs)
 }
 
 # ---- pair-level building blocks (uniform scale, vectorised) -------------

@@ -49,6 +49,7 @@ exportMethods(tsfit)
 exportMethods(tssim)
 exportMethods(vcov)
 import(methods)
+importFrom(Rcpp,sourceCpp)
 importFrom(parallel,mclapply)
 importFrom(rvinecopulib,
   bicop_dist,
@@ -71,3 +72,4 @@ importFrom(stats,
 )
 importFrom(udp,pcoincide)
 importFrom(utils,modifyList)
+useDynLib(tscop, .registration = TRUE)
