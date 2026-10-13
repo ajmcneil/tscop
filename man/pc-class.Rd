@@ -31,8 +31,10 @@ evaluate than the \code{rvinecopulib} families).}
 
 \item{\code{base}}{for \code{"ivt"}: the base copula, one of \code{"ast"}, \code{"joe"}, \code{"gumbel"},
 \code{"clayton180"} (survival Clayton), \code{"frank"} (no tail dependence, cheaper
-than the tail-dependent bases) and \code{"gauss"} (Gaussian, the cheapest, a
-base for weakly dependent high lags); \code{NA} otherwise.}
+than the tail-dependent bases) and \code{"gauss"} (Gaussian, the cheapest);
+\code{NA} otherwise. The fulcrum estimates are reliable with the \code{"joe"},
+\code{"clayton180"} and \code{"frank"} bases but not with \code{"gumbel"} and \code{"gauss"}:
+see the section on fulcrum estimation in \code{\link[=pc]{pc()}}.}
 
 \item{\code{aux}}{auxiliary parameter: degrees of freedom for \code{"t"} (at least 2)
 or the second parameter (\code{delta} in rvinecopulib) for \code{"bb1"} (at least 1); \code{NA} for other families, and \code{NA}

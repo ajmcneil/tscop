@@ -32,7 +32,8 @@ mode). A \code{pc("gauss")} entry keeps a lag Gaussian.}
 \code{"ast"}, or a \code{\link[=pc]{pc()}} specification of one of these, or of an \code{"ivt"}
 pair copula (\code{pc("ivt", base = ...)}, with base \code{"ast"}, \code{"joe"},
 \code{"gumbel"}, \code{"clayton180"}, \code{"frank"} or \code{"gauss"}; it uses the fulcrums \code{vt} of the
-model). Families whose Kendall's tau cannot tend to zero with their
+model; the \code{"gumbel"} and \code{"gauss"} bases make the fulcrum estimates
+unreliable, see \code{\link[=pc]{pc()}}). Families whose Kendall's tau cannot tend to zero with their
 auxiliary parameters fixed (\code{"t"}, \code{"bb1"}) are rejected. Free mode has a
 Gaussian tail.}
 

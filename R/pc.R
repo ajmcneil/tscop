@@ -34,8 +34,10 @@
 #' @slot neg rotation (90 or 270) used when Kendall's tau is negative.
 #' @slot base for `"ivt"`: the base copula, one of `"ast"`, `"joe"`, `"gumbel"`,
 #'   `"clayton180"` (survival Clayton), `"frank"` (no tail dependence, cheaper
-#'   than the tail-dependent bases) and `"gauss"` (Gaussian, the cheapest, a
-#'   base for weakly dependent high lags); `NA` otherwise.
+#'   than the tail-dependent bases) and `"gauss"` (Gaussian, the cheapest);
+#'   `NA` otherwise. The fulcrum estimates are reliable with the `"joe"`,
+#'   `"clayton180"` and `"frank"` bases but not with `"gumbel"` and `"gauss"`:
+#'   see the section on fulcrum estimation in [pc()].
 #' @slot aux auxiliary parameter: degrees of freedom for `"t"` (at least 2)
 #'   or the second parameter (`delta` in rvinecopulib) for `"bb1"` (at least 1); `NA` for other families, and `NA`
 #'   for `"t"`/`"bb1"` if it has not been given yet (a starting value is then
@@ -94,8 +96,30 @@ setValidity("pc", function(object) {
 #' @param base for `family = "ivt"` the base copula: `"ast"`, `"joe"`,
 #'   `"gumbel"`, `"clayton180"` (the survival Clayton copula), `"frank"` or `"gauss"`
 #'   (the Gaussian copula, whose inverse-v-transformed version has a
-#'   cross-shaped density; cheap to evaluate, so useful for the weakly
-#'   dependent high lags); `NULL` for the other families.
+#'   cross-shaped density); `NULL` for the other families.
+#'
+#' @section Fulcrum estimation with the IVT base copulas:
+#' The likelihood of an IVT model as a function of the fulcrums is smooth for
+#' the `"joe"`, `"clayton180"` and `"frank"` bases: fits from different starting
+#' values and by different optimisers reach the same optimum, with a gradient of
+#' zero. For the `"gumbel"` and `"gauss"` bases it has cusps at the observations:
+#' the log-likelihood changes by up to several units (in either direction) when
+#' a fulcrum is moved onto an observation, and the fulcrum estimates tend to
+#' land within 1e-9 of an observation. The optimiser then stops at a point where
+#' the gradient is not zero (although its convergence code is 0), and the
+#' log-likelihood and the fulcrum estimates depend on the starting values and the
+#' optimiser, by up to about 1 to 2 log-likelihood units for `"gumbel"` and more for
+#' `"gauss"`. A single `"gumbel"` or `"gauss"` pair anywhere in the model is
+#' enough, including a `"gauss"` base used for the high lags after `"joe"` pairs
+#' at the first lags. Prefer the `"joe"`, `"clayton180"` or `"frank"` base; for an
+#' approximation of the high lags by a cheap radially symmetric base use
+#' `"frank"` (regular, and about as cheap as any base except `"gauss"`), and keep
+#' enough explicit lags: with only a few explicit `"joe"` lags and a persistent
+#' process the Frank or Gaussian tail can lose over a hundred log-likelihood
+#' units against `"joe"` at all lags. With the compiled likelihood the cost of
+#' `"joe"` at all lags is similar to that of a `"joe"` first part with a `"frank"`
+#' tail. If a `"gumbel"` or `"gauss"` base is needed, fix the fulcrums
+#' (`vtpar = "none"` in [sdvinecop()]) at values from a fit with a regular base.
 #'
 #' @details Both rotations are always stored. Which one is used at a lag is
 #'   decided by the sign of Kendall's tau at the current parameter values, so

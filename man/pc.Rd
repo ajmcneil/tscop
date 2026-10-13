@@ -25,8 +25,7 @@ negative. Ignored for radially symmetric families.}
 \item{base}{for \code{family = "ivt"} the base copula: \code{"ast"}, \code{"joe"},
 \code{"gumbel"}, \code{"clayton180"} (the survival Clayton copula), \code{"frank"} or \code{"gauss"}
 (the Gaussian copula, whose inverse-v-transformed version has a
-cross-shaped density; cheap to evaluate, so useful for the weakly
-dependent high lags); \code{NULL} for the other families.}
+cross-shaped density); \code{NULL} for the other families.}
 
 \item{x}{a \link[=pc-class]{pc} specification, for \code{rep}.}
 
@@ -48,6 +47,31 @@ convention is that of \code{\link[rvinecopulib:bicop_dist]{rvinecopulib::bicop_d
 \code{rep(x, ...)} repeats a specification and returns a list of
 \link[=pc-class]{pc} objects, the form taken by the \code{pairs} argument of \code{\link[=sdvinecop]{sdvinecop()}}.
 }
+\section{Fulcrum estimation with the IVT base copulas}{
+
+The likelihood of an IVT model as a function of the fulcrums is smooth for
+the \code{"joe"}, \code{"clayton180"} and \code{"frank"} bases: fits from different starting
+values and by different optimisers reach the same optimum, with a gradient of
+zero. For the \code{"gumbel"} and \code{"gauss"} bases it has cusps at the observations:
+the log-likelihood changes by up to several units (in either direction) when
+a fulcrum is moved onto an observation, and the fulcrum estimates tend to
+land within 1e-9 of an observation. The optimiser then stops at a point where
+the gradient is not zero (although its convergence code is 0), and the
+log-likelihood and the fulcrum estimates depend on the starting values and the
+optimiser, by up to about 1 to 2 log-likelihood units for \code{"gumbel"} and more for
+\code{"gauss"}. A single \code{"gumbel"} or \code{"gauss"} pair anywhere in the model is
+enough, including a \code{"gauss"} base used for the high lags after \code{"joe"} pairs
+at the first lags. Prefer the \code{"joe"}, \code{"clayton180"} or \code{"frank"} base; for an
+approximation of the high lags by a cheap radially symmetric base use
+\code{"frank"} (regular, and about as cheap as any base except \code{"gauss"}), and keep
+enough explicit lags: with only a few explicit \code{"joe"} lags and a persistent
+process the Frank or Gaussian tail can lose over a hundred log-likelihood
+units against \code{"joe"} at all lags. With the compiled likelihood the cost of
+\code{"joe"} at all lags is similar to that of a \code{"joe"} first part with a \code{"frank"}
+tail. If a \code{"gumbel"} or \code{"gauss"} base is needed, fix the fulcrums
+(\code{vtpar = "none"} in \code{\link[=sdvinecop]{sdvinecop()}}) at values from a fit with a regular base.
+}
+
 \examples{
 pc("gumbel")
 pc("clayton", pos = 180, neg = 270)
