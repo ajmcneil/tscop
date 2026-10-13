@@ -4,7 +4,8 @@
 # for volatile series): simulation, two-stage estimation (the margin by maximum
 # likelihood, then the copula process on the probability integral transforms),
 # the semiparametric version with an empirical margin, residual diagnostics,
-# predictive distributions and risk measures.
+# predictive distributions and risk measures; finally joint maximum likelihood
+# of the margin and the copula parameters.
 # Run with demo("tsmod", package = "tscop") or
 #   devtools::load_all(); source("demo/tsmod.R", echo = TRUE)
 
@@ -90,4 +91,19 @@ fv <- tsfit(xv, tsmod("st", vtscop(arfactcop(order = 1), udp::v2p(0.5, 1))))
 fv
 rbind(true = coef(vt_true), estimate = coef(fv))
 ks.test(resid(fv), "punif")$p.value
+section("7. Joint maximum likelihood")
+# method = "joint" maximises the margin and copula log-likelihood together, starting at
+# the two-stage estimates (parametric margins only). It is never worse in likelihood,
+# and it gives Hessian standard errors that include the margin-copula interplay.
+fj <- tsfit(x, tsmod("sst", arfactcop(order = 1)), method = "joint", se = "hessian")
+round(rbind(twostage = coef(fit), joint = coef(fj)), 3)
+c(twostage = as.numeric(logLik(fit)), joint = as.numeric(logLik(fj)))
+round(cbind(estimate = fj@estimate, se = fj@se), 4)
+# With a non-Gaussian copula the joint fit can move the margin and the copula parameters
+# more, and the gain in log-likelihood is larger (here for the volatile series of
+# section 6). A higher likelihood does not mean every estimate is closer to the truth in
+# a single sample; compare with the true values.
+fvj <- tsfit(xv, tsmod("st", vtscop(arfactcop(order = 1), udp::v2p(0.5, 1))), method = "joint")
+round(rbind(true = coef(vt_true), twostage = coef(fv), joint = coef(fvj)), 3)
+c(twostage = as.numeric(logLik(fv)), joint = as.numeric(logLik(fvj)))
 cat("\nEnd of demo.\n")
