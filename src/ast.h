@@ -34,6 +34,7 @@ struct AstMap {
   static constexpr int NP = AST_NP;
   static constexpr double SMAX = SMIN + NP * W;
   double nu = 0, nu2 = 0, c1 = 0, zlo = 0, zhi = 0, xlo = 0, xhi = 0;   // xlo, xhi: images of the clamps of the u scale
+  double xt10 = 0;                             // t copula: upper-tail quantile of 1e-10 (the clamp of rvinecopulib's arguments)
   std::vector<double> C;                       // NP x (D + 1) Chebyshev coefficients
   // optional tables of d ln G / d nu and d ln G / d nu2 (finite differences of the exact composition)
   std::vector<double> C1, C2;
@@ -45,6 +46,7 @@ struct AstMap {
     c1 = R::dt(0.0, nu + 1.0, 0) / R::dt(0.0, nu2, 0);    // G(z) = c1 z for small z
     zlo = std::exp(SMIN); zhi = std::exp(SMAX);
     xlo = ast_q(1e-12, nu2); xhi = ast_q(1.0 - 1e-12, nu2);
+    xt10 = R::qt(1e-10, nu2, 0, 0);
     C.assign(NP * (D + 1), 0.0);
     if (withD) { C1.assign(NP * (D + 1), 0.0); C2.assign(NP * (D + 1), 0.0); }
     double node[D + 1], cs[D + 1][D + 1];

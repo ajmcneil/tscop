@@ -67,12 +67,11 @@ test_that("the C++ kernel equals the R likelihood for IVT pairs with every base"
   cmp_cpp(dv_resolve(m2), runif(500))
 })
 
-test_that("unsupported families use the R implementation and the option switches the kernel off", {
+test_that("unsupported pair copulas use the R implementation and the option switches the kernel off", {
   kp <- arfactcop(lambda = 0.9, w = 0.5)
-  m <- sdvinecop(kp, pairs = list(pc("t", aux = 6), pc("gumbel")), tail = "gauss", maxlag = 6)
-  m@K <- 6L
+  m <- unsupported_model()
   pr <- dv_resolve(m)
-  expect_null(dv_encode(pr))
+  expect_null(dv_encode(pr, ast = TRUE))
   u <- tssim(m, 300)
   expect_equal(dv_loglik(u, pr), dv_loglik_r(u, pr))
   ma <- sdvinecop(kp, tail = pc("ivt", base = "ast"), maxlag = 5)
@@ -206,8 +205,7 @@ test_that("dv_negll_grad is exact for a pure AR kpacf, whose deep lags have tau 
 
 test_that("dv_negll_grad declines unsupported models and dv_negll_gr then falls back to differences", {
   set.seed(8)
-  m <- sdvinecop(arfactcop(lambda = 0.9, w = 0.5), pairs = list(pc("t", aux = 6)), tail = "gauss", maxlag = 6)
-  m@K <- 6L
+  m <- unsupported_model()
   u <- tssim(m, 300)
   lay <- dv_layout(m)
   z <- dv_start(m, NULL, u, list())$z0
@@ -542,6 +540,55 @@ test_that("a model with ast pairs is fitted with the kernel and agrees with the 
   truth <- sdvinecop(kp, tail = pc("ivt", base = "ast"), vt = c(0.45, 0.55), maxlag = 12, tautol = 1e-3)
   u <- tssim(truth, 800)
   spec <- sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "ast"), maxlag = 12, tautol = 1e-3)
+  f1 <- tsfit(u, spec, pseudo = FALSE)
+  old <- options(tscop.cpp = FALSE)
+  on.exit(options(old))
+  f2 <- tsfit(u, spec, pseudo = FALSE)
+  expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-3)
+  expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-6)
+})
+
+# ---- t copula -------------------------------------------------------------------
+
+test_that("the t copula kernel equals the R likelihood for runs of t levels, negative correlation and mixtures", {
+  set.seed(41)
+  for (nm in names(t_models())) {
+    m <- t_models()[[nm]]
+    m@K <- 10L
+    pr <- dv_resolve(m)
+    expect_false(is.null(dv_encode(pr, ast = TRUE)), info = nm)
+    expect_equal(dv_loglik(tssim(m, 500) -> u, pr), dv_loglik_r(u, pr), tolerance = 1e-8, info = nm)
+  }
+})
+
+test_that("the t copula gradient with the free degrees of freedom equals Richardson differences", {
+  set.seed(42)
+  cfd <- function(f, z, h) vapply(seq_along(z), function(k) {
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    (f(zp) - f(zm)) / (2 * h)
+  }, 1)
+  for (nm in names(t_models())) {
+    m <- t_models()[[nm]]
+    m@K <- 10L
+    u <- tssim(m, 500)
+    lay <- dv_layout(m)
+    z0 <- dv_start(m, NULL, u, list())$z0
+    z <- z0 + rnorm(length(z0), 0, 0.03)
+    g <- dv_negll_grad(z, lay, 10L, u)
+    expect_false(is.null(g), info = nm)
+    f <- function(zz) dv_negll(zz, lay, 10L, u)
+    d <- (4 * cfd(f, z, 1e-4) - cfd(f, z, 2e-4)) / 3
+    expect_lt(max(abs(g - d) / pmax(abs(d), 1)), 1e-5)
+  }
+})
+
+test_that("a model with t pairs is fitted with the kernel and the exact gradient and agrees with the R fit", {
+  skip_on_cran()
+  set.seed(43)
+  truth <- sdvinecop(arfactcop(lambda = 0.9, w = 0.5), pairs = list(pc("t", aux = 6)), tail = pc("joe"), maxlag = 10, tautol = 1e-3)
+  u <- tssim(truth, 700)
+  spec <- sdvinecop(arfactcop(order = 1), pairs = list(pc("t", aux = 8)), tail = pc("joe"), maxlag = 10, tautol = 1e-3)
   f1 <- tsfit(u, spec, pseudo = FALSE)
   old <- options(tscop.cpp = FALSE)
   on.exit(options(old))

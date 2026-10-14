@@ -38,8 +38,27 @@ inline double ast_hinv_d(double a, double p, double nu) {
   return 1.0 - 2.0 * R::pt(b, nu, 0, 0);
 }
 
+// ---- t copula (th = rho, th2 = nu) ----
+inline double tc_h_d(double a, double b, double rho, double nu, int cv) {
+  const double x = R::qt(clampin(a), nu, 1, 0), y = R::qt(clampin(b), nu, 1, 0);
+  const double gv = cv == 1 ? x : y, ot = cv == 1 ? y : x;     // given and other
+  return R::pt((ot - rho * gv) / std::sqrt((nu + gv * gv) * (1.0 - rho * rho) / (nu + 1.0)), nu + 1.0, 1, 0);
+}
+inline double tc_dens_d(double a, double b, double rho, double nu) {
+  const double x = R::qt(clampin(a), nu, 1, 0), y = R::qt(clampin(b), nu, 1, 0);
+  const double c0 = R::lgammafn((nu + 2.0) / 2.0) + R::lgammafn(nu / 2.0) - 2.0 * R::lgammafn((nu + 1.0) / 2.0) - 0.5 * std::log1p(-rho * rho);
+  const double Q = (x * x - 2.0 * rho * x * y + y * y) / (1.0 - rho * rho);
+  return std::exp(c0 - (nu + 2.0) / 2.0 * std::log1p(Q / nu) + (nu + 1.0) / 2.0 * (std::log1p(x * x / nu) + std::log1p(y * y / nu)));
+}
+inline double tc_hinv_d(double a, double p, double rho, double nu) {
+  const double x = R::qt(clampin(a), nu, 1, 0);
+  const double y = rho * x + std::sqrt((nu + x * x) * (1.0 - rho * rho) / (nu + 1.0)) * R::qt(p, nu + 1.0, 1, 0);
+  return R::pt(y, nu, 1, 0);
+}
+
 // h-function of a (non-IVT) pair copula: cv = 1: P(B <= b | A = a), cv = 2: P(A <= a | B = b)
 inline double h_plain(int fam, int rot, double th, double th2, double a, double b, int cv) {
+  if (fam == TCOP) return tc_h_d(a, b, th, th2, cv);
   if (fam == AST) return cv == 1 ? ast_h_ab_d(ast_q(a, th), ast_q(b, th), th) : ast_h_ab_d(ast_q(b, th), ast_q(a, th), th);
   if (fam == GAUSS) {
     const double s = std::sqrt(1.0 - th * th);
@@ -57,6 +76,7 @@ inline double hinv0(int fam, double th, double th2, double a, double p) {
   p = clampin(p);
   switch (fam) {
     case AST: return ast_hinv_d(a, p, th);
+    case TCOP: return tc_hinv_d(a, p, th, th2);
     case INDEP: return p;
     case GAUSS: return pn(th * qn(a) + std::sqrt(1.0 - th * th) * qn(p));
     case CLAYTON: {
@@ -116,6 +136,7 @@ inline double lv_hinv(const Level &L, double a, double p) {
 // copula density of a (non-IVT) pair copula at (a, b)
 inline double dens_plain(int fam, int rot, double th, double th2, double a, double b) {
   if (fam == AST) return ast_dens_d(a, b, th);
+  if (fam == TCOP) return tc_dens_d(a, b, th, th2);
   if (fam == GAUSS) {
     const double x = qn(a), y = qn(b), r2 = th * th;
     return std::exp(-0.5 * std::log1p(-r2) - (r2 * (x * x + y * y) - 2.0 * th * x * y) / (2.0 * (1.0 - r2)));

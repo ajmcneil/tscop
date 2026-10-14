@@ -154,6 +154,8 @@ dv_dpar_dtau <- function(fam, rot, par, tau, ivt = FALSE, par2 = NULL) {
   if (any(i)) out[i] <- 1 / frank_tau_d(abs(par[i]))$dtau
   i <- fam == 6L
   if (any(i)) out[i] <- 2 / ((1 - a[i])^2 * par2[i])
+  i <- fam == 8L        # t: rho = sin(pi tau / 2)
+  out[i] <- (pi / 2) * cos(pi * tau[i] / 2)
   i <- fam == 7L        # ast: nu = astcopula_nu(tau), differentiated by central differences
   if (any(i)) out[i] <- vapply(a[i], function(t) { h <- 1e-5 * max(t, 1e-3); (udp::astcopula_nu(min(t + h, 0.999999)) - udp::astcopula_nu(t - h)) / (min(t + h, 0.999999) - (t - h)) }, numeric(1))
   flip <- !ivt & tau < 0 & (rot == 90L | rot == 270L) & fam %in% c(2:4, 6L)
@@ -210,6 +212,8 @@ dv_grad_pieces <- function(z, lay, K) {
       dl <- e$bpar[j]
       dpar[j, na + i] <- -(e$par[j] + 2) / dl * (dl - 1)
       dbpar[j, na + i] <- dl - 1
+    } else if (e$fam[j] == 8L) {
+      dbpar[j, na + i] <- e$bpar[j] - 2      # nu = 2 + exp(z)
     }
   }
   dd1 <- dd2 <- numeric(P)

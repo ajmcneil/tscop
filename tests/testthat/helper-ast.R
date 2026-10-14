@@ -17,3 +17,10 @@ ast_models <- function() {
                          vt = c(0.4, 0.6), maxlag = 12, tautol = 1e-6)
   )
 }
+
+# A model the kernels do not support: ast pairs with a negative tau at lag 2 are rotated (rotation 90)
+unsupported_model <- function() {
+  m <- sdvinecop(armacop(ar = c(0.5, -0.3)), pairs = list(pc("ast"), pc("ast")), tail = pc("gauss"), maxlag = 6)
+  m@K <- 6L
+  m
+}

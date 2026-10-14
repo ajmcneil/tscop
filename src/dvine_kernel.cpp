@@ -50,6 +50,43 @@ template <int P> inline Dual<P> ast_carry(const AstMap &m, const Dual<P> &z, con
   return r;
 }
 
+// ---- t copula (rho in par, nu in bpar of a plain level): signed t-scale values x = qt(u, nu) ----
+inline double tc_entry(double u, double nu) { return R::qt(clampin(u), nu, 1, 0); }
+template <int P> inline Dual<P> tc_entry(const Dual<P> &u, const Dual<P> &nu) {
+  const double uc = clampin(u.v);
+  const double x = R::qt(uc, nu.v, 1, 0), ft = R::dt(x, nu.v, 0);
+  Dual<P> r; r.v = x;
+  const double dxdu = (uc == u.v) ? 1.0 / ft : 0.0, dxdnu = pt_dk(x, nu.v) / ft;
+  for (int k = 0; k < P; k++) r.d[k] = dxdu * u.d[k] + dxdnu * nu.d[k];
+  return r;
+}
+// next level's signed t-scale value: sign(w) G(|w|) through the same level map (G is odd), clamped
+// to the image of rvinecopulib's clamp of its arguments
+inline double tc_carry(const AstMap &m, double w, double, double) {
+  double g = m.eval(std::fabs(w));
+  if (g > m.xt10) g = m.xt10;
+  return w < 0.0 ? -g : g;
+}
+template <int P> inline Dual<P> tc_carry(const AstMap &m, const Dual<P> &w, const Dual<P> &nu, const Dual<P> &nu2) {
+  const double aw = std::fabs(w.v), sg = w.v < 0.0 ? -1.0 : 1.0;
+  double gnu, gnu2;
+  const double g = m.evalD(aw, gnu, gnu2);
+  Dual<P> r;
+  if (g > m.xt10) { r.v = sg * m.xt10; return r; }
+  const double gz = R::dt(aw, nu.v + 1.0, 0) / R::dt(g, nu2.v, 0);
+  r.v = sg * g;
+  for (int k = 0; k < P; k++) r.d[k] = gz * w.d[k] + sg * (gnu * nu.d[k] + gnu2 * nu2.d[k]);
+  return r;
+}
+// u-scale value pt(w, nu + 1) (leaving a run of t levels; not clamped, as the h-functions of rvinecopulib)
+inline double tc_exit(double w, double nu) { return R::pt(w, nu + 1.0, 1, 0); }
+template <int P> inline Dual<P> tc_exit(const Dual<P> &w, const Dual<P> &nu) {
+  Dual<P> r; r.v = R::pt(w.v, nu.v + 1.0, 1, 0);
+  const double dw = R::dt(w.v, nu.v + 1.0, 0), dn = -pt_dk(w.v, nu.v + 1.0);
+  for (int k = 0; k < P; k++) r.d[k] = dw * w.d[k] + dn * nu.d[k];
+  return r;
+}
+
 // u-scale value 1 - 2 pt_upper(z, nu + 1), clamped (leaving a run of ast levels)
 inline double ast_exit(double z, double nu) { return clampu(1.0 - 2.0 * R::pt(z, nu + 1.0, 0, 0)); }
 template <int P> inline Dual<P> ast_exit(const Dual<P> &z, const Dual<P> &nu) {
@@ -137,6 +174,40 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
           for (int i = 0; i < m - 1; i++) { A[i] = h1[i]; B[i] = h2[i]; }
           ts = carry;
           if (ivt[j]) for (int i = 0; i < m - 1; i++) sB[i] = sB[i + 1];
+          m -= 1;
+        }
+        continue;
+      }
+    }
+    {
+      // ---- t copula levels (plain; rho = par, nu = bpar): signed t-scale values carried through level maps ----
+      auto is_tc = [&](int jj) { return !ivt[jj] && fam[jj] == TCOP; };
+      if (is_tc(j)) {
+        if (zs) { for (int i = 0; i < m; i++) { A[i] = pnorm_(A[i]); B[i] = pnorm_(B[i]); } zs = false; }
+        const T rho = par[j], nu = bpar[j];
+        if (!ts) for (int i = 0; i < m; i++) { A[i] = tc_entry(A[i], nu); B[i] = tc_entry(B[i], nu); }
+        const T omr = 1.0 - rho * rho;
+        const T c0 = lgamma_((nu + 2.0) / 2.0) + lgamma_(nu / 2.0) - 2.0 * lgamma_((nu + 1.0) / 2.0) - 0.5 * log1p(-rho * rho);
+        const T e1 = -(nu + 2.0) / 2.0, e2 = (nu + 1.0) / 2.0;
+        T s = c0 * double(m);
+        for (int i = 0; i < m; i++) {
+          const T Q = (A[i] * A[i] - 2.0 * rho * A[i] * B[i] + B[i] * B[i]) / omr;
+          s = s + e1 * log1p(Q / nu) + e2 * (log1p(A[i] * A[i] / nu) + log1p(B[i] * B[i] / nu));
+        }
+        ll = ll + s;
+        if (!last) {
+          const bool carry = is_tc(j + 1);
+          AstMap amap;
+          if (carry) amap.build(val(nu), val(bpar[j + 1]), !std::is_same<T, double>::value);
+          const T k1 = nu + 1.0;
+          for (int i = 0; i < m - 1; i++) {
+            const T wA = (A[i] - rho * B[i]) / sqrt((nu + B[i] * B[i]) * omr / k1);                 // h2 at pair i
+            const T wB = (B[i + 1] - rho * A[i + 1]) / sqrt((nu + A[i + 1] * A[i + 1]) * omr / k1);   // h1 at pair i + 1
+            if (carry) { h1[i] = tc_carry(amap, wA, nu, bpar[j + 1]); h2[i] = tc_carry(amap, wB, nu, bpar[j + 1]); }
+            else { h1[i] = tc_exit(wA, nu); h2[i] = tc_exit(wB, nu); }
+          }
+          for (int i = 0; i < m - 1; i++) { A[i] = h1[i]; B[i] = h2[i]; }
+          ts = carry;
           m -= 1;
         }
         continue;

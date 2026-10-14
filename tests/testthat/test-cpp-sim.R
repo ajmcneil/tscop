@@ -52,10 +52,9 @@ test_that("the C++ simulation inverts the Rosenblatt transform and agrees with t
 
 test_that("simulation and the Rosenblatt transform fall back to R for unsupported families", {
   set.seed(3)
-  m <- sdvinecop(arfactcop(lambda = 0.9, w = 0.5), pairs = list(pc("t", aux = 6), pc("gumbel")), tail = "gauss", maxlag = 5)
-  m@K <- 5L
+  m <- unsupported_model()
   pr <- dv_resolve(m)
-  expect_null(dv_encode(pr))
+  expect_null(dv_encode(pr, ast = TRUE))
   w <- matrix(runif(100), 100, 1)
   expect_equal(dv_simulate(pr, w), dv_simulate_r(pr, w))
   u <- as.numeric(dv_simulate(pr, w))
@@ -147,6 +146,23 @@ test_that("simulation, Rosenblatt and predictive kernels cover ast pairs, plain 
     m@K <- 10L
     pr <- dv_resolve(m)
     expect_false(is.null(dv_encode(pr, ast = TRUE)))
+    w <- matrix(runif(200 * 2), 200, 2)
+    u <- dv_simulate(pr, w)
+    for (j in 1:2) expect_equal(dv_rosenblatt(pr, u[, j]), w[, j], tolerance = 1e-9, info = nm)
+    expect_equal(u, dv_simulate_r(pr, w), tolerance = 1e-3, info = nm)
+    x <- c(0.05, 0.5, 0.95)
+    for (type in c("df", "qf", "dens")) {
+      expect_equal(dv_predictive(pr, u[, 1], x, type), dv_predictive_r(pr, u[, 1], x, type), tolerance = 1e-7, info = paste(nm, type))
+    }
+  }
+})
+
+test_that("simulation, Rosenblatt and predictive kernels cover the t copula", {
+  set.seed(44)
+  for (nm in names(t_models())) {
+    m <- t_models()[[nm]]
+    m@K <- 10L
+    pr <- dv_resolve(m)
     w <- matrix(runif(200 * 2), 200, 2)
     u <- dv_simulate(pr, w)
     for (j in 1:2) expect_equal(dv_rosenblatt(pr, u[, j]), w[, j], tolerance = 1e-9, info = nm)

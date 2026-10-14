@@ -13,7 +13,7 @@ const double EPS = 1e-12;       // clamp of the R reference (dv_clamp)
 const double EPS_IN = 1e-10;    // rvinecopulib clamps the arguments of its copula functions at this value
 const int MAXP = 12;            // largest number of derivative directions
 
-enum Family { INDEP = 0, GAUSS = 1, CLAYTON = 2, GUMBEL = 3, JOE = 4, FRANK = 5, BB1 = 6, AST = 7 };
+enum Family { INDEP = 0, GAUSS = 1, CLAYTON = 2, GUMBEL = 3, JOE = 4, FRANK = 5, BB1 = 6, AST = 7, TCOP = 8 };
 
 // ---- forward-mode dual numbers with P derivative directions ----------------
 
