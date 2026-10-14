@@ -303,7 +303,7 @@ vt_build_model <- function(object, z, L, K, limit) {
 #' @export
 setMethod("tsfit", signature(U = "ANY", object = "vtscop"),
   function(U, object, pseudo = TRUE, se = FALSE, B = 200, init = NULL,
-           control = list(), bootstart = "fitted", ...) {
+           control = list(), bootstart = "fitted", cores = 1L, ...) {
     if (isTRUE(se)) se <- "bootstrap"
     if (!identical(se, FALSE) && !(is.character(se) && length(se) == 1L &&
                                    se %in% c("hessian", "bootstrap"))) {
@@ -343,17 +343,24 @@ setMethod("tsfit", signature(U = "ANY", object = "vtscop"),
       boot <- matrix(NA_real_, B, npar, dimnames = list(NULL, cn))
       ctrl <- modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, length(z))), control)
       miss <- is.na(u)
-      for (b in seq_len(B)) {
+      Ub[miss, ] <- NA
+      if (pseudo) Ub <- apply(Ub, 2L, function(v) rank(v, na.last = "keep", ties.method = "random") / (sum(!miss) + 1))
+      Hinv <- boot_prepare(function(zz) vt_negll_gr(zz, L, K, u), z)
+      refit <- function(b) {
         ub <- Ub[, b]
-        ub[miss] <- NA
-        if (pseudo) ub <- rank(ub, na.last = "keep", ties.method = "random") / (sum(!miss) + 1)
-        est_b <- tryCatch(suppressWarnings({
-          opt <- stats::optim(z, vt_negll, gr = vt_negll_gr, L = L, K = K, u = ub, method = "BFGS", control = ctrl)
-          if (opt$convergence != 0L || opt$value >= 1e10) stop("no convergence")
-          vt_free_to_coef(opt$par, L)
+        tryCatch(suppressWarnings({
+          r <- if (is.null(Hinv)) NULL else boot_newton(z, function(zz) vt_negll(zz, L, K, ub),
+                                                        function(zz) vt_negll_gr(zz, L, K, ub), Hinv)
+          if (is.null(r)) {
+            opt <- stats::optim(z, vt_negll, gr = vt_negll_gr, L = L, K = K, u = ub, method = "BFGS", control = ctrl)
+            if (opt$convergence != 0L || opt$value >= 1e10) stop("no convergence")
+            r <- list(par = opt$par)
+          }
+          vt_free_to_coef(r$par, L)
         }), error = function(e) NULL)
-        if (!is.null(est_b)) boot[b, ] <- est_b
       }
+      res <- boot_run(B, refit, cores)
+      for (b in seq_len(B)) if (is.numeric(res[[b]]) && length(res[[b]]) == npar) boot[b, ] <- res[[b]]
       good <- stats::complete.cases(boot)
       if (sum(good) >= 2L) {
         V[] <- stats::cov(boot[good, , drop = FALSE])

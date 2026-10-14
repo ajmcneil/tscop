@@ -66,6 +66,7 @@ Collate:
     'vtscop.R'
     'vtscop-fit.R'
     'copula-objective.R'
+    'bootstrap-refit.R'
     'vtscop-predict.R'
     'marg-numerics.R'
     'marg-families.R'

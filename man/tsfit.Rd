@@ -45,6 +45,7 @@ tsfit(U, object, ...)
   init = NULL,
   control = list(),
   bootstart = "fitted",
+  cores = 1L,
   ...
 )
 
@@ -57,6 +58,7 @@ tsfit(U, object, ...)
   init = NULL,
   control = list(),
   bootstart = "fitted",
+  cores = 1L,
   ...
 )
 
@@ -110,14 +112,16 @@ effective lag held fixed, which is much cheaper; \code{"user"} repeats the whole
 procedure from the original starting rules, including the effective-lag
 rule.}
 
+\item{cores}{number of processes for the bootstrap refits of a
+\link[=tsmod-class]{tsmod}, \link[=sdvinecop-class]{sdvinecop} or \link[=vtscop-class]{vtscop} model (default 1; not on
+Windows). The simulated series are generated first and the refits use no
+random numbers, so the results do not depend on \code{cores}.}
+
 \item{method}{estimation method for a \link[=tsmod-class]{tsmod} model: \code{"twostage"}
 (default) or \code{"joint"}, joint maximum likelihood of the margin and copula
 parameters started at the two-stage estimates (parametric margins only;
 the effective lag of a d-vine copula is held at its two-stage value);
 \code{se = "hessian"} is then available.}
-
-\item{cores}{number of processes for the bootstrap refits of a
-\link[=tsmod-class]{tsmod} model (default 1).}
 
 \item{margin_control}{control list passed to the optimiser of the margin.}
 

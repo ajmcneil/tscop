@@ -438,7 +438,7 @@ dv_fit_all <- function(u, object, init, control) {
 #' @export
 setMethod("tsfit", signature(U = "ANY", object = "sdvinecop"),
   function(U, object, pseudo = TRUE, se = FALSE, B = 200, init = NULL,
-           control = list(), bootstart = "fitted", ...) {
+           control = list(), bootstart = "fitted", cores = 1L, ...) {
     if (object@mode != "tied") {
       stop("free-mode d-vine models cannot be fitted; specify a tied model (an armacop with pc() specifications)")
     }
@@ -480,23 +480,30 @@ setMethod("tsfit", signature(U = "ANY", object = "sdvinecop"),
     } else if (identical(se, "bootstrap") && npar > 0L) {
       pairs_hat <- dv_make_pairs(z, lay, K)
       Ub <- dv_simulate(pairs_hat, matrix(stats::runif(n * B), n, B))
+      if (pseudo) Ub <- apply(Ub, 2L, function(v) rank(v, ties.method = "random") / (n + 1))
       boot <- matrix(NA_real_, B, npar, dimnames = list(NULL, cn))
-      for (b in seq_len(B)) {
+      ctrl <- modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, length(z))), control)
+      Hinv <- if (bootstart == "fitted") boot_prepare(function(zz) dv_negll_gr(zz, lay, K, u), z) else NULL
+      refit <- function(b) {
         ub <- Ub[, b]
-        if (pseudo) ub <- rank(ub, ties.method = "random") / (n + 1)
-        est_b <- tryCatch(suppressWarnings({
+        tryCatch(suppressWarnings({
           if (bootstart == "fitted") {
-            ctrl <- modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, length(z))), control)
-            opt <- stats::optim(z, dv_negll, gr = dv_negll_gr, lay = lay, K = K, u = ub, method = "BFGS", control = ctrl)
-            if (opt$convergence != 0L || opt$value >= 1e10) stop("no convergence")
-            dv_free_to_coef(opt$par, lay)
+            r <- if (is.null(Hinv)) NULL else boot_newton(z, function(zz) dv_negll(zz, lay, K, ub),
+                                                          function(zz) dv_negll_gr(zz, lay, K, ub), Hinv)
+            if (is.null(r)) {
+              opt <- stats::optim(z, dv_negll, gr = dv_negll_gr, lay = lay, K = K, u = ub, method = "BFGS", control = ctrl)
+              if (opt$convergence != 0L || opt$value >= 1e10) stop("no convergence")
+              r <- list(par = opt$par)
+            }
+            dv_free_to_coef(r$par, lay)
           } else {
             fb <- dv_fit_all(ub, object, init, control)
             dv_free_to_coef(fb$z, lay)
           }
         }), error = function(e) NULL)
-        if (!is.null(est_b)) boot[b, ] <- est_b
       }
+      res <- boot_run(B, refit, cores)
+      for (b in seq_len(B)) if (is.numeric(res[[b]]) && length(res[[b]]) == npar) boot[b, ] <- res[[b]]
       good <- stats::complete.cases(boot)
       if (sum(good) >= 2L) {
         V[] <- stats::cov(boot[good, , drop = FALSE])

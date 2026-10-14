@@ -213,7 +213,9 @@ setClass("tsmodfit", slots = c(
 #' @param automarg_args list of arguments of [automarg()] (`families`, `fix`,
 #'   `criterion`) used when the margin of a [tsmod-class] model is `"auto"`.
 #' @param cores number of processes for the bootstrap refits of a
-#'   [tsmod-class] model (default 1).
+#'   [tsmod-class], [sdvinecop-class] or [vtscop-class] model (default 1; not on
+#'   Windows). The simulated series are generated first and the refits use no
+#'   random numbers, so the results do not depend on `cores`.
 #' @export
 setMethod("tsfit", signature(U = "ANY", object = "tsmod"),
   function(U, object, method = "twostage", se = FALSE, B = 200, cores = 1L,
