@@ -139,3 +139,21 @@ test_that("simulation, Rosenblatt and predictive kernels cover BB1 pairs with ro
     }
   }
 })
+
+test_that("simulation, Rosenblatt and predictive kernels cover ast pairs, plain and as an IVT base", {
+  set.seed(34)
+  for (nm in names(ast_models())) {
+    m <- ast_models()[[nm]]
+    m@K <- 10L
+    pr <- dv_resolve(m)
+    expect_false(is.null(dv_encode(pr, ast = TRUE)))
+    w <- matrix(runif(200 * 2), 200, 2)
+    u <- dv_simulate(pr, w)
+    for (j in 1:2) expect_equal(dv_rosenblatt(pr, u[, j]), w[, j], tolerance = 1e-9, info = nm)
+    expect_equal(u, dv_simulate_r(pr, w), tolerance = 1e-3, info = nm)
+    x <- c(0.05, 0.5, 0.95)
+    for (type in c("df", "qf", "dens")) {
+      expect_equal(dv_predictive(pr, u[, 1], x, type), dv_predictive_r(pr, u[, 1], x, type), tolerance = 1e-7, info = paste(nm, type))
+    }
+  }
+})

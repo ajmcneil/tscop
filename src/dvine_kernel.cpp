@@ -7,6 +7,8 @@
 // forward-mode dual number with P derivative directions gives the
 // log-likelihood and its gradient (see pair.h).
 #include "pair.h"
+#include "ast.h"
+#include <type_traits>
 
 namespace {
 
@@ -25,6 +27,7 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
   std::vector<T> A(udat.begin(), udat.end() - 1), B(udat.begin() + 1, udat.end());
   std::vector<T> sA, sB, h1(m), h2(m);
   bool zs = false, bs = false, zb = false;
+  bool ts = false;   // the arrays hold t-scale values of the current ast level (double only)
   T ll(0.0);
   for (int j = 0; j < K; j++) {
     const bool last = (j == K - 1);
@@ -35,6 +38,59 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
       }
       for (int i = 0; i < m; i++) { A[i] = clampu(d1 - sA[i] * A[i]); B[i] = clampu(d2 - sB[i] * B[i]); }
       bs = false;
+    }
+    if constexpr (std::is_same<T, double>::value) {
+      // ---- absolute spherical t (ast) levels: plain (rotation 0) or the base of an IVT pair ----
+      auto is_ast = [&](int jj) { return ivt[jj] ? bfam[jj] == AST : fam[jj] == AST; };
+      if (is_ast(j)) {
+        if (ivt[j]) {
+          if (!bs) {
+            if (zs) { for (int i = 0; i < m; i++) { A[i] = pnorm_(A[i]); B[i] = pnorm_(B[i]); } zs = false; }
+            sA.assign(m, T(0.0)); sB.assign(m, T(0.0));
+            for (int i = 0; i < m; i++) {
+              sA[i] = alin(A[i], d1); sB[i] = alin(B[i], d2);
+              A[i] = vlin(A[i], d1); B[i] = vlin(B[i], d2);
+            }
+            bs = true; zb = false;
+          }
+          if (zb) { for (int i = 0; i < m; i++) { A[i] = pnorm_(A[i]); B[i] = pnorm_(B[i]); } zb = false; }
+        } else if (zs) {
+          for (int i = 0; i < m; i++) { A[i] = pnorm_(A[i]); B[i] = pnorm_(B[i]); }
+          zs = false;
+        }
+        const double nu = ivt[j] ? bpar[j] : par[j];
+        if (!ts) for (int i = 0; i < m; i++) { A[i] = ast_q(A[i], nu); B[i] = ast_q(B[i], nu); }
+        // log density: lgamma terms once, three log1p per pair
+        const double c0 = R::lgammafn((nu + 2.0) / 2.0) - 2.0 * R::lgammafn((nu + 1.0) / 2.0) + R::lgammafn(nu / 2.0);
+        double s = 0.0;
+        for (int i = 0; i < m; i++) {
+          const double x2 = A[i] * A[i] / nu, y2 = B[i] * B[i] / nu;
+          s += c0 - (nu + 2.0) / 2.0 * std::log1p(x2 + y2) + (nu + 1.0) / 2.0 * (std::log1p(x2) + std::log1p(y2));
+        }
+        ll = ll + s;
+        if (!last) {
+          const bool carry = is_ast(j + 1) && (bool(ivt[j + 1]) == bool(ivt[j]));
+          AstMap amap;
+          if (carry) amap.build(nu, ivt[j + 1] ? bpar[j + 1] : par[j + 1]);
+          const double k1 = nu + 1.0;
+          for (int i = 0; i < m - 1; i++) {
+            const double zA = A[i] * std::sqrt(k1 / (nu + B[i] * B[i]));          // h2 at pair i
+            const double zB = B[i + 1] * std::sqrt(k1 / (nu + A[i + 1] * A[i + 1]));   // h1 at pair i + 1
+            if (carry) {
+              h1[i] = std::min(std::max(amap.eval(zA), amap.xlo), amap.xhi);
+              h2[i] = std::min(std::max(amap.eval(zB), amap.xlo), amap.xhi);
+            } else {
+              h1[i] = clampu(1.0 - 2.0 * R::pt(zA, k1, 0, 0));
+              h2[i] = clampu(1.0 - 2.0 * R::pt(zB, k1, 0, 0));
+            }
+          }
+          for (int i = 0; i < m - 1; i++) { A[i] = h1[i]; B[i] = h2[i]; }
+          ts = carry;
+          if (ivt[j]) for (int i = 0; i < m - 1; i++) sB[i] = sB[i + 1];
+          m -= 1;
+        }
+        continue;
+      }
     }
     const bool plain_gauss = !ivt[j] && fam[j] == GAUSS;
     if (plain_gauss) {

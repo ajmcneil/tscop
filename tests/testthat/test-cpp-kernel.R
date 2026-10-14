@@ -467,3 +467,53 @@ test_that("a model with a BB1 lag is fitted with the kernel and the exact gradie
   expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-3)
   expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-6)
 })
+
+# ---- absolute spherical t (ast) -------------------------------------------------
+
+test_that("the ast likelihood kernel equals the R likelihood for plain, IVT and mixed models", {
+  set.seed(31)
+  for (nm in names(ast_models())) {
+    m <- ast_models()[[nm]]
+    m@K <- 12L
+    pr <- dv_resolve(m)
+    u <- tssim(m, 500)
+    expect_null(dv_encode(pr))                      # the other kernels do not take ast
+    expect_false(is.null(dv_encode(pr, ast = TRUE)))
+    expect_equal(dv_loglik(u, pr), dv_loglik_r(u, pr), tolerance = 1e-8, info = nm)
+  }
+})
+
+test_that("rotated ast pairs and ast models without exact gradients fall back to R", {
+  set.seed(32)
+  kp <- arfactcop(lambda = 0.9, w = 0.5)
+  m <- sdvinecop(armacop(ar = c(0.5, -0.3)), pairs = list(pc("ast"), pc("ast")), tail = pc("gauss"), maxlag = 6)
+  m@K <- 6L
+  pr <- dv_resolve(m)
+  expect_equal(pr[[2]]$rotation, 90)                # a negative tau at lag 2: a rotated ast pair
+  expect_null(dv_encode(pr, ast = TRUE))
+  u <- tssim(m, 300)
+  expect_equal(dv_loglik(u, pr), dv_loglik_r(u, pr))
+  ma <- ast_models()$ivt
+  ma@K <- 8L
+  ua <- tssim(ma, 300)
+  lay <- dv_layout(ma)
+  z <- dv_start(ma, NULL, ua, list())$z0
+  expect_null(dv_negll_grad(z, lay, 8L, ua))        # no exact gradient for ast yet
+  g <- dv_negll_gr(z, lay, 8L, ua)                  # central differences of the compiled value
+  expect_true(all(is.finite(g)))
+})
+
+test_that("a model with ast pairs is fitted with the kernel and agrees with the R fit", {
+  skip_on_cran()
+  set.seed(33)
+  kp <- arfactcop(lambda = 0.9, w = 0.5)
+  truth <- sdvinecop(kp, tail = pc("ivt", base = "ast"), vt = c(0.45, 0.55), maxlag = 12, tautol = 1e-3)
+  u <- tssim(truth, 800)
+  spec <- sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "ast"), maxlag = 12, tautol = 1e-3)
+  f1 <- tsfit(u, spec, pseudo = FALSE)
+  old <- options(tscop.cpp = FALSE)
+  on.exit(options(old))
+  f2 <- tsfit(u, spec, pseudo = FALSE)
+  expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-3)
+  expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-6)
+})

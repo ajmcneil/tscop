@@ -5,6 +5,7 @@
 // pairs with these bases). They follow dv_simulate_r and dv_rosenblatt_r
 // (R/dvine-engine.R) step by step.
 #include "pair.h"
+#include "ast.h"
 
 namespace {
 
@@ -17,8 +18,29 @@ struct Level {
 inline double pn(double x) { return R::pnorm(x, 0, 1, 1, 0); }
 inline double qn(double p) { return R::qnorm(p, 0, 1, 1, 0); }
 
+// ---- absolute spherical t copula, exact (th = nu; rotation 0) ----
+// h(given u | x): 1 - 2 pt_upper(b sqrt((nu + 1) / (nu + a^2)), nu + 1) with a, b the quantiles of the
+// given and the other variable
+inline double ast_h_ab_d(double a, double b, double nu) {
+  if (std::isinf(b)) return 1.0;
+  if (std::isinf(a)) return 0.0;
+  return 1.0 - 2.0 * R::pt(b * std::sqrt((nu + 1.0) / (nu + a * a)), nu + 1.0, 0, 0);
+}
+inline double ast_dens_d(double a, double b, double nu) {
+  const double x = ast_q(a, nu), y = ast_q(b, nu);
+  const double c0 = R::lgammafn((nu + 2.0) / 2.0) - 2.0 * R::lgammafn((nu + 1.0) / 2.0) + R::lgammafn(nu / 2.0);
+  const double x2 = x * x / nu, y2 = y * y / nu;
+  return std::exp(c0 - (nu + 2.0) / 2.0 * std::log1p(x2 + y2) + (nu + 1.0) / 2.0 * (std::log1p(x2) + std::log1p(y2)));
+}
+inline double ast_hinv_d(double a, double p, double nu) {
+  const double qa = ast_q(a, nu);
+  const double b = std::sqrt((nu + qa * qa) / (nu + 1.0)) * R::qt((1.0 - p) / 2.0, nu + 1.0, 0, 0);
+  return 1.0 - 2.0 * R::pt(b, nu, 0, 0);
+}
+
 // h-function of a (non-IVT) pair copula: cv = 1: P(B <= b | A = a), cv = 2: P(A <= a | B = b)
 inline double h_plain(int fam, int rot, double th, double th2, double a, double b, int cv) {
+  if (fam == AST) return cv == 1 ? ast_h_ab_d(ast_q(a, th), ast_q(b, th), th) : ast_h_ab_d(ast_q(b, th), ast_q(a, th), th);
   if (fam == GAUSS) {
     const double s = std::sqrt(1.0 - th * th);
     return cv == 1 ? pn((qn(clampin(b)) - th * qn(clampin(a))) / s)
@@ -34,6 +56,7 @@ inline double hinv0(int fam, double th, double th2, double a, double p) {
   a = clampin(a);
   p = clampin(p);
   switch (fam) {
+    case AST: return ast_hinv_d(a, p, th);
     case INDEP: return p;
     case GAUSS: return pn(th * qn(a) + std::sqrt(1.0 - th * th) * qn(p));
     case CLAYTON: {
@@ -92,6 +115,7 @@ inline double lv_hinv(const Level &L, double a, double p) {
 
 // copula density of a (non-IVT) pair copula at (a, b)
 inline double dens_plain(int fam, int rot, double th, double th2, double a, double b) {
+  if (fam == AST) return ast_dens_d(a, b, th);
   if (fam == GAUSS) {
     const double x = qn(a), y = qn(b), r2 = th * th;
     return std::exp(-0.5 * std::log1p(-r2) - (r2 * (x * x + y * y) - 2.0 * th * x * y) / (2.0 * (1.0 - r2)));

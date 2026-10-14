@@ -403,11 +403,13 @@ dv_loglik_r <- function(u, pairs) {
 # otherwise falls back to the R reference implementation dv_loglik_r().
 # options(tscop.cpp = FALSE) forces the R implementation.
 
-.cpp_family_codes <- c(indep = 0L, gauss = 1L, gaussian = 1L, clayton = 2L, gumbel = 3L, joe = 4L, frank = 5L, bb1 = 6L)
+.cpp_family_codes <- c(indep = 0L, gauss = 1L, gaussian = 1L, clayton = 2L, gumbel = 3L, joe = 4L, frank = 5L, bb1 = 6L, ast = 7L)
 
 # Integer/double vectors describing the resolved pair copulas for the kernel,
-# or NULL if some pair copula is not supported.
-dv_encode <- function(pairs) {
+# or NULL if some pair copula is not supported. The absolute spherical t (ast) copula (code 7,
+# rotation 0 only, plain or as an IVT base) is supported by the likelihood kernel alone, so it
+# is encoded only when `ast = TRUE`.
+dv_encode <- function(pairs, ast = FALSE) {
   K <- length(pairs)
   fam <- rot <- ivt <- bfam <- brot <- integer(K)
   par <- bpar <- numeric(K)
@@ -417,7 +419,7 @@ dv_encode <- function(pairs) {
     if (identical(pr$family, "ivt")) {
       b <- pr$base
       code <- .cpp_family_codes[b$family]
-      if (is.na(code)) return(NULL)
+      if (is.na(code) || (code == 7L && !ast)) return(NULL)
       ivt[j] <- 1L
       bfam[j] <- code
       brot[j] <- as.integer(b$rotation)
@@ -426,7 +428,7 @@ dv_encode <- function(pairs) {
       d2 <- pr$delta[2L]
     } else {
       code <- .cpp_family_codes[pr$family]
-      if (is.na(code)) return(NULL)
+      if (is.na(code) || (code == 7L && (!ast || pr$rotation != 0))) return(NULL)
       fam[j] <- code
       rot[j] <- as.integer(pr$rotation)
       par[j] <- if (length(pr$parameters)) pr$parameters[1L] else 0
@@ -439,7 +441,7 @@ dv_encode <- function(pairs) {
 
 dv_loglik <- function(u, pairs) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
-    e <- dv_encode(pairs)
+    e <- dv_encode(pairs, ast = TRUE)
     if (!is.null(e)) {
       return(dv_loglik_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
     }
@@ -589,7 +591,7 @@ dv_simulate_r <- function(pairs, w) {
 # dv_encode); the R implementations above are the reference.
 dv_simulate <- function(pairs, w) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
-    e <- dv_encode(pairs)
+    e <- dv_encode(pairs, ast = TRUE)
     if (!is.null(e)) return(dv_simulate_cpp(w, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
   }
   dv_simulate_r(pairs, w)
@@ -597,7 +599,7 @@ dv_simulate <- function(pairs, w) {
 
 dv_rosenblatt <- function(pairs, u) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
-    e <- dv_encode(pairs)
+    e <- dv_encode(pairs, ast = TRUE)
     if (!is.null(e)) return(dv_rosenblatt_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
   }
   dv_rosenblatt_r(pairs, u)
@@ -671,7 +673,7 @@ dv_predictive_r <- function(pairs, u, x, type) {
 # by the kernels (dv_encode), otherwise the R reference above.
 dv_predictive <- function(pairs, u, x, type) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L && length(u) > 0L) {
-    e <- dv_encode(pairs)
+    e <- dv_encode(pairs, ast = TRUE)
     if (!is.null(e)) {
       code <- match(type, c("df", "qf", "dens"))
       return(dv_predictive_cpp(as.numeric(u), as.numeric(x), code, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
