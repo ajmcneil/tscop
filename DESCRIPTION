@@ -1,7 +1,7 @@
 Package: tscop
 Type: Package
 Title: Time Series Copula Models
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: c(
     person(
       "Alexander J.", "McNeil",
@@ -20,9 +20,10 @@ Description: Tools for the analysis of time series using copula models, built
     and McNeil (2022) <doi:10.1016/j.ecosta.2021.07.004>), and
     inverse-v-transformed pair copulas for stochastic volatility (Dias, Han
     and McNeil (2027) <doi:10.1016/j.jmva.2026.105695>), and parametric marginal distributions (Gaussian,
-    Laplace, Student t, skew t, Johnson SU, generalised hyperbolic and its special
+    Laplace, Student t, skew t, Johnson SU, sinh-arcsinh, generalised hyperbolic and its special
     cases) with automatic selection, and empirical margins for the semiparametric
-    approach. Under development.
+    approach. Likelihoods, gradients, simulation and prediction are compiled for
+    all d-vine pair copula families.
 License: GPL-3
 Depends:
     R (>= 3.5.0)

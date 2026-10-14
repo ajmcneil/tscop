@@ -1,6 +1,15 @@
 # tscop
 
-A ground-up rebuild of the `tscopula` package for time series copula models, built on [udp](https://github.com/ajmcneil/udp). Under development; the legacy `tscopula` package is left untouched.
+A ground-up rebuild of the `tscopula` package for time series copula models, built on [udp](https://github.com/ajmcneil/udp). The legacy `tscopula` package is left untouched.
+
+## What is in the package
+
+- **Copula processes**: `armacop` and `arfactcop` (Gaussian), `sdvinecop` (stationary d-vine processes with an ARMA-type Kendall partial autocorrelation function, including inverse-v-transformed pair copulas for stochastic volatility), and `vtscop` (process-level v-transforms).
+- **Margins**: `marg` (Gaussian, Laplace, Student t, skew t, Johnson SU, sinh-arcsinh, NIG, hyperbolic, generalised hyperbolic), `automarg`, and `emarg` for the semiparametric approach.
+- **Models and inference**: `tsmod` combines a margin and a copula process; `tsfit` fits by two-stage or joint maximum likelihood with bootstrap standard errors; `AIC`, `BIC` and `AICc` compare models; `tssim`, `ktauhat` and `tsrisk` simulate, diagnose and forecast.
+- **Speed**: compiled likelihood, exact gradient, simulation and prediction kernels (Rcpp) for all d-vine pair copula families.
+
+Worked examples are in `demo()`: `demo("armacop", package = "tscop")`, and likewise `arfactcop`, `sdvinecop`, `ivt`, `vtscop`, `marg`, `tsmod` and `speed`. See `NEWS.md` for the contents and known limitations of this version.
 
 ## Installation
 
