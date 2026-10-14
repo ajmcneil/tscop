@@ -90,6 +90,22 @@ inline double lv_hinv(const Level &L, double a, double p) {
   return clampu(L.d2 - al(p, L.d2) * hb);
 }
 
+// copula density of a (non-IVT) pair copula at (a, b)
+inline double dens_plain(int fam, int rot, double th, double a, double b) {
+  if (fam == GAUSS) {
+    const double x = qn(a), y = qn(b), r2 = th * th;
+    return std::exp(-0.5 * std::log1p(-r2) - (r2 * (x * x + y * y) - 2.0 * th * x * y) / (2.0 * (1.0 - r2)));
+  }
+  double lc, h1, h2;
+  pair_eval(fam, rot, th, a, b, false, false, lc, h1, h2);
+  return std::exp(lc);
+}
+
+inline double lv_dens(const Level &L, double a, double b) {
+  if (!L.ivt) return dens_plain(L.fam, L.rot, L.th, a, b);
+  return dens_plain(L.bfam, L.brot, L.bth, vl(a, L.d1), vl(b, L.d2));
+}
+
 std::vector<Level> make_levels(const IntegerVector &fam, const IntegerVector &rot, const NumericVector &par,
                                const IntegerVector &ivt, const IntegerVector &bfam, const IntegerVector &brot,
                                const NumericVector &bpar, double d1, double d2) {
@@ -157,4 +173,59 @@ NumericVector dv_rosenblatt_cpp(NumericVector u, IntegerVector fam, IntegerVecto
     }
   }
   return r;
+}
+
+// One-step predictive distribution of the next value given the data u: type 1
+// (distribution function), 2 (quantile function) or 3 (density), evaluated at x.
+// The backward variables of the last k = min(K, n) values are computed by the
+// level recursion on that window (as dv_backward_tail), then the conditional
+// pair copulas are applied in turn.
+// [[Rcpp::export]]
+NumericVector dv_predictive_cpp(NumericVector u, NumericVector x, int type, IntegerVector fam, IntegerVector rot,
+                                NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot,
+                                NumericVector bpar, double d1, double d2) {
+  const int n = u.size(), K = fam.size();
+  const int k = std::min(K, n);
+  const int nx = x.size();
+  NumericVector out(nx);
+  if (k < 1) {
+    for (int i = 0; i < nx; i++) out[i] = type == 3 ? 1.0 : x[i];
+    return out;
+  }
+  const std::vector<Level> lv = make_levels(fam, rot, par, ivt, bfam, brot, bpar, d1, d2);
+  // backward variables B_i(n - i), i = 0, ..., k - 1, of the last k values
+  std::vector<double> Bt(k), A(k), B(k), An(k), Bn(k);
+  for (int i = 0; i < k; i++) A[i] = u[n - k + i];
+  Bt[0] = A[k - 1];
+  if (k >= 2) {
+    for (int i = 0; i < k - 1; i++) { B[i] = A[i + 1]; }
+    int m = k - 1;   // length of the current A (first m window values) and B
+    for (int i = 1; i <= k - 1; i++) {
+      const Level &L = lv[i - 1];
+      Bt[i] = lv_h(L, A[m - 1], B[m - 1], 2);
+      if (i < k - 1) {
+        for (int j = 0; j < m - 1; j++) { An[j] = lv_h(L, A[j], B[j], 2); Bn[j] = lv_h(L, A[j + 1], B[j + 1], 1); }
+        for (int j = 0; j < m - 1; j++) { A[j] = An[j]; B[j] = Bn[j]; }
+        m -= 1;
+      }
+    }
+  }
+  for (int i = 0; i < nx; i++) {
+    double f = x[i];
+    if (type == 1) {
+      for (int j = 1; j <= k; j++) f = lv_h(lv[j - 1], Bt[j - 1], f, 1);
+      out[i] = f;
+    } else if (type == 2) {
+      for (int j = k; j >= 1; j--) f = lv_hinv(lv[j - 1], Bt[j - 1], f);
+      out[i] = f;
+    } else {
+      double d = 1.0;
+      for (int j = 1; j <= k; j++) {
+        d *= lv_dens(lv[j - 1], Bt[j - 1], f);
+        f = lv_h(lv[j - 1], Bt[j - 1], f, 1);
+      }
+      out[i] = d;
+    }
+  }
+  return out;
 }

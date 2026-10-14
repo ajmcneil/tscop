@@ -76,3 +76,48 @@ test_that("tssim, resid and the bootstrap use the kernels and give consistent re
   expect_gt(stats::ks.test(r, "punif")$p.value, 0.001)
   expect_lt(abs(stats::cor(r[-1], r[-length(r)])), 0.15)
 })
+
+# ---- predictive distribution -------------------------------------------------
+
+test_that("the C++ predictive distribution equals the R one for every supported pair copula", {
+  set.seed(5)
+  x <- c(0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99)
+  for (nm in names(sim_models())) {
+    m <- sim_models()[[nm]]
+    m@K <- as.integer(min(m@maxlag, 12))
+    pr <- dv_resolve(m)
+    u <- tssim(m, 150)
+    for (type in c("df", "qf", "dens")) {
+      # the rotated model has Frank pairs with tau near zero, where rvinecopulib's density is inaccurate
+      tol <- if (nm == "rot_0_90" && type == "dens") 1e-3 else 1e-8
+      expect_equal(dv_predictive(pr, u, x, type), dv_predictive_r(pr, u, x, type), tolerance = tol, info = paste(nm, type))
+      # fewer past values than the order of the model
+      expect_equal(dv_predictive(pr, u[1:3], x, type), dv_predictive_r(pr, u[1:3], x, type), tolerance = tol, info = paste(nm, type, "short"))
+    }
+    expect_equal(dv_predictive(pr, u, dv_predictive(pr, u, x, "df"), "qf"), x, tolerance = 1e-8, info = nm)
+  }
+})
+
+test_that("the predictive density integrates to one and matches the distribution function", {
+  set.seed(6)
+  m <- sdvinecop(arfactcop(lambda = 0.95, w = 0.5), tail = pc("ivt", base = "joe"), vt = c(0.4, 0.6), maxlag = 10, tautol = 1e-6)
+  m@K <- 10L
+  pr <- dv_resolve(m)
+  u <- tssim(m, 100)
+  g <- seq(0, 1, length.out = 4001)[-c(1, 4001)]
+  d <- dv_predictive(pr, u, g, "dens")
+  expect_equal(sum(d) / length(g), 1, tolerance = 5e-3)
+  Fx <- dv_predictive(pr, u, g, "df")
+  expect_equal(diff(Fx) / diff(g), 0.5 * (d[-1] + d[-length(d)]), tolerance = 5e-2)
+})
+
+test_that("predict for d-vine and v-transform models uses the kernel and agrees with R", {
+  set.seed(7)
+  m <- sdvinecop(arfactcop(lambda = 0.95, w = 0.5), tail = pc("joe"), maxlag = 8, tautol = 1e-6)
+  u <- tssim(m, 120)
+  p1 <- predict(m, u, type = "qf", x = c(0.05, 0.5, 0.95))
+  old <- options(tscop.cpp = FALSE)
+  on.exit(options(old))
+  p2 <- predict(m, u, type = "qf", x = c(0.05, 0.5, 0.95))
+  expect_equal(p1, p2, tolerance = 1e-8)
+})

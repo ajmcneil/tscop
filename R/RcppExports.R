@@ -17,6 +17,10 @@ dv_rosenblatt_cpp <- function(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
     .Call(`_tscop_dv_rosenblatt_cpp`, u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2)
 }
 
+dv_predictive_cpp <- function(u, x, type, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
+    .Call(`_tscop_dv_predictive_cpp`, u, x, type, fam, rot, par, ivt, bfam, brot, bpar, d1, d2)
+}
+
 joe_tau_cpp <- function(theta, c) {
     .Call(`_tscop_joe_tau_cpp`, theta, c)
 }

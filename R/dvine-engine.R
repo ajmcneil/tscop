@@ -630,10 +630,10 @@ dv_backward_tail <- function(pairs, u, k) {
   out
 }
 
-# Predictive distribution of the next value given the data: type "df"
+# Predictive distribution of the next value given the data (R reference): type "df"
 # (distribution function), "qf" (quantile function) or "dens" (density),
 # evaluated at x.
-dv_predictive <- function(pairs, u, x, type) {
+dv_predictive_r <- function(pairs, u, x, type) {
   n <- length(u)
   K <- length(pairs)
   k <- min(K, n)
@@ -663,4 +663,17 @@ dv_predictive <- function(pairs, u, x, type) {
       d
     }
   )
+}
+
+# Compiled one-step predictive distribution where every pair copula is supported
+# by the kernels (dv_encode), otherwise the R reference above.
+dv_predictive <- function(pairs, u, x, type) {
+  if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L && length(u) > 0L) {
+    e <- dv_encode(pairs)
+    if (!is.null(e)) {
+      code <- match(type, c("df", "qf", "dens"))
+      return(dv_predictive_cpp(as.numeric(u), as.numeric(x), code, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+    }
+  }
+  dv_predictive_r(pairs, u, x, type)
 }
