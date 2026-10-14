@@ -31,12 +31,13 @@ BEGIN_RCPP
 END_RCPP
 }
 // dv_loglik_grad_cpp
-List dv_loglik_grad_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par, NumericMatrix dpar, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, NumericMatrix dbpar, double d1, double d2, NumericVector dd1, NumericVector dd2);
-RcppExport SEXP _tscop_dv_loglik_grad_cpp(SEXP uSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP dparSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP dbparSEXP, SEXP d1SEXP, SEXP d2SEXP, SEXP dd1SEXP, SEXP dd2SEXP) {
+List dv_loglik_grad_cpp(NumericVector u, NumericMatrix du, IntegerVector fam, IntegerVector rot, NumericVector par, NumericMatrix dpar, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, NumericMatrix dbpar, double d1, double d2, NumericVector dd1, NumericVector dd2);
+RcppExport SEXP _tscop_dv_loglik_grad_cpp(SEXP uSEXP, SEXP duSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP dparSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP dbparSEXP, SEXP d1SEXP, SEXP d2SEXP, SEXP dd1SEXP, SEXP dd2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< NumericVector >::type u(uSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type du(duSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type fam(famSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type rot(rotSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type par(parSEXP);
@@ -50,7 +51,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type d2(d2SEXP);
     Rcpp::traits::input_parameter< NumericVector >::type dd1(dd1SEXP);
     Rcpp::traits::input_parameter< NumericVector >::type dd2(dd2SEXP);
-    rcpp_result_gen = Rcpp::wrap(dv_loglik_grad_cpp(u, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2));
+    rcpp_result_gen = Rcpp::wrap(dv_loglik_grad_cpp(u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -167,7 +168,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_tscop_dv_loglik_cpp", (DL_FUNC) &_tscop_dv_loglik_cpp, 10},
-    {"_tscop_dv_loglik_grad_cpp", (DL_FUNC) &_tscop_dv_loglik_grad_cpp, 14},
+    {"_tscop_dv_loglik_grad_cpp", (DL_FUNC) &_tscop_dv_loglik_grad_cpp, 15},
     {"_tscop_dv_simulate_cpp", (DL_FUNC) &_tscop_dv_simulate_cpp, 10},
     {"_tscop_dv_rosenblatt_cpp", (DL_FUNC) &_tscop_dv_rosenblatt_cpp, 10},
     {"_tscop_dv_predictive_cpp", (DL_FUNC) &_tscop_dv_predictive_cpp, 12},

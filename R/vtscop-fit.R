@@ -87,6 +87,55 @@ vt_negll <- function(z, L, K, u) {
   }
 }
 
+# Gradient of vt_negll for a d-vine base from the C++ kernel. The base parameters
+# enter through the level parameters (as in dv_negll_grad); the v-transform
+# parameters enter through the transformed series v = V(u), whose derivatives
+# with respect to the free v-transform parameters (central differences of the
+# udp transform, chained through the logit and log maps) are passed to the
+# kernel as derivatives of the data. NULL if the kernel does not apply (a
+# Gaussian base, unsupported pair copulas, more than 12 free parameters).
+vt_negll_grad <- function(z, L, K, u) {
+  if (L$kind != "dvine" || anyNA(K)) return(NULL)
+  nb <- L$nb
+  nv <- length(L$free)
+  zv <- z[nb + seq_len(nv)]
+  if (any(!is.finite(z)) || (nv > 0L && any(abs(zv) > 8)) || nb + nv > 12L) return(NULL)
+  g <- dv_grad_pieces(z[seq_len(nb)], L$lay, K)
+  if (is.null(g)) return(NULL)
+  p <- vt_pars_from_free(zv, L)
+  v <- vt_transform_data(vt_build(L$vtname, p), u)
+  if (anyNA(v)) return(NULL)
+  P <- nb + nv
+  du <- matrix(0, length(u), P)
+  for (k in seq_len(nv)) {
+    nm <- L$free[k]
+    th <- p[[nm]]
+    h <- 1e-6
+    pp <- p; pp[[nm]] <- th + h
+    pm <- p; pm[[nm]] <- th - h
+    dv <- (vt_transform_data(vt_build(L$vtname, pp), u) - vt_transform_data(vt_build(L$vtname, pm), u)) / (2 * h)
+    du[, nb + k] <- dv * (if (nm == "delta") th * (1 - th) else th)
+  }
+  e <- g$e
+  pad <- function(m) cbind(m, matrix(0, nrow(m), nv))
+  r <- dv_loglik_grad_cpp(v, du, e$fam, e$rot, e$par, pad(g$dpar), e$ivt, e$bfam, e$brot, e$bpar, pad(g$dbpar),
+                          e$d1, e$d2, c(g$dd1, numeric(nv)), c(g$dd2, numeric(nv)))
+  if (!is.finite(r$value) || any(!is.finite(r$gradient))) return(NULL)
+  -r$gradient
+}
+
+# Gradient for optim(): exact where available, otherwise central differences of vt_negll.
+vt_negll_gr <- function(z, L, K, u) {
+  g <- vt_negll_grad(z, L, K, u)
+  if (!is.null(g)) return(g)
+  vapply(seq_along(z), function(k) {
+    h <- 1e-6
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    (vt_negll(zp, L, K, u) - vt_negll(zm, L, K, u)) / (2 * h)
+  }, numeric(1))
+}
+
 # Natural coefficient vector (base coefficients, then the free v-transform
 # parameters) from the free vector.
 vt_free_to_coef <- function(z, L) {
@@ -151,7 +200,7 @@ vt_fit_all <- function(u, object, init, control) {
     npar <- length(z)
     if (npar == 0L) return(list(z = z, value = vt_negll(z, L, K, u), convergence = 0L, message = ""))
     c1 <- modifyList(ctrl, list(ndeps = rep(1e-6, npar)))
-    opt <- stats::optim(z, vt_negll, L = L, K = K, u = u, method = "BFGS", control = c1)
+    opt <- stats::optim(z, vt_negll, gr = vt_negll_gr, L = L, K = K, u = u, method = "BFGS", control = c1)
     if (opt$convergence != 0L || opt$value >= 1e10) {
       alt <- stats::optim(opt$par, vt_negll, L = L, K = K, u = u, method = "Nelder-Mead",
                           control = list(maxit = 5000, reltol = 1e-10, warn.1d.NelderMead = FALSE))
@@ -249,7 +298,7 @@ setMethod("tsfit", signature(U = "ANY", object = "vtscop"),
         ub[miss] <- NA
         if (pseudo) ub <- rank(ub, na.last = "keep", ties.method = "random") / (sum(!miss) + 1)
         est_b <- tryCatch(suppressWarnings({
-          opt <- stats::optim(z, vt_negll, L = L, K = K, u = ub, method = "BFGS", control = ctrl)
+          opt <- stats::optim(z, vt_negll, gr = vt_negll_gr, L = L, K = K, u = ub, method = "BFGS", control = ctrl)
           if (opt$convergence != 0L || opt$value >= 1e10) stop("no convergence")
           vt_free_to_coef(opt$par, L)
         }), error = function(e) NULL)

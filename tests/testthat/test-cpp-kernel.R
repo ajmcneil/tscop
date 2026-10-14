@@ -117,7 +117,7 @@ test_that("the kernel gradient with respect to the level parameters and fulcrums
     dd1 <- dd2 <- numeric(P)
     dd1[K + 1L] <- 1
     dd2[K + 2L] <- 1
-    g <- dv_loglik_grad_cpp(u, e$fam, e$rot, e$par, dpar, e$ivt, e$bfam, e$brot, e$bpar, dbp, e$d1, e$d2, dd1, dd2)
+    g <- dv_loglik_grad_cpp(u, matrix(0, 0, ncol(dpar)), e$fam, e$rot, e$par, dpar, e$ivt, e$bfam, e$brot, e$bpar, dbp, e$d1, e$d2, dd1, dd2)
     f <- function(bpar, d1, d2) dv_loglik_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, bpar, d1, d2)
     expect_equal(g$value, f(e$bpar, e$d1, e$d2), tolerance = 1e-12)
     h <- 1e-7
@@ -142,7 +142,7 @@ test_that("the kernel gradient with respect to the level parameters and fulcrums
   dpar <- diag(K)
   dbp <- matrix(0, K, P)
   z <- numeric(P)
-  g <- dv_loglik_grad_cpp(u, e$fam, e$rot, e$par, dpar, e$ivt, e$bfam, e$brot, e$bpar, dbp, e$d1, e$d2, z, z)
+  g <- dv_loglik_grad_cpp(u, matrix(0, 0, ncol(dpar)), e$fam, e$rot, e$par, dpar, e$ivt, e$bfam, e$brot, e$bpar, dbp, e$d1, e$d2, z, z)
   f <- function(p) dv_loglik_cpp(u, e$fam, e$rot, p, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2)
   h <- 1e-7
   fd <- vapply(seq_len(K), function(j) { p <- e$par; p[j] <- p[j] + h; a <- f(p); p[j] <- p[j] - 2 * h; (a - f(p)) / (2 * h) }, 1)
@@ -215,4 +215,61 @@ test_that("dv_negll_grad declines unsupported models and dv_negll_gr then falls 
   gr <- dv_negll_gr(z, lay, 6L, u)
   expect_length(gr, length(z))
   expect_true(all(is.finite(gr)))
+})
+
+# ---- gradients for v-transform copulas -----------------------------------------
+
+test_that("vt_negll_grad equals finite differences for v-transform copulas with a d-vine base", {
+  set.seed(9)
+  kp <- arfactcop(lambda = 0.9, w = 0.5)
+  b <- function(f) sdvinecop(kp, pairs = list(pc(f)), tail = pc(f), maxlag = 10, tautol = 1e-6)
+  cases <- list(
+    vtscop(b("joe"), udp::v2p(0.45, 0.8)),
+    vtscop(b("gumbel"), udp::v2b(0.45, 0.8)),
+    vtscop(b("clayton"), udp::vlinear(0.45)),
+    vtscop(b("frank"), udp::v3p(0.45, 0.8, 1.2)),
+    vtscop(b("joe"), udp::v2p(0.45, 0.8), vtfix = "delta")
+  )
+  for (m in cases) {
+    u <- tssim(m, 500)
+    L <- vt_layout(m)
+    K <- 10L
+    st <- vt_start(m, NULL, u, list())
+    z <- st$z0 + rnorm(length(st$z0), 0, 0.03)
+    g <- vt_negll_grad(z, L, K, u)
+    expect_false(is.null(g))
+    fd <- vapply(seq_along(z), function(k) {
+      h <- 1e-6
+      zp <- z; zp[k] <- zp[k] + h
+      zm <- z; zm[k] <- zm[k] - h
+      (vt_negll(zp, L, K, u) - vt_negll(zm, L, K, u)) / (2 * h)
+    }, 1)
+    expect_lt(max(abs(g - fd) / pmax(abs(fd), 1)), 1e-4)
+  }
+})
+
+test_that("vt_negll_grad declines a Gaussian base and vt_negll_gr then uses differences", {
+  set.seed(10)
+  m <- vtscop(arfactcop(lambda = 0.9, w = 0.5), udp::v2p(0.45, 0.8))
+  u <- tssim(m, 300)
+  L <- vt_layout(m)
+  z <- vt_start(m, NULL, u, list())$z0
+  expect_null(vt_negll_grad(z, L, NA_integer_, u))
+  expect_true(all(is.finite(vt_negll_gr(z, L, NA_integer_, u))))
+})
+
+test_that("vtscop fits with the exact gradient agree with fits by finite differences", {
+  skip_on_cran()
+  set.seed(11)
+  truth <- vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.5), pairs = list(pc("joe")), tail = pc("joe"), maxlag = 12, tautol = 1e-4),
+                  udp::v2p(0.45, 0.8))
+  u <- tssim(truth, 800)
+  spec <- vtscop(sdvinecop(arfactcop(order = 1), pairs = list(pc("joe")), tail = pc("joe"), maxlag = 12, tautol = 1e-4),
+                 udp::v2p(0.5, 1))
+  f1 <- tsfit(u, spec, pseudo = FALSE)
+  old <- options(tscop.cppgrad = FALSE)
+  on.exit(options(old))
+  f2 <- tsfit(u, spec, pseudo = FALSE)
+  expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-3)
+  expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-5)
 })

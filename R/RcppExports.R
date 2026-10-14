@@ -5,8 +5,8 @@ dv_loglik_cpp <- function(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
     .Call(`_tscop_dv_loglik_cpp`, u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2)
 }
 
-dv_loglik_grad_cpp <- function(u, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2) {
-    .Call(`_tscop_dv_loglik_grad_cpp`, u, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2)
+dv_loglik_grad_cpp <- function(u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2) {
+    .Call(`_tscop_dv_loglik_grad_cpp`, u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2)
 }
 
 dv_simulate_cpp <- function(w, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {

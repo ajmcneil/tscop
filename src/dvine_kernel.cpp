@@ -14,15 +14,15 @@ namespace {
 // rot[j], parameter par[j]; an IVT level has ivt[j] = 1 and its base copula in
 // bfam[j], brot[j], bpar[j]. The v-transform fulcrums are d1, d2.
 template <class T>
-T loglik_impl(const NumericVector &u, const IntegerVector &fam, const IntegerVector &rot,
+T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const IntegerVector &rot,
               const std::vector<T> &par, const IntegerVector &ivt, const IntegerVector &bfam,
               const IntegerVector &brot, const std::vector<T> &bpar, const T &d1, const T &d2) {
   using std::sqrt; using std::log1p;
-  const int n = u.size();
+  const int n = udat.size();
   const int K = std::min<int>(fam.size(), n - 1);
   if (K < 1) return T(0.0);
   int m = n - 1;
-  std::vector<T> A(u.begin(), u.end() - 1), B(u.begin() + 1, u.end());
+  std::vector<T> A(udat.begin(), udat.end() - 1), B(udat.begin() + 1, udat.end());
   std::vector<T> sA, sB, h1(m), h2(m);
   bool zs = false, bs = false, zb = false;
   T ll(0.0);
@@ -122,7 +122,7 @@ T loglik_impl(const NumericVector &u, const IntegerVector &fam, const IntegerVec
 // the derivatives of the level parameters, dd1 and dd2 the derivatives of the
 // fulcrums, all with respect to the P directions.
 template <int P>
-List grad_impl(const NumericVector &u, const IntegerVector &fam, const IntegerVector &rot,
+List grad_impl(const NumericVector &u, const NumericMatrix &du, const IntegerVector &fam, const IntegerVector &rot,
                const NumericVector &par, const NumericMatrix &dpar, const IntegerVector &ivt,
                const IntegerVector &bfam, const IntegerVector &brot, const NumericVector &bpar,
                const NumericMatrix &dbpar, double d1, double d2, const NumericVector &dd1,
@@ -135,7 +135,16 @@ List grad_impl(const NumericVector &u, const IntegerVector &fam, const IntegerVe
   }
   Dual<P> D1(d1), D2(d2);
   for (int k = 0; k < P; k++) { D1.d[k] = dd1[k]; D2.d[k] = dd2[k]; }
-  Dual<P> ll = loglik_impl<Dual<P> >(u, fam, rot, p, ivt, bfam, brot, bp, D1, D2);
+  // the data enter with their own derivatives when du (n x P) is supplied (data that depend on the
+  // parameters, for example a v-transformed series); otherwise they are constants
+  const int n = u.size();
+  std::vector<Dual<P> > ud(n);
+  const bool dd = du.nrow() == n && du.ncol() == P;
+  for (int i = 0; i < n; i++) {
+    ud[i].v = u[i];
+    if (dd) for (int k = 0; k < P; k++) ud[i].d[k] = du(i, k);
+  }
+  Dual<P> ll = loglik_impl<Dual<P> >(ud, fam, rot, p, ivt, bfam, brot, bp, D1, D2);
   NumericVector g(P);
   for (int k = 0; k < P; k++) g[k] = ll.d[k];
   if (!std::isfinite(ll.v)) return List::create(_["value"] = R_NegInf, _["gradient"] = g);
@@ -152,20 +161,22 @@ double dv_loglik_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, Nume
   const int K = fam.size();
   std::vector<double> p(par.begin(), par.end()), bp(bpar.begin(), bpar.end());
   (void)K;
-  const double ll = loglik_impl<double>(u, fam, rot, p, ivt, bfam, brot, bp, d1, d2);
+  const std::vector<double> ud(u.begin(), u.end());
+  const double ll = loglik_impl<double>(ud, fam, rot, p, ivt, bfam, brot, bp, d1, d2);
   return std::isfinite(ll) ? ll : R_NegInf;
 }
 
 // Log-likelihood and gradient with respect to P (1 to 12) directions along which the
-// level parameters (K x P matrices dpar, dbpar) and the fulcrums (dd1, dd2) vary.
+// level parameters (K x P matrices dpar, dbpar), the fulcrums (dd1, dd2) and, if du is an
+// n x P matrix, the data u vary.
 // [[Rcpp::export]]
-List dv_loglik_grad_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par,
+List dv_loglik_grad_cpp(NumericVector u, NumericMatrix du, IntegerVector fam, IntegerVector rot, NumericVector par,
                         NumericMatrix dpar, IntegerVector ivt, IntegerVector bfam, IntegerVector brot,
                         NumericVector bpar, NumericMatrix dbpar, double d1, double d2,
                         NumericVector dd1, NumericVector dd2) {
   const int P = dpar.ncol();
   switch (P) {
-#define CASE(PP) case PP: return grad_impl<PP>(u, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2);
+#define CASE(PP) case PP: return grad_impl<PP>(u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2);
     CASE(1) CASE(2) CASE(3) CASE(4) CASE(5) CASE(6) CASE(7) CASE(8) CASE(9) CASE(10) CASE(11) CASE(12)
 #undef CASE
     default: stop("the kernel gradient supports 1 to 12 directions");

@@ -166,7 +166,7 @@ dv_dpar_dtau <- function(fam, rot, par, tau, ivt = FALSE) {
 # unsupported families, an infeasible point, more than 12 free parameters, or a
 # rotation that changes within the difference step; the caller then uses
 # finite differences of dv_negll.
-dv_negll_grad <- function(z, lay, K, u) {
+dv_grad_pieces <- function(z, lay, K) {
   if (!isTRUE(getOption("tscop.cpp", TRUE)) || !isTRUE(getOption("tscop.cppgrad", TRUE))) return(NULL)
   na <- lay$nk
   P <- length(z)
@@ -181,7 +181,7 @@ dv_negll_grad <- function(z, lay, K, u) {
   if (is.null(pairs)) return(NULL)
   e <- dv_encode(pairs)
   if (is.null(e)) return(NULL)
-  # d tau / d z (K x na)
+  # d tau / d z (K x P)
   dtau <- matrix(0, K, P)
   for (k in seq_len(na)) {
     h <- 1e-6 * max(1, abs(zk[k]))
@@ -207,10 +207,17 @@ dv_negll_grad <- function(z, lay, K, u) {
       dd2[iv[1L]] <- e$d2 * (1 - e$d2)
     }
   }
-  g <- dv_loglik_grad_cpp(u, e$fam, e$rot, e$par, dpar, e$ivt, e$bfam, e$brot, e$bpar, dbpar,
-                          e$d1, e$d2, dd1, dd2)
-  if (!is.finite(g$value) || any(!is.finite(g$gradient))) return(NULL)
-  -g$gradient
+  list(e = e, dpar = dpar, dbpar = dbpar, dd1 = dd1, dd2 = dd2)
+}
+
+dv_negll_grad <- function(z, lay, K, u) {
+  g <- dv_grad_pieces(z, lay, K)
+  if (is.null(g)) return(NULL)
+  e <- g$e
+  r <- dv_loglik_grad_cpp(u, matrix(0, 0, length(z)), e$fam, e$rot, e$par, g$dpar, e$ivt, e$bfam, e$brot, e$bpar, g$dbpar,
+                          e$d1, e$d2, g$dd1, g$dd2)
+  if (!is.finite(r$value) || any(!is.finite(r$gradient))) return(NULL)
+  -r$gradient
 }
 
 # Gradient for optim(): the exact gradient where available, otherwise central
