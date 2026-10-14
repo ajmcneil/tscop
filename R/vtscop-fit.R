@@ -94,19 +94,29 @@ vt_negll <- function(z, L, K, u) {
 # udp transform, chained through the logit and log maps) are passed to the
 # kernel as derivatives of the data. NULL if the kernel does not apply (a
 # Gaussian base, unsupported pair copulas, more than 12 free parameters).
-vt_negll_grad <- function(z, L, K, u) {
+vt_negll_grad <- function(z, L, K, u, du = NULL) {
   if (L$kind != "dvine" || anyNA(K)) return(NULL)
   nb <- L$nb
   nv <- length(L$free)
   zv <- z[nb + seq_len(nv)]
-  if (any(!is.finite(z)) || (nv > 0L && any(abs(zv) > 8)) || nb + nv > 12L) return(NULL)
+  nx <- if (is.null(du)) 0L else ncol(du)    # extra leading directions: derivatives of the data u
+  if (any(!is.finite(z)) || (nv > 0L && any(abs(zv) > 8)) || nx + nb + nv > 12L) return(NULL)
   g <- dv_grad_pieces(z[seq_len(nb)], L$lay, K)
   if (is.null(g)) return(NULL)
   p <- vt_pars_from_free(zv, L)
-  v <- vt_transform_data(vt_build(L$vtname, p), u)
+  vt <- vt_build(L$vtname, p)
+  v <- vt_transform_data(vt, u)
   if (anyNA(v)) return(NULL)
-  P <- nb + nv
-  du <- matrix(0, length(u), P)
+  P <- nx + nb + nv
+  dvm <- matrix(0, length(u), P)
+  if (nx > 0L) {
+    # v depends on u through the transform: dv/du by central differences, times du/d(extra directions)
+    h <- 1e-6
+    up <- pmin(u + h, 1 - 1e-12)
+    um <- pmax(u - h, 1e-12)
+    dvdu <- (vt_transform_data(vt, up) - vt_transform_data(vt, um)) / (up - um)
+    dvm[, seq_len(nx)] <- dvdu * du
+  }
   for (k in seq_len(nv)) {
     nm <- L$free[k]
     th <- p[[nm]]
@@ -114,12 +124,12 @@ vt_negll_grad <- function(z, L, K, u) {
     pp <- p; pp[[nm]] <- th + h
     pm <- p; pm[[nm]] <- th - h
     dv <- (vt_transform_data(vt_build(L$vtname, pp), u) - vt_transform_data(vt_build(L$vtname, pm), u)) / (2 * h)
-    du[, nb + k] <- dv * (if (nm == "delta") th * (1 - th) else th)
+    dvm[, nx + nb + k] <- dv * (if (nm == "delta") th * (1 - th) else th)
   }
   e <- g$e
-  pad <- function(m) cbind(m, matrix(0, nrow(m), nv))
-  r <- dv_loglik_grad_cpp(v, du, e$fam, e$rot, e$par, pad(g$dpar), e$ivt, e$bfam, e$brot, e$bpar, pad(g$dbpar),
-                          e$d1, e$d2, c(g$dd1, numeric(nv)), c(g$dd2, numeric(nv)))
+  pad <- function(m) cbind(matrix(0, nrow(m), nx), m, matrix(0, nrow(m), nv))
+  r <- dv_loglik_grad_cpp(v, dvm, e$fam, e$rot, e$par, pad(g$dpar), e$ivt, e$bfam, e$brot, e$bpar, pad(g$dbpar),
+                          e$d1, e$d2, c(numeric(nx), g$dd1, numeric(nv)), c(numeric(nx), g$dd2, numeric(nv)))
   if (!is.finite(r$value) || any(!is.finite(r$gradient))) return(NULL)
   -r$gradient
 }

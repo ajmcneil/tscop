@@ -10,6 +10,10 @@
 #   build(z)   the copula model with free vector z
 #   coef(z)    the natural coefficient vector (named) at z
 #   K          effective lag held fixed in the objective (NA if none)
+#   grad       NULL, or function(z, u, du) returning the gradient of the negative
+#              log-likelihood with respect to nm directions along which the data u
+#              vary (the columns of the n x nm matrix du) followed by z; NULL when
+#              the exact gradient is unavailable
 #
 # A joint fit of a margin and a copula process uses only this interface, so a
 # class gets joint maximum likelihood by implementing one method (and exact
@@ -30,7 +34,8 @@ setMethod("cop_obj", "armacop", function(model, u) {
     },
     build = ops$build,
     coef = function(z) stats::setNames(ops$coef(z), names(coef(model))),
-    K = NA_integer_
+    K = NA_integer_,
+    grad = NULL
   )
 })
 
@@ -47,7 +52,8 @@ setMethod("cop_obj", "arfactcop", function(model, u) {
     },
     build = ops$build,
     coef = function(z) stats::setNames(ops$coef(z), names(coef(model))),
-    K = NA_integer_
+    K = NA_integer_,
+    grad = NULL
   )
 })
 
@@ -62,7 +68,19 @@ setMethod("cop_obj", "sdvinecop", function(model, u) {
     negll = function(z, u) dv_negll(z, lay, K, u),
     build = function(z) dv_build_model(model, z, lay, K, limit),
     coef = function(z) stats::setNames(dv_free_to_coef(z, lay), names(coef(model))),
-    K = K
+    K = K,
+    grad = function(z, u, du) {
+      nx <- ncol(du)
+      if (nx + length(z) > 12L) return(NULL)
+      g <- dv_grad_pieces(z, lay, K)
+      if (is.null(g)) return(NULL)
+      e <- g$e
+      pad <- function(m) cbind(matrix(0, nrow(m), nx), m)
+      r <- dv_loglik_grad_cpp(u, cbind(du, matrix(0, nrow(du), length(z))), e$fam, e$rot, e$par, pad(g$dpar), e$ivt, e$bfam, e$brot,
+                              e$bpar, pad(g$dbpar), e$d1, e$d2, c(numeric(nx), g$dd1), c(numeric(nx), g$dd2))
+      if (!is.finite(r$value) || any(!is.finite(r$gradient))) return(NULL)
+      -r$gradient
+    }
   )
 })
 
@@ -77,6 +95,7 @@ setMethod("cop_obj", "vtscop", function(model, u) {
     negll = function(z, u) vt_negll(z, L, K, u),
     build = function(z) vt_build_model(model, z, L, K, limit),
     coef = function(z) stats::setNames(vt_free_to_coef(z, L), names(coef(model))),
-    K = K
+    K = K,
+    grad = function(z, u, du) vt_negll_grad(z, L, K, u, du)
   )
 })

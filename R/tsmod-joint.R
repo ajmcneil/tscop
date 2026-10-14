@@ -32,6 +32,32 @@ tm_joint_setup <- function(mmodel, cmodel, x) {
     if (!is.finite(vc) || vc >= 1e10) return(1e10)
     vm + vc
   }
+  # Exact gradient of the joint negative log-likelihood where the copula supplies one: the
+  # margin part by central differences of its density (cheap), the copula part by the kernel with
+  # the derivatives of the PITs u = F(x; theta_m) with respect to the free margin parameters
+  # passed as derivatives of the data. NULL (differences are used) otherwise.
+  gradient <- function(theta, x) {
+    if (is.null(cop$grad) || !isTRUE(getOption("tscop.cppgrad", TRUE))) return(NULL)
+    zm <- theta[seq_len(nm)]
+    zc <- theta[nm + seq_along(cop$z0)]
+    if (any(!is.finite(theta))) return(NULL)
+    clampu <- function(v) pmin(pmax(v, 1e-12), 1 - 1e-12)
+    u <- clampu(mg_cdf(fam, mpars(zm), x))
+    if (anyNA(u)) return(NULL)
+    gm <- numeric(nm)
+    du <- matrix(0, length(x), nm)
+    h <- 1e-5
+    for (k in seq_len(nm)) {
+      zp <- zm; zp[k] <- zp[k] + h
+      zq <- zm; zq[k] <- zq[k] - h
+      gm[k] <- (mg_negll(zp, fam, free, th0, x) - mg_negll(zq, fam, free, th0, x)) / (2 * h)
+      du[, k] <- (clampu(mg_cdf(fam, mpars(zp), x)) - clampu(mg_cdf(fam, mpars(zq), x))) / (2 * h)
+    }
+    if (nm > 0L && (any(!is.finite(gm)) || any(!is.finite(du)))) return(NULL)
+    gc <- cop$grad(zc, u, du)
+    if (is.null(gc) || any(!is.finite(gc))) return(NULL)
+    c(gm, rep(0, length(cop$z0))) + gc
+  }
   coefmap <- function(theta) {
     zm <- theta[seq_len(nm)]
     zc <- theta[nm + seq_along(cop$z0)]
@@ -39,7 +65,7 @@ tm_joint_setup <- function(mmodel, cmodel, x) {
       stats::setNames(cop$coef(zc), paste0("copula.", names(cop$coef(zc)))))
   }
   list(fam = fam, th0 = th0, free = free, nm = nm, cop = cop, mmodel = mmodel,
-       theta0 = c(zm0, cop$z0), negll = negll, coefmap = coefmap,
+       theta0 = c(zm0, cop$z0), negll = negll, gradient = gradient, coefmap = coefmap,
        build = function(theta) {
          zm <- theta[seq_len(nm)]
          list(margin = new("marg", family = mmodel@family, pars = mpars(zm), fix = mmodel@fix),
@@ -53,7 +79,17 @@ tm_joint_optim <- function(jt, x, start = jt$theta0, control = list()) {
   if (np == 0L) return(list(theta = start, value = jt$negll(start, x), convergence = 0L, message = ""))
   if (jt$negll(start, x) >= 1e10) stop("the two-stage estimates are infeasible for the joint likelihood", call. = FALSE)
   ctrl <- utils::modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, np)), control)
-  opt <- stats::optim(start, jt$negll, x = x, method = "BFGS", control = ctrl)
+  gr <- function(theta, x) {
+    g <- jt$gradient(theta, x)
+    if (!is.null(g)) return(g)
+    vapply(seq_along(theta), function(k) {
+      h <- 1e-6
+      tp <- theta; tp[k] <- tp[k] + h
+      tm <- theta; tm[k] <- tm[k] - h
+      (jt$negll(tp, x) - jt$negll(tm, x)) / (2 * h)
+    }, numeric(1))
+  }
+  opt <- stats::optim(start, jt$negll, gr = gr, x = x, method = "BFGS", control = ctrl)
   if (opt$convergence != 0L || opt$value >= 1e10) {
     alt <- stats::optim(opt$par, jt$negll, x = x, method = "Nelder-Mead",
                         control = list(maxit = 5000, reltol = 1e-10, warn.1d.NelderMead = FALSE))

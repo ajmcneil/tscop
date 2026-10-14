@@ -70,3 +70,55 @@ test_that("joint ML is refused for an empirical margin and bootstrap SEs work", 
   expect_equal(fb@se_method, "bootstrap")
   expect_equal(dim(fb@boot), c(10L, 5L))
 })
+
+test_that("the exact joint gradient equals finite differences (d-vine, IVT and v-transform copulas)", {
+  set.seed(12)
+  kp <- arfactcop(lambda = 0.9, w = 0.5)
+  cases <- list(
+    list(tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)),
+               sdvinecop(kp, pairs = list(pc("gumbel")), tail = pc("joe"), maxlag = 12, tautol = 1e-4)),
+         tsmod("st", sdvinecop(arfactcop(order = 1), pairs = list(pc("gumbel")), tail = pc("joe"), maxlag = 12, tautol = 1e-4))),
+    list(tsmod(marg("sst", c(mu = 0, sigma = 1, df = 6, gamma = 1.2)),
+               sdvinecop(kp, tail = pc("ivt", base = "joe"), vt = c(0.45, 0.55), maxlag = 12, tautol = 1e-4)),
+         tsmod("sst", sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), maxlag = 12, tautol = 1e-4))),
+    list(tsmod(marg("st", c(mu = 0, sigma = 1, df = 8)),
+               vtscop(sdvinecop(kp, pairs = list(pc("joe")), tail = pc("joe"), maxlag = 12, tautol = 1e-4), udp::v2p(0.45, 0.8))),
+         tsmod("st", vtscop(sdvinecop(arfactcop(order = 1), pairs = list(pc("joe")), tail = pc("joe"), maxlag = 12, tautol = 1e-4),
+                            udp::v2p(0.5, 1))))
+  )
+  for (cs in cases) {
+    x <- tssim(cs[[1]], 600)
+    f2 <- tsfit(x, cs[[2]])
+    jt <- tm_joint_setup(f2@model@margin, f2@model@copula, x)
+    th <- jt$theta0 + rnorm(length(jt$theta0), 0, 0.02)
+    g <- jt$gradient(th, x)
+    expect_false(is.null(g))
+    fd <- vapply(seq_along(th), function(k) {
+      h <- 1e-6
+      tp <- th; tp[k] <- tp[k] + h
+      tm <- th; tm[k] <- tm[k] - h
+      (jt$negll(tp, x) - jt$negll(tm, x)) / (2 * h)
+    }, 1)
+    expect_lt(max(abs(g - fd) / pmax(abs(fd), 1)), 1e-4)
+  }
+})
+
+test_that("Gaussian copulas have no exact joint gradient and joint fits with the gradient agree with differences", {
+  skip_on_cran()
+  set.seed(13)
+  x0 <- tssim(tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)), arfactcop(lambda = 0.9, w = 0.5)), 400)
+  f0 <- tsfit(x0, tsmod("st", arfactcop(order = 1)))
+  jt0 <- tm_joint_setup(f0@model@margin, f0@model@copula, x0)
+  expect_null(jt0$gradient(jt0$theta0, x0))
+  kp <- arfactcop(lambda = 0.9, w = 0.5)
+  tru <- tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)),
+               sdvinecop(kp, pairs = list(pc("gumbel")), tail = pc("joe"), maxlag = 10, tautol = 1e-4))
+  spec <- tsmod("st", sdvinecop(arfactcop(order = 1), pairs = list(pc("gumbel")), tail = pc("joe"), maxlag = 10, tautol = 1e-4))
+  x <- tssim(tru, 700)
+  f1 <- tsfit(x, spec, method = "joint")
+  old <- options(tscop.cppgrad = FALSE)
+  on.exit(options(old))
+  f2 <- tsfit(x, spec, method = "joint")
+  expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-3)
+  expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-6)
+})
