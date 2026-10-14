@@ -12,6 +12,57 @@
 
 namespace {
 
+// ---- absolute spherical t: scalar helpers with derivatives (double and dual numbers) ----
+
+inline double lgamma_(double a) { return R::lgammafn(a); }
+template <int P> inline Dual<P> lgamma_(const Dual<P> &a) { return chain(a, R::lgammafn(a.v), R::digamma(a.v)); }
+
+// d pt_upper(z, k) / dk by a central difference (pt itself is accurate to 1e-15)
+inline double pt_dk(double z, double k) {
+  const double h = 1e-4 * k;
+  return (R::pt(z, k + h, 0, 0) - R::pt(z, k - h, 0, 0)) / (2.0 * h);
+}
+
+// t-scale value x = qt_upper((1 - u) / 2, nu) of a u-scale value
+inline double ast_entry(double u, double nu) { return ast_q(u, nu); }
+template <int P> inline Dual<P> ast_entry(const Dual<P> &u, const Dual<P> &nu) {
+  const double x = ast_q(u.v, nu.v), ft = R::dt(x, nu.v, 0);
+  Dual<P> r; r.v = x;
+  const double dxdu = 0.5 / ft, dxdnu = pt_dk(x, nu.v) / ft;   // implicit: pt_upper(x, nu) = (1 - u) / 2
+  for (int k = 0; k < P; k++) r.d[k] = dxdu * u.d[k] + dxdnu * nu.d[k];
+  return r;
+}
+
+// next level's t-scale value G(z) through the level map, clamped to the image of the u-scale clamps
+inline double ast_carry(const AstMap &m, double z, double, double) {
+  const double g = m.eval(z);
+  return g < m.xlo ? m.xlo : (g > m.xhi ? m.xhi : g);
+}
+template <int P> inline Dual<P> ast_carry(const AstMap &m, const Dual<P> &z, const Dual<P> &nu, const Dual<P> &nu2) {
+  double gnu, gnu2;
+  const double g = m.evalD(z.v, gnu, gnu2);
+  Dual<P> r;
+  if (g < m.xlo) { r.v = m.xlo; return r; }
+  if (g > m.xhi) { r.v = m.xhi; return r; }
+  const double gz = R::dt(z.v, nu.v + 1.0, 0) / R::dt(g, nu2.v, 0);   // dG/dz = dt(z, nu + 1) / dt(G, nu2)
+  r.v = g;
+  for (int k = 0; k < P; k++) r.d[k] = gz * z.d[k] + gnu * nu.d[k] + gnu2 * nu2.d[k];
+  return r;
+}
+
+// u-scale value 1 - 2 pt_upper(z, nu + 1), clamped (leaving a run of ast levels)
+inline double ast_exit(double z, double nu) { return clampu(1.0 - 2.0 * R::pt(z, nu + 1.0, 0, 0)); }
+template <int P> inline Dual<P> ast_exit(const Dual<P> &z, const Dual<P> &nu) {
+  const double u = 1.0 - 2.0 * R::pt(z.v, nu.v + 1.0, 0, 0);
+  Dual<P> r;
+  if (u < EPS) { r.v = EPS; return r; }
+  if (u > 1.0 - EPS) { r.v = 1.0 - EPS; return r; }
+  const double dz = 2.0 * R::dt(z.v, nu.v + 1.0, 0), dn = -2.0 * pt_dk(z.v, nu.v + 1.0);
+  r.v = u;
+  for (int k = 0; k < P; k++) r.d[k] = dz * z.d[k] + dn * nu.d[k];
+  return r;
+}
+
 // The level recursion. Level j (0-based) has family code fam[j], rotation
 // rot[j], parameter par[j]; an IVT level has ivt[j] = 1 and its base copula in
 // bfam[j], brot[j], bpar[j]. The v-transform fulcrums are d1, d2.
@@ -39,8 +90,10 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
       for (int i = 0; i < m; i++) { A[i] = clampu(d1 - sA[i] * A[i]); B[i] = clampu(d2 - sB[i] * B[i]); }
       bs = false;
     }
-    if constexpr (std::is_same<T, double>::value) {
+    {
       // ---- absolute spherical t (ast) levels: plain (rotation 0) or the base of an IVT pair ----
+      // t-scale values of a run of ast levels are carried through the level maps G (src/ast.h); for
+      // dual numbers the maps also carry the derivatives with respect to the degrees of freedom.
       auto is_ast = [&](int jj) { return ivt[jj] ? bfam[jj] == AST : fam[jj] == AST; };
       if (is_ast(j)) {
         if (ivt[j]) {
@@ -58,31 +111,28 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
           for (int i = 0; i < m; i++) { A[i] = pnorm_(A[i]); B[i] = pnorm_(B[i]); }
           zs = false;
         }
-        const double nu = ivt[j] ? bpar[j] : par[j];
-        if (!ts) for (int i = 0; i < m; i++) { A[i] = ast_q(A[i], nu); B[i] = ast_q(B[i], nu); }
+        const T nu = ivt[j] ? bpar[j] : par[j];
+        if (!ts) for (int i = 0; i < m; i++) { A[i] = ast_entry(A[i], nu); B[i] = ast_entry(B[i], nu); }
         // log density: lgamma terms once, three log1p per pair
-        const double c0 = R::lgammafn((nu + 2.0) / 2.0) - 2.0 * R::lgammafn((nu + 1.0) / 2.0) + R::lgammafn(nu / 2.0);
-        double s = 0.0;
+        const T c0 = lgamma_((nu + 2.0) / 2.0) - 2.0 * lgamma_((nu + 1.0) / 2.0) + lgamma_(nu / 2.0);
+        const T e1 = -(nu + 2.0) / 2.0, e2 = (nu + 1.0) / 2.0;
+        T s = c0 * double(m);
         for (int i = 0; i < m; i++) {
-          const double x2 = A[i] * A[i] / nu, y2 = B[i] * B[i] / nu;
-          s += c0 - (nu + 2.0) / 2.0 * std::log1p(x2 + y2) + (nu + 1.0) / 2.0 * (std::log1p(x2) + std::log1p(y2));
+          const T x2 = A[i] * A[i] / nu, y2 = B[i] * B[i] / nu;
+          s = s + e1 * log1p(x2 + y2) + e2 * (log1p(x2) + log1p(y2));
         }
         ll = ll + s;
         if (!last) {
           const bool carry = is_ast(j + 1) && (bool(ivt[j + 1]) == bool(ivt[j]));
+          const T nu2 = ivt[j + 1] ? bpar[j + 1] : par[j + 1];
           AstMap amap;
-          if (carry) amap.build(nu, ivt[j + 1] ? bpar[j + 1] : par[j + 1]);
-          const double k1 = nu + 1.0;
+          if (carry) amap.build(val(nu), val(nu2), !std::is_same<T, double>::value);
+          const T k1 = nu + 1.0;
           for (int i = 0; i < m - 1; i++) {
-            const double zA = A[i] * std::sqrt(k1 / (nu + B[i] * B[i]));          // h2 at pair i
-            const double zB = B[i + 1] * std::sqrt(k1 / (nu + A[i + 1] * A[i + 1]));   // h1 at pair i + 1
-            if (carry) {
-              h1[i] = std::min(std::max(amap.eval(zA), amap.xlo), amap.xhi);
-              h2[i] = std::min(std::max(amap.eval(zB), amap.xlo), amap.xhi);
-            } else {
-              h1[i] = clampu(1.0 - 2.0 * R::pt(zA, k1, 0, 0));
-              h2[i] = clampu(1.0 - 2.0 * R::pt(zB, k1, 0, 0));
-            }
+            const T zA = A[i] * sqrt(k1 / (nu + B[i] * B[i]));                    // h2 at pair i
+            const T zB = B[i + 1] * sqrt(k1 / (nu + A[i + 1] * A[i + 1]));        // h1 at pair i + 1
+            if (carry) { h1[i] = ast_carry(amap, zA, nu, nu2); h2[i] = ast_carry(amap, zB, nu, nu2); }
+            else { h1[i] = ast_exit(zA, nu); h2[i] = ast_exit(zB, nu); }
           }
           for (int i = 0; i < m - 1; i++) { A[i] = h1[i]; B[i] = h2[i]; }
           ts = carry;

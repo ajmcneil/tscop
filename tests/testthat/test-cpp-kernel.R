@@ -483,9 +483,8 @@ test_that("the ast likelihood kernel equals the R likelihood for plain, IVT and 
   }
 })
 
-test_that("rotated ast pairs and ast models without exact gradients fall back to R", {
+test_that("rotated ast pairs fall back to R", {
   set.seed(32)
-  kp <- arfactcop(lambda = 0.9, w = 0.5)
   m <- sdvinecop(armacop(ar = c(0.5, -0.3)), pairs = list(pc("ast"), pc("ast")), tail = pc("gauss"), maxlag = 6)
   m@K <- 6L
   pr <- dv_resolve(m)
@@ -493,14 +492,47 @@ test_that("rotated ast pairs and ast models without exact gradients fall back to
   expect_null(dv_encode(pr, ast = TRUE))
   u <- tssim(m, 300)
   expect_equal(dv_loglik(u, pr), dv_loglik_r(u, pr))
-  ma <- ast_models()$ivt
-  ma@K <- 8L
-  ua <- tssim(ma, 300)
-  lay <- dv_layout(ma)
-  z <- dv_start(ma, NULL, ua, list())$z0
-  expect_null(dv_negll_grad(z, lay, 8L, ua))        # no exact gradient for ast yet
-  g <- dv_negll_gr(z, lay, 8L, ua)                  # central differences of the compiled value
-  expect_true(all(is.finite(g)))
+  lay <- dv_layout(m)
+  z <- dv_start(m, NULL, u, list())$z0
+  expect_null(dv_negll_grad(z, lay, 6L, u))         # no exact gradient: central differences are used
+  expect_true(all(is.finite(dv_negll_gr(z, lay, 6L, u))))
+})
+
+test_that("the exact ast gradient equals large-step differences and differences of the R implementation", {
+  set.seed(35)
+  cfd <- function(f, z, h) vapply(seq_along(z), function(k) {
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    (f(zp) - f(zm)) / (2 * h)
+  }, 1)
+  for (nm in names(ast_models())) {
+    m <- ast_models()[[nm]]
+    m@K <- 10L
+    u <- tssim(m, 500)
+    lay <- dv_layout(m)
+    z0 <- dv_start(m, NULL, u, list())$z0
+    z <- z0 + rnorm(length(z0), 0, 0.03)
+    g <- dv_negll_grad(z, lay, 10L, u)
+    expect_false(is.null(g), info = nm)
+    # Richardson-extrapolated differences with a large step: the compiled value carries the 2e-10
+    # error of the level maps, which makes small steps noisy
+    f <- function(zz) dv_negll(zz, lay, 10L, u)
+    d <- (4 * cfd(f, z, 1e-3) - cfd(f, z, 2e-3)) / 3
+    # (models with a lag of nu below 1 are limited to about 1e-5 by R's own qt, accurate to 3e-7 there)
+    expect_lt(max(abs(g - d) / pmax(abs(d), 1)), 1e-4)
+  }
+  # against the R implementation, which uses the exact qt and pt
+  m <- ast_models()$ivt
+  m@K <- 10L
+  u <- tssim(m, 500)
+  lay <- dv_layout(m)
+  z <- dv_start(m, NULL, u, list())$z0 + rnorm(4, 0, 0.03)
+  g <- dv_negll_grad(z, lay, 10L, u)
+  old <- options(tscop.cpp = FALSE)
+  on.exit(options(old))
+  fr <- function(zz) dv_negll(zz, lay, 10L, u)
+  dr <- (4 * cfd(fr, z, 1e-4) - cfd(fr, z, 2e-4)) / 3
+  expect_lt(max(abs(g - dr) / pmax(abs(dr), 1)), 1e-5)
 })
 
 test_that("a model with ast pairs is fitted with the kernel and agrees with the R fit", {

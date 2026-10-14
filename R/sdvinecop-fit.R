@@ -154,6 +154,8 @@ dv_dpar_dtau <- function(fam, rot, par, tau, ivt = FALSE, par2 = NULL) {
   if (any(i)) out[i] <- 1 / frank_tau_d(abs(par[i]))$dtau
   i <- fam == 6L
   if (any(i)) out[i] <- 2 / ((1 - a[i])^2 * par2[i])
+  i <- fam == 7L        # ast: nu = astcopula_nu(tau), differentiated by central differences
+  if (any(i)) out[i] <- vapply(a[i], function(t) { h <- 1e-5 * max(t, 1e-3); (udp::astcopula_nu(min(t + h, 0.999999)) - udp::astcopula_nu(t - h)) / (min(t + h, 0.999999) - (t - h)) }, numeric(1))
   flip <- !ivt & tau < 0 & (rot == 90L | rot == 270L) & fam %in% c(2:4, 6L)
   out[flip] <- -out[flip]
   out
@@ -183,7 +185,7 @@ dv_grad_pieces <- function(z, lay, K) {
   aux <- dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam)
   pairs <- dv_make_pairs_tau(tau, aux, vt, lay, K)
   if (is.null(pairs)) return(NULL)
-  e <- dv_encode(pairs)
+  e <- dv_encode(pairs, ast = TRUE)
   if (is.null(e)) return(NULL)
   # d tau / d z (K x P)
   dtau <- matrix(0, K, P)

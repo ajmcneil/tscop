@@ -35,13 +35,18 @@ struct AstMap {
   static constexpr double SMAX = SMIN + NP * W;
   double nu = 0, nu2 = 0, c1 = 0, zlo = 0, zhi = 0, xlo = 0, xhi = 0;   // xlo, xhi: images of the clamps of the u scale
   std::vector<double> C;                       // NP x (D + 1) Chebyshev coefficients
+  // optional tables of d ln G / d nu and d ln G / d nu2 (finite differences of the exact composition)
+  std::vector<double> C1, C2;
+  bool withD = false;
+  double lc1_nu = 0, lc1_nu2 = 0;               // d ln c1 / d nu and / d nu2
 
-  void build(double nu_, double nu2_) {
-    nu = nu_; nu2 = nu2_;
+  void build(double nu_, double nu2_, bool withD_ = false) {
+    nu = nu_; nu2 = nu2_; withD = withD_;
     c1 = R::dt(0.0, nu + 1.0, 0) / R::dt(0.0, nu2, 0);    // G(z) = c1 z for small z
     zlo = std::exp(SMIN); zhi = std::exp(SMAX);
     xlo = ast_q(1e-12, nu2); xhi = ast_q(1.0 - 1e-12, nu2);
     C.assign(NP * (D + 1), 0.0);
+    if (withD) { C1.assign(NP * (D + 1), 0.0); C2.assign(NP * (D + 1), 0.0); }
     double node[D + 1], cs[D + 1][D + 1];
     for (int k = 0; k <= D; k++) {
       node[k] = std::cos(M_PI * (k + 0.5) / (D + 1));
@@ -57,7 +62,54 @@ struct AstMap {
         C[p * (D + 1) + j] = 2.0 / (D + 1) * s;
       }
       C[p * (D + 1)] *= 0.5;
+      if (withD) {
+        const double h1 = 1e-4 * nu, h2 = 1e-4 * nu2;
+        double y1[D + 1], y2[D + 1];
+        for (int k = 0; k <= D; k++) {
+          const double z = std::exp(a + (node[k] + 1.0) / 2.0 * W);
+          y1[k] = (std::log(ast_Gexact(z, nu + h1, nu2)) - std::log(ast_Gexact(z, nu - h1, nu2))) / (2.0 * h1);
+          y2[k] = (std::log(ast_Gexact(z, nu, nu2 + h2)) - std::log(ast_Gexact(z, nu, nu2 - h2))) / (2.0 * h2);
+        }
+        for (int j = 0; j <= D; j++) {
+          double s1 = 0.0, s2 = 0.0;
+          for (int k = 0; k <= D; k++) { s1 += y1[k] * cs[j][k]; s2 += y2[k] * cs[j][k]; }
+          C1[p * (D + 1) + j] = 2.0 / (D + 1) * s1;
+          C2[p * (D + 1) + j] = 2.0 / (D + 1) * s2;
+        }
+        C1[p * (D + 1)] *= 0.5;
+        C2[p * (D + 1)] *= 0.5;
+      }
     }
+    if (withD) {
+      lc1_nu = 0.5 * R::digamma((nu + 2.0) / 2.0) - 0.5 * R::digamma((nu + 1.0) / 2.0) - 0.5 / (nu + 1.0);
+      lc1_nu2 = -(0.5 * R::digamma((nu2 + 1.0) / 2.0) - 0.5 * R::digamma(nu2 / 2.0) - 0.5 / nu2);
+    }
+  }
+
+  // G(z) and its derivatives with respect to nu and nu2 (build with withD = true)
+  inline double evalD(double z, double &gnu, double &gnu2) const {
+    if (z < zlo) { const double g = c1 * z; gnu = g * lc1_nu; gnu2 = g * lc1_nu2; return g; }
+    if (z > zhi) {
+      const double g = ast_Gexact(z, nu, nu2), h1 = 1e-4 * nu, h2 = 1e-4 * nu2;
+      gnu = g * (std::log(ast_Gexact(z, nu + h1, nu2)) - std::log(ast_Gexact(z, nu - h1, nu2))) / (2.0 * h1);
+      gnu2 = g * (std::log(ast_Gexact(z, nu, nu2 + h2)) - std::log(ast_Gexact(z, nu, nu2 - h2))) / (2.0 * h2);
+      return g;
+    }
+    const double s = std::log(z);
+    int p = (int)((s - SMIN) / W);
+    if (p > NP - 1) p = NP - 1;
+    const double t = 2.0 * (s - SMIN - p * W) / W - 1.0;
+    const double *c = &C[p * (D + 1)], *d1 = &C1[p * (D + 1)], *d2 = &C2[p * (D + 1)];
+    double b1 = 0.0, b2 = 0.0, e1 = 0.0, e2 = 0.0, f1 = 0.0, f2 = 0.0;
+    for (int j = D; j >= 1; j--) {
+      const double b0 = 2.0 * t * b1 - b2 + c[j]; b2 = b1; b1 = b0;
+      const double e0 = 2.0 * t * e1 - e2 + d1[j]; e2 = e1; e1 = e0;
+      const double f0 = 2.0 * t * f1 - f2 + d2[j]; f2 = f1; f1 = f0;
+    }
+    const double g = std::exp(t * b1 - b2 + c[0]);
+    gnu = g * (t * e1 - e2 + d1[0]);
+    gnu2 = g * (t * f1 - f2 + d2[0]);
+    return g;
   }
 
   inline double eval(double z) const {
