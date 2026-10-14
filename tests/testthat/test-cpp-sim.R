@@ -121,3 +121,21 @@ test_that("predict for d-vine and v-transform models uses the kernel and agrees 
   p2 <- predict(m, u, type = "qf", x = c(0.05, 0.5, 0.95))
   expect_equal(p1, p2, tolerance = 1e-8)
 })
+
+test_that("simulation, Rosenblatt and predictive kernels cover BB1 pairs with rotations", {
+  set.seed(26)
+  for (nm in names(bb1_models())) {
+    m <- bb1_models()[[nm]]
+    m@K <- 10L
+    pr <- dv_resolve(m)
+    expect_false(is.null(dv_encode(pr)))
+    w <- matrix(runif(200 * 2), 200, 2)
+    u <- dv_simulate(pr, w)
+    for (j in 1:2) expect_equal(dv_rosenblatt(pr, u[, j]), w[, j], tolerance = 1e-9, info = nm)
+    expect_equal(u, dv_simulate_r(pr, w), tolerance = 1e-3, info = nm)
+    x <- c(0.1, 0.5, 0.9)
+    for (type in c("df", "qf", "dens")) {
+      expect_equal(dv_predictive(pr, u[, 1], x, type), dv_predictive_r(pr, u[, 1], x, type), tolerance = 1e-7, info = paste(nm, type))
+    }
+  }
+})

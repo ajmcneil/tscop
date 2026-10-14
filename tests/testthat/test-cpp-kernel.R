@@ -419,3 +419,51 @@ test_that("the exact joint gradient covers an armacop copula, and fits agree wit
   expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-3)
   expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-6)
 })
+
+# ---- BB1 -----------------------------------------------------------------------
+
+test_that("the BB1 pair copula is supported by the kernels and equals the R functions", {
+  set.seed(23)
+  for (rot in c(0, 90, 180, 270)) {
+    for (par in list(c(0.5, 1.3), c(2, 1), c(1, 2.5), c(0.1, 1.05))) {
+      p <- list(family = "bb1", rotation = rot, parameters = par)
+      u <- runif(200)
+      expect_false(is.null(dv_encode(list(p, p))))
+      expect_equal(dv_loglik(u, list(p, p)), dv_loglik_r(u, list(p, p)), tolerance = 1e-6, info = paste(rot, par[1], par[2]))
+    }
+  }
+})
+
+test_that("the gradient with respect to the free BB1 parameter equals finite differences", {
+  set.seed(24)
+  for (m in bb1_models()) {
+    m@K <- 10L
+    u <- tssim(m, 600)
+    lay <- dv_layout(m)
+    z0 <- dv_start(m, NULL, u, list())$z0
+    z <- z0 + rnorm(length(z0), 0, 0.03)
+    g <- dv_negll_grad(z, lay, 10L, u)
+    expect_false(is.null(g))
+    fd <- vapply(seq_along(z), function(k) {
+      h <- 1e-6
+      zp <- z; zp[k] <- zp[k] + h
+      zm <- z; zm[k] <- zm[k] - h
+      (dv_negll(zp, lay, 10L, u) - dv_negll(zm, lay, 10L, u)) / (2 * h)
+    }, 1)
+    expect_lt(max(abs(g - fd) / pmax(abs(fd), 1)), 1e-5)
+  }
+})
+
+test_that("a model with a BB1 lag is fitted with the kernel and the exact gradient and agrees with the R fit", {
+  skip_on_cran()
+  set.seed(25)
+  truth <- sdvinecop(arfactcop(lambda = 0.9, w = 0.5), pairs = list(pc("bb1", aux = 1.2)), tail = pc("joe"), maxlag = 10, tautol = 1e-4)
+  u <- tssim(truth, 700)
+  spec <- sdvinecop(arfactcop(order = 1), pairs = list(pc("bb1", aux = 1.1)), tail = pc("joe"), maxlag = 10, tautol = 1e-4)
+  f1 <- tsfit(u, spec, pseudo = FALSE)
+  old <- options(tscop.cpp = FALSE)
+  on.exit(options(old))
+  f2 <- tsfit(u, spec, pseudo = FALSE)
+  expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-3)
+  expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-6)
+})

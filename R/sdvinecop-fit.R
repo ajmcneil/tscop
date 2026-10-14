@@ -139,7 +139,7 @@ dv_negll <- function(z, lay, K, u) {
 # relation for Joe and Frank. Rotated families (90, 270) are calibrated to
 # |tau|, which flips the sign of the derivative for negative tau. ivt = TRUE
 # for the base copulas of IVT levels (tau >= 0).
-dv_dpar_dtau <- function(fam, rot, par, tau, ivt = FALSE) {
+dv_dpar_dtau <- function(fam, rot, par, tau, ivt = FALSE, par2 = NULL) {
   a <- abs(tau)
   out <- numeric(length(par))
   i <- fam == 2L
@@ -152,7 +152,9 @@ dv_dpar_dtau <- function(fam, rot, par, tau, ivt = FALSE) {
   if (any(i)) out[i] <- 1 / joe_tau_d(par[i])$dtau
   i <- fam == 5L
   if (any(i)) out[i] <- 1 / frank_tau_d(abs(par[i]))$dtau
-  flip <- !ivt & tau < 0 & (rot == 90L | rot == 270L) & fam %in% 2:4
+  i <- fam == 6L
+  if (any(i)) out[i] <- 2 / ((1 - a[i])^2 * par2[i])
+  flip <- !ivt & tau < 0 & (rot == 90L | rot == 270L) & fam %in% c(2:4, 6L)
   out[flip] <- -out[flip]
   out
 }
@@ -170,14 +172,16 @@ dv_grad_pieces <- function(z, lay, K) {
   if (!isTRUE(getOption("tscop.cpp", TRUE)) || !isTRUE(getOption("tscop.cppgrad", TRUE))) return(NULL)
   na <- lay$nk
   P <- length(z)
-  if (P < 1L || P > 12L || length(lay$aux_lags) > 0L) return(NULL)
+  if (P < 1L || P > 12L) return(NULL)
   if (any(!is.finite(z)) || (na > 0L && any(abs(z[seq_len(na)]) > lay$ops$zbound)) ||
+      any(abs(z[na + seq_along(lay$aux_lags)]) > 12) ||
       (lay$nvt > 0L && any(abs(z[dv_vt_index(lay)]) > 6))) return(NULL)
   zk <- z[seq_len(na)]
   tau_of <- function(zz) (2 / pi) * asin(lay$ops$pacf(zz, K))
   tau <- tau_of(zk)
   vt <- dv_vt_from_free(z, lay)
-  pairs <- dv_make_pairs_tau(tau, numeric(0), vt, lay, K)
+  aux <- dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam)
+  pairs <- dv_make_pairs_tau(tau, aux, vt, lay, K)
   if (is.null(pairs)) return(NULL)
   e <- dv_encode(pairs)
   if (is.null(e)) return(NULL)
@@ -190,12 +194,22 @@ dv_grad_pieces <- function(z, lay, K) {
     dtau[, k] <- (tau_of(zp) - tau_of(zm)) / (2 * h)
   }
   # d parameter / d tau, lag by lag, analytically from the family's tau-parameter relation
-  dpar_dtau <- dv_dpar_dtau(e$fam, e$rot, e$par, tau, ivt = FALSE)
+  dpar_dtau <- dv_dpar_dtau(e$fam, e$rot, e$par, tau, ivt = FALSE, par2 = e$bpar)
   dbpar_dtau <- dv_dpar_dtau(e$bfam, e$brot, e$bpar, tau, ivt = TRUE)
   dpar_dtau[e$ivt == 1L] <- 0
   dbpar_dtau[e$ivt == 0L] <- 0
   dpar <- dtau * dpar_dtau
   dbpar <- dtau * dbpar_dtau
+  # BB1 pairs: theta = 2 / ((1 - |tau|) delta) - 2 also depends on the free auxiliary parameter
+  # (delta = 1 + exp(z), d delta / dz = delta - 1), and delta itself is the plain level's bpar
+  for (i in seq_along(lay$aux_lags)) {
+    j <- lay$aux_lags[i]
+    if (e$fam[j] == 6L) {
+      dl <- e$bpar[j]
+      dpar[j, na + i] <- -(e$par[j] + 2) / dl * (dl - 1)
+      dbpar[j, na + i] <- dl - 1
+    }
+  }
   dd1 <- dd2 <- numeric(P)
   if (lay$nvt > 0L) {
     iv <- dv_vt_index(lay)

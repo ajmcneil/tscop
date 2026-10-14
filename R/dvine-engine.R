@@ -403,7 +403,7 @@ dv_loglik_r <- function(u, pairs) {
 # otherwise falls back to the R reference implementation dv_loglik_r().
 # options(tscop.cpp = FALSE) forces the R implementation.
 
-.cpp_family_codes <- c(indep = 0L, gauss = 1L, gaussian = 1L, clayton = 2L, gumbel = 3L, joe = 4L, frank = 5L)
+.cpp_family_codes <- c(indep = 0L, gauss = 1L, gaussian = 1L, clayton = 2L, gumbel = 3L, joe = 4L, frank = 5L, bb1 = 6L)
 
 # Integer/double vectors describing the resolved pair copulas for the kernel,
 # or NULL if some pair copula is not supported.
@@ -430,6 +430,8 @@ dv_encode <- function(pairs) {
       fam[j] <- code
       rot[j] <- as.integer(pr$rotation)
       par[j] <- if (length(pr$parameters)) pr$parameters[1L] else 0
+      # the second parameter of a plain BB1 level travels in the (otherwise unused) bpar slot
+      if (code == 6L) bpar[j] <- pr$parameters[2L]
     }
   }
   list(fam = fam, rot = rot, par = par, ivt = ivt, bfam = bfam, brot = brot, bpar = bpar, d1 = d1, d2 = d2)

@@ -13,7 +13,7 @@ const double EPS = 1e-12;       // clamp of the R reference (dv_clamp)
 const double EPS_IN = 1e-10;    // rvinecopulib clamps the arguments of its copula functions at this value
 const int MAXP = 12;            // largest number of derivative directions
 
-enum Family { INDEP = 0, GAUSS = 1, CLAYTON = 2, GUMBEL = 3, JOE = 4, FRANK = 5 };
+enum Family { INDEP = 0, GAUSS = 1, CLAYTON = 2, GUMBEL = 3, JOE = 4, FRANK = 5, BB1 = 6 };
 
 // ---- forward-mode dual numbers with P derivative directions ----------------
 
@@ -153,10 +153,29 @@ inline void frank0(const T &a, const T &b, const T &th, T &lc, T &h1, T &h2) {
   h2 = ev * Pu / D;
 }
 
+// BB1 (Joe's two-parameter Clayton-Gumbel family; th > 0, dl >= 1):
+// C(u, v) = (1 + t)^(-1/th), t = (x^dl + y^dl)^(1/dl), x = u^-th - 1, y = v^-th - 1.
+template <class T>
+inline void bb10(const T &a, const T &b, const T &th, const T &dl, T &lc, T &h1, T &h2) {
+  using std::log; using std::exp; using std::log1p; using std::expm1;
+  const T la = log(a), lb = log(b);
+  const T x = expm1(-th * la), y = expm1(-th * lb);
+  const T lx = log(x), ly = log(y);
+  const T s = exp(dl * lx) + exp(dl * ly);
+  const T ls = log(s);
+  const T t = exp(ls / dl);
+  const T l1t = log1p(t);
+  lc = (dl - 1.0) * (lx + ly) - (th + 1.0) * (la + lb) - (1.0 / th + 2.0) * l1t + (1.0 / dl - 2.0) * ls +
+       log((1.0 + th) * t + th * (dl - 1.0) * (1.0 + t));
+  const T AB = exp(-(1.0 / th + 1.0) * l1t + (1.0 / dl - 1.0) * ls);
+  h1 = AB * exp((dl - 1.0) * lx - (th + 1.0) * la);
+  h2 = AB * exp((dl - 1.0) * ly - (th + 1.0) * lb);
+}
+
 // Pair copula of the given family and rotation (rvinecopulib convention) at
 // (a, b); h-values only if needh.
 template <class T>
-inline void pair_eval(int fam, int rot, const T &th, const T &a, const T &b, bool needh, bool clampout,
+inline void pair_eval(int fam, int rot, const T &th, const T &th2, const T &a, const T &b, bool needh, bool clampout,
                       T &lc, T &h1, T &h2) {
   if (fam == INDEP) { lc = T(0.0); h1 = b; h2 = a; return; }
   const bool fa = (rot == 90 || rot == 180), fb = (rot == 270 || rot == 180);
@@ -167,6 +186,7 @@ inline void pair_eval(int fam, int rot, const T &th, const T &a, const T &b, boo
     case GUMBEL: gumbel0(aa, bb, th, lc, g1, g2); break;
     case JOE: joe0(aa, bb, th, lc, g1, g2); break;
     case FRANK: frank0(aa, bb, th, lc, g1, g2); break;
+    case BB1: bb10(aa, bb, th, th2, lc, g1, g2); break;
     default: stop("unsupported family in the kernel");
   }
   if (needh) {

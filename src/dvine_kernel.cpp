@@ -88,7 +88,7 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
       } else {
         for (int i = 0; i < m; i++) {
           T lc;
-          pair_eval(bfam[j], brot[j], bpar[j], A[i], B[i], !last, true, lc, h1[i], h2[i]);
+          pair_eval(bfam[j], brot[j], bpar[j], bpar[j], A[i], B[i], !last, true, lc, h1[i], h2[i]);
           ll = ll + lc;
         }
         if (!last) {
@@ -106,7 +106,7 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
       }
       for (int i = 0; i < m; i++) {
         T lc;
-        pair_eval(fam[j], rot[j], par[j], A[i], B[i], !last, false, lc, h1[i], h2[i]);
+        pair_eval(fam[j], rot[j], par[j], bpar[j], A[i], B[i], !last, false, lc, h1[i], h2[i]);   // bpar[j]: the second parameter of BB1
         ll = ll + lc;
       }
       if (!last) {

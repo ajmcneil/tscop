@@ -11,26 +11,26 @@ namespace {
 struct Level {
   int fam, rot, bfam, brot;
   bool ivt;
-  double th, bth, d1, d2;
+  double th, th2, bth, d1, d2;   // th2: the second parameter of a plain BB1 level
 };
 
 inline double pn(double x) { return R::pnorm(x, 0, 1, 1, 0); }
 inline double qn(double p) { return R::qnorm(p, 0, 1, 1, 0); }
 
 // h-function of a (non-IVT) pair copula: cv = 1: P(B <= b | A = a), cv = 2: P(A <= a | B = b)
-inline double h_plain(int fam, int rot, double th, double a, double b, int cv) {
+inline double h_plain(int fam, int rot, double th, double th2, double a, double b, int cv) {
   if (fam == GAUSS) {
     const double s = std::sqrt(1.0 - th * th);
     return cv == 1 ? pn((qn(clampin(b)) - th * qn(clampin(a))) / s)
                    : pn((qn(clampin(a)) - th * qn(clampin(b))) / s);
   }
   double lc, h1, h2;
-  pair_eval(fam, rot, th, a, b, true, false, lc, h1, h2);
+  pair_eval(fam, rot, th, th2, a, b, true, false, lc, h1, h2);
   return cv == 1 ? h1 : h2;
 }
 
 // inverse of h(a, .) (cv = 1) of a rotation 0 copula, by closed form or safeguarded Newton
-inline double hinv0(int fam, double th, double a, double p) {
+inline double hinv0(int fam, double th, double th2, double a, double p) {
   a = clampin(a);
   p = clampin(p);
   switch (fam) {
@@ -53,7 +53,7 @@ inline double hinv0(int fam, double th, double a, double p) {
   double lo = EPS_IN, hi = 1.0 - EPS_IN, b = p;
   for (int it = 0; it < 100; it++) {
     double lc, h1, h2;
-    if (fam == GUMBEL) gumbel0(a, b, th, lc, h1, h2); else joe0(a, b, th, lc, h1, h2);
+    if (fam == GUMBEL) gumbel0(a, b, th, lc, h1, h2); else if (fam == JOE) joe0(a, b, th, lc, h1, h2); else bb10(a, b, th, th2, lc, h1, h2);
     const double f = h1 - p;
     if (std::fabs(f) < 1e-15) break;                       // converged: keep b
     if (f > 0) hi = b; else lo = b;
@@ -65,12 +65,12 @@ inline double hinv0(int fam, double th, double a, double p) {
   return b;
 }
 
-inline double hinv_plain(int fam, int rot, double th, double a, double p) {
+inline double hinv_plain(int fam, int rot, double th, double th2, double a, double p) {
   switch (rot) {
-    case 180: return 1.0 - hinv0(fam, th, 1.0 - a, 1.0 - p);
-    case 90: return hinv0(fam, th, 1.0 - a, p);
-    case 270: return 1.0 - hinv0(fam, th, a, 1.0 - p);
-    default: return hinv0(fam, th, a, p);
+    case 180: return 1.0 - hinv0(fam, th, th2, 1.0 - a, 1.0 - p);
+    case 90: return hinv0(fam, th, th2, 1.0 - a, p);
+    case 270: return 1.0 - hinv0(fam, th, th2, a, 1.0 - p);
+    default: return hinv0(fam, th, th2, a, p);
   }
 }
 
@@ -78,32 +78,32 @@ inline double vl(double x, double d) { return vlin(x, d); }
 inline double al(double x, double d) { return alin(x, d); }
 
 inline double lv_h(const Level &L, double a, double b, int cv) {
-  if (!L.ivt) return clampu(h_plain(L.fam, L.rot, L.th, a, b, cv));
+  if (!L.ivt) return clampu(h_plain(L.fam, L.rot, L.th, L.th2, a, b, cv));
   const double x = vl(a, L.d1), y = vl(b, L.d2);
-  const double hb = clampu(h_plain(L.bfam, L.brot, L.bth, x, y, cv));
+  const double hb = clampu(h_plain(L.bfam, L.brot, L.bth, 0.0, x, y, cv));
   return clampu(cv == 1 ? L.d2 - al(b, L.d2) * hb : L.d1 - al(a, L.d1) * hb);
 }
 
 inline double lv_hinv(const Level &L, double a, double p) {
-  if (!L.ivt) return clampu(hinv_plain(L.fam, L.rot, L.th, a, p));
-  const double hb = clampu(hinv_plain(L.bfam, L.brot, L.bth, vl(a, L.d1), vl(p, L.d2)));
+  if (!L.ivt) return clampu(hinv_plain(L.fam, L.rot, L.th, L.th2, a, p));
+  const double hb = clampu(hinv_plain(L.bfam, L.brot, L.bth, 0.0, vl(a, L.d1), vl(p, L.d2)));
   return clampu(L.d2 - al(p, L.d2) * hb);
 }
 
 // copula density of a (non-IVT) pair copula at (a, b)
-inline double dens_plain(int fam, int rot, double th, double a, double b) {
+inline double dens_plain(int fam, int rot, double th, double th2, double a, double b) {
   if (fam == GAUSS) {
     const double x = qn(a), y = qn(b), r2 = th * th;
     return std::exp(-0.5 * std::log1p(-r2) - (r2 * (x * x + y * y) - 2.0 * th * x * y) / (2.0 * (1.0 - r2)));
   }
   double lc, h1, h2;
-  pair_eval(fam, rot, th, a, b, false, false, lc, h1, h2);
+  pair_eval(fam, rot, th, th2, a, b, false, false, lc, h1, h2);
   return std::exp(lc);
 }
 
 inline double lv_dens(const Level &L, double a, double b) {
-  if (!L.ivt) return dens_plain(L.fam, L.rot, L.th, a, b);
-  return dens_plain(L.bfam, L.brot, L.bth, vl(a, L.d1), vl(b, L.d2));
+  if (!L.ivt) return dens_plain(L.fam, L.rot, L.th, L.th2, a, b);
+  return dens_plain(L.bfam, L.brot, L.bth, 0.0, vl(a, L.d1), vl(b, L.d2));
 }
 
 std::vector<Level> make_levels(const IntegerVector &fam, const IntegerVector &rot, const NumericVector &par,
@@ -113,7 +113,7 @@ std::vector<Level> make_levels(const IntegerVector &fam, const IntegerVector &ro
   std::vector<Level> lv(K);
   for (int j = 0; j < K; j++) {
     lv[j].fam = fam[j]; lv[j].rot = rot[j]; lv[j].th = par[j];
-    lv[j].ivt = ivt[j] != 0; lv[j].bfam = bfam[j]; lv[j].brot = brot[j]; lv[j].bth = bpar[j];
+    lv[j].ivt = ivt[j] != 0; lv[j].bfam = bfam[j]; lv[j].brot = brot[j]; lv[j].bth = bpar[j]; lv[j].th2 = bpar[j];
     lv[j].d1 = d1; lv[j].d2 = d2;
   }
   return lv;
