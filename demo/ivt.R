@@ -7,10 +7,12 @@
 # non-negative (here an AR-factor kpacf). Run with
 #   demo("ivt", package = "tscop")   or
 #   devtools::load_all(); source("demo/ivt.R", echo = TRUE)
-# It takes about two minutes.
+# It takes about half a minute: the likelihood, its exact gradient, the simulation and the
+# prediction run in compiled code (see demo("speed", package = "tscop")).
 
 if (!("package:tscop" %in% search())) library(tscop)
 set.seed(2029)
+ncores <- if (.Platform$OS.type == "windows") 1L else max(1L, parallel::detectCores() - 1L)   # processes for the bootstrap refits
 op <- par(no.readonly = TRUE)
 section <- function(title) cat("\n\n==== ", title, " ====\n\n", sep = "")
 
@@ -31,9 +33,12 @@ plot(gauss[-3000], gauss[-1], pch = 20, cex = 0.4, xlab = "u[t]", ylab = "u[t+1]
 par(op)
 
 # ---------------------------------------------------------------------------
-section("2. The four base copulas")
-par(mfrow = c(2, 2))
-for (b in c("ast", "joe", "gumbel", "clayton180")) {
+section("2. The base copulas")
+# ast, joe, gumbel and clayton180 have upper tail dependence; frank has none and gauss is the
+# cheapest. (Fulcrum estimates are regular for joe, clayton180 and frank; for gumbel and gauss
+# the likelihood has cusps at the observations, see ?pc.)
+par(mfrow = c(2, 3))
+for (b in c("ast", "joe", "gumbel", "clayton180", "frank", "gauss")) {
   m <- sdvinecop(kp, tail = pc("ivt", base = b), vt = c(0.5, 0.5), tautol = 1e-3)
   x <- tssim(m, 2500)
   plot(x[-2500], x[-1], pch = 20, cex = 0.4, xlab = "u[t]", ylab = "u[t+1]", main = b)
@@ -50,9 +55,9 @@ sim_garch <- function(n, a0 = 0.1, a1 = 0.3, b1 = 0.6, df = 4, burn = 1000) {
   for (t in seq_along(x)) { x[t] <- sqrt(s2) * eps[t]; s2 <- a0 + a1 * x[t]^2 + b1 * s2 }
   x[-(1:burn)]
 }
-x <- sim_garch(2500)
+x <- sim_garch(10000)                         # the length used in the paper
 pobs <- rank(x) / (length(x) + 1)             # pseudo-observations
-spec <- sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "ast"), maxlag = 20, tautol = 1e-3)
+spec <- sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "ast"), maxlag = 40, tautol = 1e-3)
 t0 <- Sys.time()
 fit <- tsfit(pobs, spec, pseudo = TRUE)
 fit
@@ -104,4 +109,8 @@ predict(fit, type = "qf", x = c(0.01, 0.05, 0.5, 0.95, 0.99))
 section("6. Standard errors")
 fit_h <- tsfit(pobs, spec, pseudo = TRUE, se = "hessian")
 fit_h
+# The parametric bootstrap (the recommended standard errors) with 100 replicates: each one is
+# simulated from the fitted model, re-ranked (pseudo = TRUE) and refitted from the fitted values.
+system.time(fit_b <- tsfit(pobs, spec, pseudo = TRUE, se = "bootstrap", B = 100, cores = ncores))
+rbind(hessian = fit_h@se, bootstrap = fit_b@se)
 cat("\nEnd of demo.\n")

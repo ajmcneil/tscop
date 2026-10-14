@@ -5,3 +5,4 @@ ivt        Inverse-v-transformed pair copulas in d-vines for stochastic volatili
 vtscop     Process-level v-transform copula processes: any udp v-transform on an arfactcop or d-vine base, simulation, fitting with standard errors, residuals, prediction
 marg       Parametric margins: gauss, laplace, slaplace, st, sst, jsu, nig, hyp, gh; simulation, fitting with standard errors, fixed parameters, residuals, automatic selection among the families (automarg), empirical margins (emarg)
 tsmod      Full time series models: a margin and a copula process; simulation, two-stage and semiparametric estimation, residuals, prediction and risk measures (tsrisk), choosing the margin, volatile series with a v-transform copula
+speed      Compiled kernels: the supported pair copulas, fits with and without the compiled likelihood, exact gradients, simulation of IVT-ast series, bootstrap standard errors on several cores, joint maximum likelihood

@@ -2,10 +2,13 @@
 # an ARMA kpacf and non-Gaussian pair copulas. Run it with
 #   demo("sdvinecop", package = "tscop")      (after installing tscop), or
 #   devtools::load_all(); source("demo/sdvinecop.R", echo = TRUE)
-# from the source folder. It produces several plots and takes about a minute.
+# from the source folder. It produces several plots and takes about ten seconds
+# (the likelihood, its gradient, the simulation and the bootstrap run in compiled code;
+# see demo("speed", package = "tscop")).
 
 if (!("package:tscop" %in% search())) library(tscop)
 set.seed(2027)
+ncores <- if (.Platform$OS.type == "windows") 1L else max(1L, parallel::detectCores() - 1L)   # processes for the bootstrap refits
 op <- par(no.readonly = TRUE)
 
 section <- function(title) cat("\n\n==== ", title, " ====\n\n", sep = "")
@@ -84,7 +87,7 @@ predict(mod, u, type = "qf", x = c(0.05, 0.5, 0.95))   # predictive quantiles
 
 # ---------------------------------------------------------------------------
 section("5. Fitting a specified model (tsfit)")
-u <- tssim(mod, 800)
+u <- tssim(mod, 3000)                         # a series of realistic length
 spec <- sdvinecop(armacop(order = c(1, 1)),
                  pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270), pc("t", aux = 5)))
 t0 <- Sys.time()
@@ -102,9 +105,10 @@ c(dvine = AIC(fit), gaussian = AIC(gfit))
 section("6. Standard errors")
 fit_h <- tsfit(u, spec, pseudo = FALSE, se = "hessian")
 fit_h
-# Parametric bootstrap (B = 30 here; use 200 or more). Replicates are simulated
-# together and refitted from the fitted values with K fixed.
-fit_b <- tsfit(u, spec, pseudo = FALSE, se = "bootstrap", B = 30)
+# Parametric bootstrap with B = 200 replicates, simulated together and refitted from
+# the fitted values with K fixed (the refits run on several cores; the results do not
+# depend on the number of cores).
+system.time(fit_b <- tsfit(u, spec, pseudo = FALSE, se = "bootstrap", B = 200, cores = ncores))
 rbind(hessian = fit_h@se, bootstrap = fit_b@se)
 # The bootstrap is recommended: Hessian standard errors are unreliable where a
 # rotated copula switches rotation (tau near 0), at the boundary of a BB1
@@ -120,7 +124,7 @@ section("7. Automatic selection of the pair copulas (autodvinecop)")
 # to estimate the kpacf well rather than to identify every family.)
 gauss <- tsfit(u, armacop(order = c(1, 1)), pseudo = FALSE)
 t0 <- Sys.time()
-auto <- autodvinecop(u, gauss, nreplace = 5, aux = "t", pseudo = FALSE)
+auto <- autodvinecop(u, gauss, nreplace = 8, aux = "t", pseudo = FALSE)
 cat("search took", format(round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 1)), "seconds\n")
 auto@path
 c(gaussian = AIC(gfit), selected = AIC(auto), true_structure = AIC(fit))
@@ -153,7 +157,7 @@ uts <- ts(u, start = c(2010, 1), frequency = 12)
 fit_ts <- tsfit(uts, spec, pseudo = FALSE)
 head(resid(fit_ts))          # the time index is carried to the residuals
 # Refit the same structure to new data, starting from the previous estimates:
-system.time(tsfit(tssim(fit@model, 800), fit@model, pseudo = FALSE))
+system.time(tsfit(tssim(fit@model, 3000), fit@model, pseudo = FALSE))
 # Simulate from the fitted model
 head(tssim(fit, 5))
 

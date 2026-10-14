@@ -82,8 +82,8 @@ fit_h
 vcov(fit_h)
 
 # se = "bootstrap": parametric bootstrap, re-ranking the simulated data when
-# pseudo = TRUE (B = 40 here to keep the demo quick; use B = 200 or more).
-fit_b <- tsfit(u, armacop(order = c(1, 1)), pseudo = FALSE, se = "bootstrap", B = 40)
+# pseudo = TRUE (B = 200 replicates, which takes a second or two).
+system.time(fit_b <- tsfit(u, armacop(order = c(1, 1)), pseudo = FALSE, se = "bootstrap", B = 200))
 fit_b
 rbind(hessian = fit_h@se, bootstrap = fit_b@se)
 

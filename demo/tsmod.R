@@ -37,7 +37,7 @@ c(logLik = as.numeric(logLik(fit)), AIC = AIC(fit), BIC = BIC(fit))
 # standard errors of the copula parameters (cores > 1 runs the refits in parallel;
 # here all but one of the available cores are used, and one core on Windows).
 ncores <- if (.Platform$OS.type == "windows") 1L else max(1L, parallel::detectCores() - 1L)
-fitse <- tsfit(x, tsmod("sst", arfactcop(order = 1)), se = "bootstrap", B = 40, cores = ncores)
+system.time(fitse <- tsfit(x, tsmod("sst", arfactcop(order = 1)), se = "bootstrap", B = 200, cores = ncores))
 round(cbind(estimate = fitse@estimate, se = fitse@se), 4)
 
 section("3. Residual diagnostics")

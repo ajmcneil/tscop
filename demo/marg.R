@@ -31,7 +31,7 @@ section("2. Fitting with standard errors")
 fit <- tsfit(x, marg("sst"), se = "hessian")
 fit
 rbind(true = m@pars, estimate = fit@model@pars)
-fitb <- tsfit(x, marg("sst"), se = "bootstrap", B = 50)   # parametric bootstrap
+fitb <- tsfit(x, marg("sst"), se = "bootstrap", B = 200)   # parametric bootstrap
 round(cbind(hessian = fit@se, bootstrap = fitb@se), 4)
 
 section("3. Fixed parameters")
