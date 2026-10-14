@@ -45,6 +45,20 @@ mg_jsu <- list(
   q = function(u, s, lt) sinh((stats::qnorm(u, lower.tail = lt) - s[["gamma"]]) / s[["delta"]])
 )
 
+# Sinh-arcsinh (Jones and Pewsey 2009): y = (x - mu) / sigma satisfies
+# sinh(delta asinh(y) - eps) ~ N(0, 1), with delta > 0 (tail weight: the tails are
+# stretched exponential, about exp(-c |y|^(2 delta)), so delta = 1 is Gaussian, delta = 1/2
+# is Laplace-like and smaller values are heavier) and eps real (skewness).
+mg_sas <- list(
+  ld = function(y, s) {
+    d <- s[["delta"]]
+    w <- d * asinh(y) - s[["eps"]]
+    log(d) + log(cosh(w)) - 0.5 * log1p(y^2) + stats::dnorm(sinh(w), log = TRUE)
+  },
+  p = function(y, s, lt) stats::pnorm(sinh(s[["delta"]] * asinh(y) - s[["eps"]]), lower.tail = lt),
+  q = function(u, s, lt) sinh((asinh(stats::qnorm(u, lower.tail = lt)) + s[["eps"]]) / s[["delta"]])
+)
+
 # Normal inverse Gaussian: z = skew * W + sqrt(W) * N with W inverse Gaussian of
 # mean 1 and shape `shape`, so that, with a = shape and r = skew, the density of z is
 #   sqrt(a (a + r^2)) / pi * exp(a + r z) K_1(sqrt((a + r^2)(a + z^2))) / sqrt(a + z^2)
@@ -242,6 +256,10 @@ mg_robust <- function(x) {
       c(mu = th[["mu"]], sigma = th[["sigma"]] / sqrt(v), delta = d, gamma = 0)
     },
     description = "Johnson SU"),
+  sas = mg_fam("sas", c("mu", "sigma", "delta", "eps"), c("real", "pos", "pos", "real"), mg_sas,
+    start = function(x) c(mu = mean(x), sigma = stats::sd(x), delta = 1, eps = 0),
+    parent = "gauss", from_parent = function(th) c(th, delta = 1, eps = 0),
+    description = "sinh-arcsinh"),
   nig = mg_fam("nig", c("mu", "sigma", "shape", "skew"), c("real", "pos", "pos", "real"), mg_nig,
     start = function(x) {
       m <- mean(x)
