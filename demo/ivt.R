@@ -7,7 +7,7 @@
 # non-negative (here an AR-factor kpacf). Run with
 #   demo("ivt", package = "tscop")   or
 #   devtools::load_all(); source("demo/ivt.R", echo = TRUE)
-# It takes about half a minute: the likelihood, its exact gradient, the simulation and the
+# It takes about 45 seconds: the likelihood, its exact gradient, the simulation and the
 # prediction run in compiled code (see demo("speed", package = "tscop")).
 
 if (!("package:tscop" %in% search())) library(tscop)
@@ -80,6 +80,13 @@ cfit <- tsfit(pobs, sdvinecop(arfactcop(order = 1), vtpar = "common", maxlag = 2
 sfit <- tsfit(pobs, sdvinecop(arfactcop(order = 1), vtpar = "none", maxlag = 20, tautol = 1e-3,
                              tail = pc("ivt", base = "ast")), pseudo = TRUE)       # fulcrums fixed at 0.5
 c(gaussian = AIC(gfit), ivt_both = AIC(fit), ivt_common = AIC(cfit), ivt_fixed = AIC(sfit))
+
+# ---------------------------------------------------------------------------
+section("4b. Empirical Kendall partial autocorrelations")
+# For IVT models the generalised-lagged pairs are v-transformed, so the diagnostic is on the scale
+# of the base copulas, where the kpacf lives; the band is simulated from the fitted model.
+kh <- ktauhat(fit, lagmax = 30, B = 50, cores = ncores)
+round(kh[c(1:5, 10, 20, 30), ], 3)
 
 # ---------------------------------------------------------------------------
 section("5. Diagnostics and one-step predictive distributions")

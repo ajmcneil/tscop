@@ -2,7 +2,7 @@
 # an ARMA kpacf and non-Gaussian pair copulas. Run it with
 #   demo("sdvinecop", package = "tscop")      (after installing tscop), or
 #   devtools::load_all(); source("demo/sdvinecop.R", echo = TRUE)
-# from the source folder. It produces several plots and takes about ten seconds
+# from the source folder. It produces several plots and takes about twenty seconds
 # (the likelihood, its gradient, the simulation and the bootstrap run in compiled code;
 # see demo("speed", package = "tscop")).
 
@@ -113,6 +113,21 @@ rbind(hessian = fit_h@se, bootstrap = fit_b@se)
 # The bootstrap is recommended: Hessian standard errors are unreliable where a
 # rotated copula switches rotation (tau near 0), at the boundary of a BB1
 # copula's feasible region, and for pseudo-observations.
+
+# ---------------------------------------------------------------------------
+section("6b. Diagnostics: empirical Kendall partial autocorrelations (ktauhat)")
+# The data's partial dependence at each lag, conditioning on the in-between values through the
+# model's own pair copulas, against the model's kpacf. The band is the 95% interval of the same
+# statistic for B series simulated from the model (parameter uncertainty is not included).
+kh <- ktauhat(fit, lagmax = 12, B = 200, cores = ncores)
+round(kh, 3)
+matplot(kh$lag, kh[, c("lo", "hi")], type = "l", lty = 2, col = "gray50", ylim = range(kh[, -c(1, 4)]),
+        xlab = "lag", ylab = "Kendall's tau", main = "empirical vs model kpacf")
+points(kh$lag, kh$tau_data, pch = 19)
+lines(kh$lag, kh$tau_model, col = 2, lwd = 2)
+# A misspecified model is flagged: a smaller AR coefficient than the data's
+bad <- sdvinecop(armacop(ar = 0.2, ma = 0.4), pairs = list(pc("gumbel"), pc("clayton", pos = 180, neg = 270), pc("t", aux = 5)))
+round(ktauhat(bad, u, lagmax = 6, B = 100, cores = ncores), 3)
 
 # ---------------------------------------------------------------------------
 section("7. Automatic selection of the pair copulas (autodvinecop)")

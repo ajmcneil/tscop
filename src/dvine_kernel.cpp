@@ -8,6 +8,7 @@
 // log-likelihood and its gradient (see pair.h).
 #include "pair.h"
 #include "ast.h"
+#include "kendall.h"
 #include <type_traits>
 
 namespace {
@@ -106,7 +107,8 @@ template <int P> inline Dual<P> ast_exit(const Dual<P> &z, const Dual<P> &nu) {
 template <class T>
 T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const IntegerVector &rot,
               const std::vector<T> &par, const IntegerVector &ivt, const IntegerVector &bfam,
-              const IntegerVector &brot, const std::vector<T> &bpar, const T &d1, const T &d2) {
+              const IntegerVector &brot, const std::vector<T> &bpar, const T &d1, const T &d2,
+              std::vector<double> *tau_out = nullptr) {
   using std::sqrt; using std::log1p;
   const int n = udat.size();
   const int K = std::min<int>(fam.size(), n - 1);
@@ -119,6 +121,13 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
   T ll(0.0);
   for (int j = 0; j < K; j++) {
     const bool last = (j == K - 1);
+    // Kendall's tau of the pairs fed to pair copula j, on the scale the arrays hold (normal scores, t
+    // scale or base scale: tau is invariant to increasing transformations of each margin)
+    auto rec = [&]() {
+      if constexpr (std::is_same<T, double>::value) {
+        if (tau_out) (*tau_out)[j] = kendall_tau_b(A.data(), B.data(), m);
+      }
+    };
     if (bs && !ivt[j]) {
       if (zb) {
         for (int i = 0; i < m; i++) { A[i] = pnorm_(A[i]); B[i] = pnorm_(B[i]); }
@@ -150,6 +159,7 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
         }
         const T nu = ivt[j] ? bpar[j] : par[j];
         if (!ts) for (int i = 0; i < m; i++) { A[i] = ast_entry(A[i], nu); B[i] = ast_entry(B[i], nu); }
+        rec();
         // log density: lgamma terms once, three log1p per pair
         const T c0 = lgamma_((nu + 2.0) / 2.0) - 2.0 * lgamma_((nu + 1.0) / 2.0) + lgamma_(nu / 2.0);
         const T e1 = -(nu + 2.0) / 2.0, e2 = (nu + 1.0) / 2.0;
@@ -186,6 +196,7 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
         if (zs) { for (int i = 0; i < m; i++) { A[i] = pnorm_(A[i]); B[i] = pnorm_(B[i]); } zs = false; }
         const T rho = par[j], nu = bpar[j];
         if (!ts) for (int i = 0; i < m; i++) { A[i] = tc_entry(A[i], nu); B[i] = tc_entry(B[i], nu); }
+        rec();
         const T omr = 1.0 - rho * rho;
         const T c0 = lgamma_((nu + 2.0) / 2.0) + lgamma_(nu / 2.0) - 2.0 * lgamma_((nu + 1.0) / 2.0) - 0.5 * log1p(-rho * rho);
         const T e1 = -(nu + 2.0) / 2.0, e2 = (nu + 1.0) / 2.0;
@@ -219,6 +230,7 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
         for (int i = 0; i < m; i++) { A[i] = qnorm_(A[i]); B[i] = qnorm_(B[i]); }
         zs = true;
       }
+      rec();
       const T rho = par[j];
       const T s = sqrt(1.0 - rho * rho);
       for (int i = 0; i < m; i++) ll = ll + gauss_ll(A[i], B[i], rho);
@@ -251,6 +263,7 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
         for (int i = 0; i < m; i++) { A[i] = pnorm_(A[i]); B[i] = pnorm_(B[i]); }
         zb = false;
       }
+      rec();
       if (gb) {
         const T rho = bpar[j];
         const T s = sqrt(1.0 - rho * rho);
@@ -281,6 +294,7 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
         for (int i = 0; i < m; i++) { A[i] = pnorm_(A[i]); B[i] = pnorm_(B[i]); }
         zs = false;
       }
+      rec();
       for (int i = 0; i < m; i++) {
         T lc;
         pair_eval(fam[j], rot[j], par[j], bpar[j], A[i], B[i], !last, false, lc, h1[i], h2[i]);   // bpar[j]: the second parameter of BB1
@@ -358,4 +372,18 @@ List dv_loglik_grad_cpp(NumericVector u, NumericMatrix du, IntegerVector fam, In
 #undef CASE
     default: stop("the kernel gradient supports 1 to 12 directions");
   }
+}
+
+// Kendall's tau of the level pairs of the d-vine recursion (the empirical Kendall partial
+// autocorrelations given the pair copulas): element j is the tau of the pairs fed to pair copula
+// j + 1, NA beyond the last level the data length allows.
+// [[Rcpp::export]]
+NumericVector dv_level_tau_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par,
+                               IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar,
+                               double d1, double d2) {
+  std::vector<double> p(par.begin(), par.end()), bp(bpar.begin(), bpar.end());
+  const std::vector<double> ud(u.begin(), u.end());
+  std::vector<double> tau(fam.size(), NA_REAL);
+  loglik_impl<double>(ud, fam, rot, p, ivt, bfam, brot, bp, d1, d2, &tau);
+  return wrap(tau);
 }

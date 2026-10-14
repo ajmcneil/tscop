@@ -25,6 +25,10 @@ dv_loglik_grad_cpp <- function(u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar
     .Call(`_tscop_dv_loglik_grad_cpp`, u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2)
 }
 
+dv_level_tau_cpp <- function(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
+    .Call(`_tscop_dv_level_tau_cpp`, u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2)
+}
+
 dv_simulate_cpp <- function(w, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
     .Call(`_tscop_dv_simulate_cpp`, w, fam, rot, par, ivt, bfam, brot, bpar, d1, d2)
 }
@@ -35,6 +39,10 @@ dv_rosenblatt_cpp <- function(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
 
 dv_predictive_cpp <- function(u, x, type, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
     .Call(`_tscop_dv_predictive_cpp`, u, x, type, fam, rot, par, ivt, bfam, brot, bpar, d1, d2)
+}
+
+kendall_tau_cpp <- function(x, y) {
+    .Call(`_tscop_kendall_tau_cpp`, x, y)
 }
 
 joe_tau_cpp <- function(theta, c) {

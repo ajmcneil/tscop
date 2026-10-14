@@ -77,5 +77,6 @@ Collate:
     'tsmod.R'
     'tsmod-joint.R'
     'tsmod-predict.R'
+    'ktauhat.R'
     'tscop-package.R'
     'RcppExports.R'
