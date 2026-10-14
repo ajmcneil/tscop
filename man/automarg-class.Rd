@@ -17,7 +17,7 @@ Result of \code{automarg}
 \item{\code{fits}}{list of the fitted \link[=margfit-class]{margfit} models of the families that
 could be fitted.}
 
-\item{\code{criterion}}{\code{"AIC"} or \code{"BIC"}.}
+\item{\code{criterion}}{\code{"AIC"}, \code{"BIC"} or \code{"AICc"}.}
 
 \item{\code{data}}{the data used.}
 }}

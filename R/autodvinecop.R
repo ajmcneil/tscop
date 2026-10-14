@@ -8,7 +8,7 @@ dv_ic <- function(loglik, npar, nobs, criterion) {
   switch(criterion,
     AIC = -2 * loglik + 2 * npar,
     BIC = -2 * loglik + log(nobs) * npar,
-    AICc = -2 * loglik + 2 * npar + 2 * npar * (npar + 1) / (nobs - npar - 1)
+    AICc = ic_aicc(loglik, npar, nobs)
   )
 }
 

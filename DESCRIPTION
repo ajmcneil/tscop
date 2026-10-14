@@ -71,6 +71,7 @@ Collate:
     'marg-numerics.R'
     'marg-families.R'
     'marg.R'
+    'aicc.R'
     'marg-fit.R'
     'emarg.R'
     'automarg.R'

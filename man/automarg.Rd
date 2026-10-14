@@ -8,7 +8,7 @@ automarg(
   x,
   families = names(.marg_families),
   fix = NULL,
-  criterion = c("AIC", "BIC"),
+  criterion = c("AIC", "BIC", "AICc"),
   se = FALSE,
   B = 200,
   control = list()
@@ -25,7 +25,7 @@ available families (\code{"gauss"}, \code{"laplace"}, \code{"slaplace"}, \code{"
 family that has the parameter, for example \code{c(mu = 0)} for zero-mean
 margins.}
 
-\item{criterion}{\code{"AIC"} (default) or \code{"BIC"}.}
+\item{criterion}{\code{"AIC"} (default), \code{"BIC"} or \code{"AICc"}.}
 
 \item{se}{standard errors for the selected model only: \code{FALSE} (default),
 \code{"hessian"} or \code{"bootstrap"}.}
@@ -37,13 +37,13 @@ margins.}
 \value{
 An object of class \link[=automarg-class]{automarg}: the selected \link[=margfit-class]{margfit} model
 (\verb{@best}), a ranking table of the families (\verb{@table}: log-likelihood, number
-of parameters, AIC, BIC, the difference from the best criterion value and the
+of parameters, AIC, BIC, AICc, the difference from the best criterion value and the
 convergence code; failures show \code{NA}), all the fits (\verb{@fits}) and the
 criterion used.
 }
 \description{
-Fits several parametric margin families to the data and ranks them by AIC or
-BIC. The families are fitted in order of nesting, and each fit starts from the
+Fits several parametric margin families to the data and ranks them by AIC,
+BIC or AICc. The families are fitted in order of nesting, and each fit starts from the
 estimates of its nested parent family when that is among the families
 (Gaussian -> Student t -> skew Student t; Gaussian -> Johnson SU; NIG -> generalised hyperbolic; Laplace -> skew Laplace), which makes
 the larger families easier to estimate. Families that fail to fit are
