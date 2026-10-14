@@ -100,6 +100,7 @@ c(Kstart = fit@Kstart, K = fit@model@K, refits = fit@nrefit)
 # Compare with the Gaussian ARMA copula (AIC counts the t degrees of freedom)
 gfit <- tsfit(u, sdvinecop(armacop(order = c(1, 1))), pseudo = FALSE)
 c(dvine = AIC(fit), gaussian = AIC(gfit))
+AICc(fit, gfit)                # AIC, BIC and the small-sample AICc are available for every fitted class
 
 # ---------------------------------------------------------------------------
 section("6. Standard errors")

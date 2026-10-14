@@ -1,7 +1,7 @@
 #' Automatic selection of a parametric margin
 #'
-#' Fits several parametric margin families to the data and ranks them by AIC or
-#' BIC. The families are fitted in order of nesting, and each fit starts from the
+#' Fits several parametric margin families to the data and ranks them by AIC,
+#' BIC or AICc. The families are fitted in order of nesting, and each fit starts from the
 #' estimates of its nested parent family when that is among the families
 #' (Gaussian -> Student t -> skew Student t; Gaussian -> Johnson SU; NIG -> generalised hyperbolic; Laplace -> skew Laplace), which makes
 #' the larger families easier to estimate. Families that fail to fit are
@@ -14,7 +14,7 @@
 #' @param fix a named numeric vector of parameter values held fixed in every
 #'   family that has the parameter, for example `c(mu = 0)` for zero-mean
 #'   margins.
-#' @param criterion `"AIC"` (default) or `"BIC"`.
+#' @param criterion `"AIC"` (default), `"BIC"` or `"AICc"`.
 #' @param se standard errors for the selected model only: `FALSE` (default),
 #'   `"hessian"` or `"bootstrap"`.
 #' @param B number of bootstrap replicates for `se = "bootstrap"`.
@@ -22,7 +22,7 @@
 #'
 #' @return An object of class [automarg-class]: the selected [margfit-class] model
 #'   (`@best`), a ranking table of the families (`@table`: log-likelihood, number
-#'   of parameters, AIC, BIC, the difference from the best criterion value and the
+#'   of parameters, AIC, BIC, AICc, the difference from the best criterion value and the
 #'   convergence code; failures show `NA`), all the fits (`@fits`) and the
 #'   criterion used.
 #' @export
@@ -30,7 +30,7 @@
 #' set.seed(1)
 #' x <- tssim(marg("st", c(mu = 0, sigma = 1, df = 4)), 1000)
 #' automarg(x)
-automarg <- function(x, families = names(.marg_families), fix = NULL, criterion = c("AIC", "BIC"),
+automarg <- function(x, families = names(.marg_families), fix = NULL, criterion = c("AIC", "BIC", "AICc"),
                      se = FALSE, B = 200, control = list()) {
   criterion <- match.arg(criterion)
   if (!is.numeric(x)) stop("the data must be numeric", call. = FALSE)
@@ -84,6 +84,7 @@ automarg <- function(x, families = names(.marg_families), fix = NULL, criterion 
   )
   tab$AIC <- -2 * tab$loglik + 2 * tab$npar
   tab$BIC <- -2 * tab$loglik + log(length(x)) * tab$npar
+  tab$AICc <- ic_aicc(tab$loglik, tab$npar, length(x))
   crit <- tab[[criterion]]
   if (all(is.na(crit))) stop("no family could be fitted: ", paste(unique(notes[notes != ""]), collapse = "; "), call. = FALSE)
   tab$delta <- crit - min(crit, na.rm = TRUE)
@@ -106,7 +107,7 @@ automarg <- function(x, families = names(.marg_families), fix = NULL, criterion 
 #' @slot table data frame ranking the families.
 #' @slot fits list of the fitted [margfit-class] models of the families that
 #'   could be fitted.
-#' @slot criterion `"AIC"` or `"BIC"`.
+#' @slot criterion `"AIC"`, `"BIC"` or `"AICc"`.
 #' @slot data the data used.
 #'
 #' @exportClass automarg
