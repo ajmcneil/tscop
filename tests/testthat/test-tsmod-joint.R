@@ -103,13 +103,9 @@ test_that("the exact joint gradient equals finite differences (d-vine, IVT and v
   }
 })
 
-test_that("Gaussian copulas have no exact joint gradient and joint fits with the gradient agree with differences", {
+test_that("joint fits with the exact gradient agree with fits by differences", {
   skip_on_cran()
   set.seed(13)
-  x0 <- tssim(tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)), arfactcop(lambda = 0.9, w = 0.5)), 400)
-  f0 <- tsfit(x0, tsmod("st", arfactcop(order = 1)))
-  jt0 <- tm_joint_setup(f0@model@margin, f0@model@copula, x0)
-  expect_null(jt0$gradient(jt0$theta0, x0))
   kp <- arfactcop(lambda = 0.9, w = 0.5)
   tru <- tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)),
                sdvinecop(kp, pairs = list(pc("gumbel")), tail = pc("joe"), maxlag = 10, tautol = 1e-4))

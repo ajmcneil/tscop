@@ -95,6 +95,7 @@ vt_negll <- function(z, L, K, u) {
 # kernel as derivatives of the data. NULL if the kernel does not apply (a
 # Gaussian base, unsupported pair copulas, more than 12 free parameters).
 vt_negll_grad <- function(z, L, K, u, du = NULL) {
+  if (L$kind == "afc") return(vt_negll_grad_afc(z, L, u, du))
   if (L$kind != "dvine" || anyNA(K)) return(NULL)
   nb <- L$nb
   nv <- length(L$free)
@@ -132,6 +133,45 @@ vt_negll_grad <- function(z, L, K, u, du = NULL) {
                           e$d1, e$d2, c(numeric(nx), g$dd1, numeric(nv)), c(numeric(nx), g$dd2, numeric(nv)))
   if (!is.finite(r$value) || any(!is.finite(r$gradient))) return(NULL)
   -r$gradient
+}
+
+# The same for an arfactcop base: the base is a Gaussian copula, so the objective is
+# the Kalman log-likelihood of x = qnorm(v) plus the sum of log phi(x); the
+# derivatives of x along the free v-transform parameters (and the extra data
+# directions du) go through the filter as derivatives of the data.
+vt_negll_grad_afc <- function(z, L, u, du = NULL) {
+  if (anyNA(u)) return(NULL)
+  nb <- L$nb
+  nv <- length(L$free)
+  nx <- if (is.null(du)) 0L else ncol(du)
+  zv <- z[nb + seq_len(nv)]
+  if (any(!is.finite(z)) || (nv > 0L && any(abs(zv) > 8))) return(NULL)
+  p <- vt_pars_from_free(zv, L)
+  vt <- vt_build(L$vtname, p)
+  v <- vt_transform_data(vt, u)
+  if (anyNA(v)) return(NULL)
+  x <- stats::qnorm(v)
+  P <- nx + nb + nv
+  dvm <- matrix(0, length(u), P)
+  if (nx > 0L) {
+    h <- 1e-6
+    up <- pmin(u + h, 1 - 1e-12)
+    um <- pmax(u - h, 1e-12)
+    dvm[, seq_len(nx)] <- (vt_transform_data(vt, up) - vt_transform_data(vt, um)) / (up - um) * du
+  }
+  for (k in seq_len(nv)) {
+    nm <- L$free[k]
+    th <- p[[nm]]
+    h <- 1e-6
+    pp <- p; pp[[nm]] <- th + h
+    pm <- p; pm[[nm]] <- th - h
+    dv <- (vt_transform_data(vt_build(L$vtname, pp), u) - vt_transform_data(vt_build(L$vtname, pm), u)) / (2 * h)
+    dvm[, nx + nb + k] <- dv * (if (nm == "delta") th * (1 - th) else th)
+  }
+  dx <- dvm / stats::dnorm(x)
+  g <- afc_negll_grad(z[seq_len(nb)], L$m, L$noise, x, dx, before = nx, after = nv)
+  if (is.null(g)) return(NULL)
+  g - colSums(x * dx)
 }
 
 # Gradient for optim(): exact where available, otherwise central differences of vt_negll.

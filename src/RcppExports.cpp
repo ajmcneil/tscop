@@ -10,6 +10,40 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// afc_loglik_cpp
+double afc_loglik_cpp(NumericVector x, NumericVector lambda, NumericVector w, double w0, double tol);
+RcppExport SEXP _tscop_afc_loglik_cpp(SEXP xSEXP, SEXP lambdaSEXP, SEXP wSEXP, SEXP w0SEXP, SEXP tolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type w(wSEXP);
+    Rcpp::traits::input_parameter< double >::type w0(w0SEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    rcpp_result_gen = Rcpp::wrap(afc_loglik_cpp(x, lambda, w, w0, tol));
+    return rcpp_result_gen;
+END_RCPP
+}
+// afc_loglik_grad_cpp
+List afc_loglik_grad_cpp(NumericVector x, NumericMatrix dx, NumericVector lambda, NumericMatrix dlam, NumericVector w, NumericMatrix dw, double w0, NumericVector dw0, double tol);
+RcppExport SEXP _tscop_afc_loglik_grad_cpp(SEXP xSEXP, SEXP dxSEXP, SEXP lambdaSEXP, SEXP dlamSEXP, SEXP wSEXP, SEXP dwSEXP, SEXP w0SEXP, SEXP dw0SEXP, SEXP tolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type dx(dxSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type dlam(dlamSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type w(wSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type dw(dwSEXP);
+    Rcpp::traits::input_parameter< double >::type w0(w0SEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type dw0(dw0SEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    rcpp_result_gen = Rcpp::wrap(afc_loglik_grad_cpp(x, dx, lambda, dlam, w, dw, w0, dw0, tol));
+    return rcpp_result_gen;
+END_RCPP
+}
 // dv_loglik_cpp
 double dv_loglik_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2);
 RcppExport SEXP _tscop_dv_loglik_cpp(SEXP uSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP) {
@@ -167,6 +201,8 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_tscop_afc_loglik_cpp", (DL_FUNC) &_tscop_afc_loglik_cpp, 5},
+    {"_tscop_afc_loglik_grad_cpp", (DL_FUNC) &_tscop_afc_loglik_grad_cpp, 9},
     {"_tscop_dv_loglik_cpp", (DL_FUNC) &_tscop_dv_loglik_cpp, 10},
     {"_tscop_dv_loglik_grad_cpp", (DL_FUNC) &_tscop_dv_loglik_grad_cpp, 15},
     {"_tscop_dv_simulate_cpp", (DL_FUNC) &_tscop_dv_simulate_cpp, 10},

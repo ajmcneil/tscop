@@ -331,6 +331,64 @@ afc_filter <- function(x, lambda, w, w0, tol = 1e-12) {
   list(mu = mu, F = Fv, v = v, loglik = ll, a = a, P = P)
 }
 
+# Gaussian log-likelihood of the normal scores: the compiled filter
+# (src/afc_kalman.cpp) unless options(tscop.cpp = FALSE), else the R filter.
+afc_loglik <- function(x, lambda, w, w0, tol = 1e-12) {
+  if (isTRUE(getOption("tscop.cpp", TRUE))) afc_loglik_cpp(as.numeric(x), lambda, w, w0, tol)
+  else afc_filter(x, lambda, w, w0, tol)$loglik
+}
+
+# Jacobian of the natural parameters (lambda, w, w0) with respect to the free
+# vector z, by central differences (the map is smooth and cheap).
+afc_free_jacobian <- function(z, m, noise) {
+  nz <- length(z)
+  Jl <- Jw <- matrix(0, m, nz)
+  Jw0 <- numeric(nz)
+  for (k in seq_len(nz)) {
+    h <- 1e-6 * max(1, abs(z[k]))
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    pp <- afc_free_to_par(zp, m, noise)
+    pm <- afc_free_to_par(zm, m, noise)
+    Jl[, k] <- (pp$lambda - pm$lambda) / (2 * h)
+    Jw[, k] <- (pp$w - pm$w) / (2 * h)
+    Jw0[k] <- (pp$w0 - pm$w0) / (2 * h)
+  }
+  list(Jl = Jl, Jw = Jw, Jw0 = Jw0)
+}
+
+# Gradient of afc_negll (the negative Gaussian log-likelihood of the normal scores
+# x) from the compiled filter. The directions are `before` extra data directions,
+# then the free parameters z, then `after` extra data directions; dx is the n x
+# (before + length(z) + after) matrix of the derivatives of x along them (NULL for
+# constant data). NULL if the gradient is unavailable (options, bounds, more than
+# 12 directions).
+afc_negll_grad <- function(z, m, noise, x, dx = NULL, before = 0L, after = 0L) {
+  if (!isTRUE(getOption("tscop.cpp", TRUE)) || !isTRUE(getOption("tscop.cppgrad", TRUE))) return(NULL)
+  nz <- length(z)
+  P <- before + nz + after
+  if (nz < 1L || P > 12L || any(!is.finite(z)) || any(abs(z) > 8 + 1e-8)) return(NULL)
+  p <- afc_free_to_par(z, m, noise)
+  J <- afc_free_jacobian(z, m, noise)
+  pad <- function(M) cbind(matrix(0, nrow(M), before), M, matrix(0, nrow(M), after))
+  r <- afc_loglik_grad_cpp(as.numeric(x), if (is.null(dx)) matrix(0, 0, P) else dx, p$lambda, pad(J$Jl), p$w, pad(J$Jw), p$w0,
+                           c(numeric(before), J$Jw0, numeric(after)), 1e-12)
+  if (!is.finite(r$value) || any(!is.finite(r$gradient))) return(NULL)
+  -r$gradient
+}
+
+# Gradient for optim(): exact where available, otherwise central differences of afc_negll.
+afc_negll_gr <- function(z, m, noise, x) {
+  g <- afc_negll_grad(z, m, noise, x)
+  if (!is.null(g)) return(g)
+  vapply(seq_along(z), function(k) {
+    h <- 1e-6
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    (afc_negll(zp, m, noise, x) - afc_negll(zm, m, noise, x)) / (2 * h)
+  }, numeric(1))
+}
+
 # Copula log-likelihood of u under a factor model.
 afc_copula_loglik <- function(u, lambda, w, w0) {
   x <- stats::qnorm(u)
@@ -340,9 +398,9 @@ afc_copula_loglik <- function(u, lambda, w, w0) {
 # Negative Gaussian log-likelihood on the free scale; a large value outside the
 # bounds or on numerical failure.
 afc_negll <- function(z, m, noise, x) {
-  if (any(!is.finite(z)) || any(abs(z) > 8)) return(1e10)
+  if (any(!is.finite(z)) || any(abs(z) > 8 + 1e-8)) return(1e10)   # (tolerance: a fit on the bound rebuilds to 8 + 1e-13)
   p <- afc_free_to_par(z, m, noise)
-  val <- tryCatch(-afc_filter(x, p$lambda, p$w, p$w0)$loglik, error = function(e) NA_real_)
+  val <- tryCatch(-afc_loglik(x, p$lambda, p$w, p$w0), error = function(e) NA_real_)
   if (is.finite(val)) val else 1e10
 }
 
@@ -388,7 +446,7 @@ arfactcop_mle <- function(u, object, init, control) {
   if (all(vals >= 1e10)) stop("the starting values are infeasible for these data")
   z0 <- starts[[which.min(vals)]]
   ctrl <- modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, length(z0))), control)
-  opt <- stats::optim(z0, afc_negll, m = m, noise = noise, x = x, method = "BFGS", control = ctrl)
+  opt <- stats::optim(z0, afc_negll, gr = afc_negll_gr, m = m, noise = noise, x = x, method = "BFGS", control = ctrl)
   if (opt$convergence != 0L || opt$value >= 1e10) {
     alt <- stats::optim(opt$par, afc_negll, m = m, noise = noise, x = x, method = "Nelder-Mead",
                         control = list(maxit = 5000, reltol = 1e-10, warn.1d.NelderMead = FALSE))

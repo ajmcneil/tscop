@@ -248,14 +248,22 @@ test_that("vt_negll_grad equals finite differences for v-transform copulas with 
   }
 })
 
-test_that("vt_negll_grad declines a Gaussian base and vt_negll_gr then uses differences", {
+test_that("vt_negll_grad declines a missing-data series and an NA effective lag for a d-vine base", {
   set.seed(10)
   m <- vtscop(arfactcop(lambda = 0.9, w = 0.5), udp::v2p(0.45, 0.8))
   u <- tssim(m, 300)
   L <- vt_layout(m)
   z <- vt_start(m, NULL, u, list())$z0
-  expect_null(vt_negll_grad(z, L, NA_integer_, u))
+  expect_false(is.null(vt_negll_grad(z, L, NA_integer_, u)))
+  u2 <- u
+  u2[5] <- NA
+  expect_null(vt_negll_grad(z, L, NA_integer_, u2))
   expect_true(all(is.finite(vt_negll_gr(z, L, NA_integer_, u))))
+  # a d-vine base needs the effective lag
+  md <- vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.5), pairs = list(pc("joe")), tail = pc("joe"), maxlag = 6), udp::v2p(0.45, 0.8))
+  Ld <- vt_layout(md)
+  zd <- vt_start(md, NULL, tssim(md, 200), list())$z0
+  expect_null(vt_negll_grad(zd, Ld, NA_integer_, tssim(md, 200)))
 })
 
 test_that("vtscop fits with the exact gradient agree with fits by finite differences", {
@@ -272,4 +280,83 @@ test_that("vtscop fits with the exact gradient agree with fits by finite differe
   f2 <- tsfit(u, spec, pseudo = FALSE)
   expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-3)
   expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-5)
+})
+
+# ---- the arfactcop Kalman filter ---------------------------------------------
+
+test_that("the compiled Kalman filter equals the R filter, with and without missing values", {
+  set.seed(14)
+  for (cfg in list(list(l = 0.9, w = 0.6), list(l = c(0.98, 0.7), w = c(0.3, 0.4)), list(l = c(0.98, 0.8, 0.5), w = c(0.2, 0.2, 0.3)))) {
+    g <- arfactcop(lambda = cfg$l, w = cfg$w)
+    x <- stats::qnorm(tssim(g, 600))
+    p <- list(lambda = cfg$l, w = cfg$w, w0 = 1 - sum(cfg$w))
+    expect_equal(afc_loglik_cpp(x, p$lambda, p$w, p$w0, 1e-12), afc_filter(x, p$lambda, p$w, p$w0)$loglik, tolerance = 1e-12)
+    x[c(1, 7, 8, 300, 600)] <- NA
+    expect_equal(afc_loglik_cpp(x, p$lambda, p$w, p$w0, 1e-12), afc_filter(x, p$lambda, p$w, p$w0)$loglik, tolerance = 1e-12)
+  }
+})
+
+test_that("afc_negll_grad equals finite differences, for parameters and for data directions", {
+  set.seed(15)
+  fd <- function(f, z, h = 1e-6) vapply(seq_along(z), function(k) {
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    (f(zp) - f(zm)) / (2 * h)
+  }, 1)
+  for (cfg in list(list(order = 1, noise = TRUE), list(order = 2, noise = TRUE), list(order = 3, noise = TRUE),
+                   list(order = 2, noise = FALSE))) {
+    w <- if (cfg$noise) c(0.3, 0.2, 0.2)[seq_len(cfg$order)] else c(0.4, 0.6)
+    g <- arfactcop(lambda = c(0.97, 0.8, 0.5)[seq_len(cfg$order)], w = w, noise = cfg$noise)
+    x <- stats::qnorm(tssim(g, 800))
+    x[c(3, 200, 201)] <- NA
+    z <- gc_free_ops(g)$to_free(g) + rnorm(afc_nfree(cfg$order, cfg$noise), 0, 0.05)
+    ex <- afc_negll_grad(z, cfg$order, cfg$noise, x)
+    nu <- fd(function(zz) afc_negll(zz, cfg$order, cfg$noise, x), z)
+    expect_lt(max(abs(ex - nu) / pmax(abs(nu), 1)), 1e-5)
+  }
+  g <- arfactcop(lambda = c(0.97, 0.7), w = c(0.3, 0.4))
+  x0 <- stats::qnorm(tssim(g, 500))
+  d1 <- sin(seq_along(x0) / 7)
+  d2 <- cos(seq_along(x0) / 11) / 2
+  z <- gc_free_ops(g)$to_free(g) + rnorm(4, 0, 0.05)
+  f <- function(par) afc_negll(par[3:6], 2, TRUE, x0 + par[1] * d1 + par[2] * d2)
+  par0 <- c(0.1, -0.2, z)
+  ex <- afc_negll_grad(z, 2, TRUE, x0 + 0.1 * d1 - 0.2 * d2, cbind(d1, d2, matrix(0, 500, 4)), before = 2L)
+  expect_lt(max(abs(ex - fd(f, par0)) / pmax(abs(fd(f, par0)), 1)), 1e-5)
+})
+
+test_that("the exact joint gradient also covers arfactcop and vtscop-on-arfactcop copulas", {
+  set.seed(16)
+  kp <- arfactcop(lambda = 0.9, w = 0.5)
+  cases <- list(
+    list(tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)), kp), tsmod("st", arfactcop(order = 1))),
+    list(tsmod(marg("sst", c(mu = 0, sigma = 1, df = 6, gamma = 1.2)), arfactcop(lambda = c(0.95, 0.6), w = c(0.3, 0.3))),
+         tsmod("sst", arfactcop(order = 2))),
+    list(tsmod(marg("st", c(mu = 0, sigma = 1, df = 8)), vtscop(kp, udp::v2p(0.45, 0.8))),
+         tsmod("st", vtscop(arfactcop(order = 1), udp::v2p(0.5, 1))))
+  )
+  for (cs in cases) {
+    x <- tssim(cs[[1]], 500)
+    f2 <- tsfit(x, cs[[2]])
+    jt <- tm_joint_setup(f2@model@margin, f2@model@copula, x)
+    # (a fit can sit on the bound of the free scale, so shrink the point inwards before perturbing)
+    th <- 0.98 * jt$theta0 + rnorm(length(jt$theta0), 0, 0.01)
+    g <- jt$gradient(th, x)
+    expect_false(is.null(g))
+    fd <- vapply(seq_along(th), function(k) {
+      h <- 1e-6
+      tp <- th; tp[k] <- tp[k] + h
+      tm <- th; tm[k] <- tm[k] - h
+      (jt$negll(tp, x) - jt$negll(tm, x)) / (2 * h)
+    }, 1)
+    expect_lt(max(abs(g - fd) / pmax(abs(fd), 1)), 1e-4)
+  }
+})
+
+test_that("an armacop copula still has no exact joint gradient", {
+  set.seed(17)
+  x <- tssim(tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)), armacop(ar = 0.6, ma = 0.3)), 300)
+  f <- tsfit(x, tsmod("st", armacop(order = c(1, 1))))
+  jt <- tm_joint_setup(f@model@margin, f@model@copula, x)
+  expect_null(jt$gradient(jt$theta0, x))
 })
