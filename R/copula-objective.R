@@ -35,7 +35,15 @@ setMethod("cop_obj", "armacop", function(model, u) {
     build = ops$build,
     coef = function(z) stats::setNames(ops$coef(z), names(coef(model))),
     K = NA_integer_,
-    grad = NULL
+    grad = function(z, u, du) {
+      nx <- ncol(du)
+      x <- stats::qnorm(u)
+      dx <- du / stats::dnorm(x)
+      g <- armacop_negll_grad(z, ord, period, x, cbind(dx, matrix(0, nrow(dx), length(z))), before = nx)
+      if (is.null(g)) return(NULL)
+      g[seq_len(nx)] <- g[seq_len(nx)] - colSums(x * dx)    # + sum log phi(x_t)
+      g
+    }
   )
 })
 

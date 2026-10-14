@@ -71,10 +71,58 @@ pars_to_free <- function(pars) {
 # Negative Gaussian log-likelihood on the unconstrained scale. The Jacobian
 # term converting it to a copula likelihood does not depend on the parameters.
 armacop_negll <- function(z, ord, period, x) {
-  if (any(!is.finite(z)) || max(abs(z)) > 6) return(1e10)
+  if (any(!is.finite(z)) || max(abs(z)) > 6 + 1e-8) return(1e10)
   e <- free_to_expanded(z, ord, period)
-  val <- tryCatch(-arma_filter(x, e$ar, e$ma)$loglik, error = function(err) NA_real_)
+  val <- tryCatch(-arma_loglik(x, e$ar, e$ma), error = function(err) NA_real_)
   if (!is.finite(val)) 1e10 else val
+}
+
+# Gaussian log-likelihood of the normal scores: the compiled filter
+# (src/arma_kalman.cpp) unless options(tscop.cpp = FALSE), else the R filter.
+arma_loglik <- function(x, ar, ma, tol = 1e-12) {
+  if (isTRUE(getOption("tscop.cpp", TRUE))) arma_loglik_cpp(as.numeric(x), ar, ma, tol)
+  else arma_filter(x, ar, ma, tol)$loglik
+}
+
+# Gradient of armacop_negll from the compiled filter: the derivatives of the expanded
+# AR and MA coefficients with respect to the free vector z by central differences (the
+# map is smooth), the kernel gradient along them. The directions are `before` extra
+# data directions, then z; dx is the n x (before + length(z)) matrix of the derivatives
+# of x along them (NULL for constant data). NULL if unavailable.
+armacop_negll_grad <- function(z, ord, period, x, dx = NULL, before = 0L) {
+  if (!isTRUE(getOption("tscop.cpp", TRUE)) || !isTRUE(getOption("tscop.cppgrad", TRUE))) return(NULL)
+  nz <- length(z)
+  P <- before + nz
+  if (nz < 1L || P > 12L || any(!is.finite(z)) || max(abs(z)) > 6 + 1e-8) return(NULL)
+  e <- free_to_expanded(z, ord, period)
+  p <- length(e$ar)
+  q <- length(e$ma)
+  Jar <- matrix(0, p, P)
+  Jma <- matrix(0, q, P)
+  for (k in seq_len(nz)) {
+    h <- 1e-6 * max(1, abs(z[k]))
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    ep <- free_to_expanded(zp, ord, period)
+    em <- free_to_expanded(zm, ord, period)
+    if (p > 0L) Jar[, before + k] <- (ep$ar - em$ar) / (2 * h)
+    if (q > 0L) Jma[, before + k] <- (ep$ma - em$ma) / (2 * h)
+  }
+  r <- arma_loglik_grad_cpp(as.numeric(x), if (is.null(dx)) matrix(0, 0, P) else dx, e$ar, Jar, e$ma, Jma, 1e-12)
+  if (!is.finite(r$value) || any(!is.finite(r$gradient))) return(NULL)
+  -r$gradient
+}
+
+# Gradient for optim(): exact where available, otherwise central differences of armacop_negll.
+armacop_negll_gr <- function(z, ord, period, x) {
+  g <- armacop_negll_grad(z, ord, period, x)
+  if (!is.null(g)) return(g)
+  vapply(seq_along(z), function(k) {
+    h <- 1e-6
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    (armacop_negll(zp, ord, period, x) - armacop_negll(zm, ord, period, x)) / (2 * h)
+  }, numeric(1))
 }
 
 # Shrink AR-type coefficients until all partial autocorrelations are inside
@@ -204,7 +252,7 @@ armacop_mle <- function(u, object, init, control) {
   ctrl <- modifyList(
     list(maxit = 1000, reltol = 1e-12, ndeps = rep(1e-6, length(z0))), control
   )
-  opt <- stats::optim(z0, armacop_negll, ord = ord, period = period, x = x,
+  opt <- stats::optim(z0, armacop_negll, gr = armacop_negll_gr, ord = ord, period = period, x = x,
                       method = "BFGS", control = ctrl)
   if (opt$convergence != 0L) {
     alt <- stats::optim(opt$par, armacop_negll, ord = ord, period = period,

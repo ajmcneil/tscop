@@ -44,6 +44,37 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// arma_loglik_cpp
+double arma_loglik_cpp(NumericVector x, NumericVector ar, NumericVector ma, double tol);
+RcppExport SEXP _tscop_arma_loglik_cpp(SEXP xSEXP, SEXP arSEXP, SEXP maSEXP, SEXP tolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type ar(arSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type ma(maSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    rcpp_result_gen = Rcpp::wrap(arma_loglik_cpp(x, ar, ma, tol));
+    return rcpp_result_gen;
+END_RCPP
+}
+// arma_loglik_grad_cpp
+List arma_loglik_grad_cpp(NumericVector x, NumericMatrix dx, NumericVector ar, NumericMatrix dar, NumericVector ma, NumericMatrix dma, double tol);
+RcppExport SEXP _tscop_arma_loglik_grad_cpp(SEXP xSEXP, SEXP dxSEXP, SEXP arSEXP, SEXP darSEXP, SEXP maSEXP, SEXP dmaSEXP, SEXP tolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type dx(dxSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type ar(arSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type dar(darSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type ma(maSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type dma(dmaSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    rcpp_result_gen = Rcpp::wrap(arma_loglik_grad_cpp(x, dx, ar, dar, ma, dma, tol));
+    return rcpp_result_gen;
+END_RCPP
+}
 // dv_loglik_cpp
 double dv_loglik_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2);
 RcppExport SEXP _tscop_dv_loglik_cpp(SEXP uSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP) {
@@ -203,6 +234,8 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_tscop_afc_loglik_cpp", (DL_FUNC) &_tscop_afc_loglik_cpp, 5},
     {"_tscop_afc_loglik_grad_cpp", (DL_FUNC) &_tscop_afc_loglik_grad_cpp, 9},
+    {"_tscop_arma_loglik_cpp", (DL_FUNC) &_tscop_arma_loglik_cpp, 4},
+    {"_tscop_arma_loglik_grad_cpp", (DL_FUNC) &_tscop_arma_loglik_grad_cpp, 7},
     {"_tscop_dv_loglik_cpp", (DL_FUNC) &_tscop_dv_loglik_cpp, 10},
     {"_tscop_dv_loglik_grad_cpp", (DL_FUNC) &_tscop_dv_loglik_grad_cpp, 15},
     {"_tscop_dv_simulate_cpp", (DL_FUNC) &_tscop_dv_simulate_cpp, 10},

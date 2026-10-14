@@ -9,6 +9,14 @@ afc_loglik_grad_cpp <- function(x, dx, lambda, dlam, w, dw, w0, dw0, tol) {
     .Call(`_tscop_afc_loglik_grad_cpp`, x, dx, lambda, dlam, w, dw, w0, dw0, tol)
 }
 
+arma_loglik_cpp <- function(x, ar, ma, tol) {
+    .Call(`_tscop_arma_loglik_cpp`, x, ar, ma, tol)
+}
+
+arma_loglik_grad_cpp <- function(x, dx, ar, dar, ma, dma, tol) {
+    .Call(`_tscop_arma_loglik_grad_cpp`, x, dx, ar, dar, ma, dma, tol)
+}
+
 dv_loglik_cpp <- function(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
     .Call(`_tscop_dv_loglik_cpp`, u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2)
 }

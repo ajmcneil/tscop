@@ -353,10 +353,69 @@ test_that("the exact joint gradient also covers arfactcop and vtscop-on-arfactco
   }
 })
 
-test_that("an armacop copula still has no exact joint gradient", {
+# ---- the ARMA Kalman filter ------------------------------------------------------
+
+test_that("the compiled ARMA filter equals the R filter for plain and seasonal models, with missing values", {
+  set.seed(18)
+  cfgs <- list(list(ar = 0.6, ma = numeric(0)), list(ar = numeric(0), ma = 0.5), list(ar = c(0.5, -0.2), ma = 0.4),
+               list(ar = 0.7, ma = c(0.3, 0.1, -0.2)), list(ar = numeric(0), ma = numeric(0)),
+               arma_expand(ar = 0.5, ma = 0.3, sar = 0.6, sma = 0.4, period = 12))
+  for (cf in cfgs) {
+    x <- stats::rnorm(300)
+    expect_equal(arma_loglik_cpp(x, cf$ar, cf$ma, 1e-12), arma_filter(x, cf$ar, cf$ma)$loglik, tolerance = 1e-11)
+    x[c(1, 4, 5, 150, 300)] <- NA
+    expect_equal(arma_loglik_cpp(x, cf$ar, cf$ma, 1e-12), arma_filter(x, cf$ar, cf$ma)$loglik, tolerance = 1e-11)
+  }
+})
+
+test_that("armacop_negll_grad equals finite differences, for coefficients and for data directions", {
+  set.seed(19)
+  fd <- function(f, z, h = 1e-6) vapply(seq_along(z), function(k) {
+    zp <- z; zp[k] <- zp[k] + h
+    zm <- z; zm[k] <- zm[k] - h
+    (f(zp) - f(zm)) / (2 * h)
+  }, 1)
+  for (ord in list(c(1, 0, 0, 0), c(0, 1, 0, 0), c(1, 1, 0, 0), c(2, 1, 0, 0), c(1, 2, 0, 0), c(1, 1, 1, 1))) {
+    period <- if (ord[3] + ord[4] > 0) 12L else NA
+    x <- stats::rnorm(400)
+    x[c(5, 6, 200)] <- NA
+    z <- stats::rnorm(sum(ord), 0, 0.5)
+    g <- armacop_negll_grad(z, ord, period, x)
+    f <- fd(function(zz) armacop_negll(zz, ord, period, x), z)
+    expect_lt(max(abs(g - f) / pmax(abs(f), 1)), 1e-6)
+  }
+  x0 <- stats::rnorm(300)
+  d1 <- sin(seq_along(x0) / 7)
+  d2 <- cos(seq_along(x0) / 11) / 2
+  ord <- c(2, 1, 0, 0)
+  z <- stats::rnorm(3, 0, 0.5)
+  f <- function(par) armacop_negll(par[3:5], ord, NA, x0 + par[1] * d1 + par[2] * d2)
+  par0 <- c(0.1, -0.2, z)
+  g <- armacop_negll_grad(z, ord, NA, x0 + 0.1 * d1 - 0.2 * d2, cbind(d1, d2, matrix(0, 300, 3)), before = 2L)
+  expect_lt(max(abs(g - fd(f, par0)) / pmax(abs(fd(f, par0)), 1)), 1e-6)
+})
+
+test_that("the exact joint gradient covers an armacop copula, and fits agree with differences", {
+  skip_on_cran()
   set.seed(17)
-  x <- tssim(tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)), armacop(ar = 0.6, ma = 0.3)), 300)
-  f <- tsfit(x, tsmod("st", armacop(order = c(1, 1))))
+  x <- tssim(tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)), armacop(ar = 0.6, ma = 0.3)), 500)
+  spec <- tsmod("st", armacop(order = c(1, 1)))
+  f <- tsfit(x, spec)
   jt <- tm_joint_setup(f@model@margin, f@model@copula, x)
-  expect_null(jt$gradient(jt$theta0, x))
+  th <- jt$theta0 + rnorm(length(jt$theta0), 0, 0.02)
+  g <- jt$gradient(th, x)
+  expect_false(is.null(g))
+  fd <- vapply(seq_along(th), function(k) {
+    h <- 1e-6
+    tp <- th; tp[k] <- tp[k] + h
+    tm <- th; tm[k] <- tm[k] - h
+    (jt$negll(tp, x) - jt$negll(tm, x)) / (2 * h)
+  }, 1)
+  expect_lt(max(abs(g - fd) / pmax(abs(fd), 1)), 1e-5)
+  f1 <- tsfit(x, spec, method = "joint")
+  old <- options(tscop.cppgrad = FALSE)
+  on.exit(options(old))
+  f2 <- tsfit(x, spec, method = "joint")
+  expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-3)
+  expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-6)
 })
