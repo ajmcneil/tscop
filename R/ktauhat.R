@@ -51,7 +51,8 @@
 #' u <- tssim(m, 1000)
 #' ktauhat(m, u, lagmax = 8)
 #' # the model fitted to other data: the empirical values depart from its kpacf
-#' ktauhat(sdvinecop(arfactcop(lambda = 0.5, w = 0.5), pairs = list(pc("gumbel"))), u, lagmax = 8, B = 50)
+#' other <- sdvinecop(arfactcop(lambda = 0.5, w = 0.5), pairs = list(pc("gumbel")))
+#' ktauhat(other, u, lagmax = 8, B = 50)
 setGeneric("ktauhat", function(object, data, lagmax = 20, ...) standardGeneric("ktauhat"),
            signature = "object")
 
