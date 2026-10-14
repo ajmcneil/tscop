@@ -10,7 +10,7 @@ family \eqn{x = \mu + \sigma z}, with \code{sigma} a pure scale parameter (not t
 standard deviation) and shape parameters depending on the family. The
 families are \code{"gauss"} (Gaussian), \code{"laplace"}, \code{"slaplace"} (skew
 Laplace), \code{"st"} (Student t, \code{df} degrees of freedom), \code{"sst"} (skew
-Student t), \code{"jsu"} (Johnson SU), \code{"nig"} (normal inverse Gaussian), \code{"hyp"}
+Student t), \code{"jsu"} (Johnson SU), \code{"sas"} (sinh-arcsinh), \code{"nig"} (normal inverse Gaussian), \code{"hyp"}
 (hyperbolic) and \code{"gh"} (generalised hyperbolic). The skew families use the Fernandez-Steel construction with the
 skewing parameter \code{gamma} (\code{gamma = 1} is symmetric; \code{mu} is then the mode of
 the distribution): the density of the standardised variable is
@@ -20,7 +20,14 @@ is the symmetric base density. The Johnson SU distribution is defined by
 \eqn{\gamma + \delta\,\mathrm{asinh}((x - \mu)/\sigma) \sim N(0, 1)}
 with \code{delta} > 0 (smaller values give heavier tails; the Gaussian is the
 limit as \code{delta} tends to infinity with \code{sigma} proportional to \code{delta}) and
-\code{gamma} real (skewness; zero is symmetric about \code{mu}). The normal inverse
+\code{gamma} real (skewness; zero is symmetric about \code{mu}). The sinh-arcsinh
+distribution (Jones and Pewsey, 2009) is defined by
+\eqn{\sinh(\delta\,\mathrm{asinh}((x - \mu)/\sigma) - \epsilon) \sim N(0, 1)}
+with \code{delta} > 0 and \code{eps} (\eqn{\epsilon}) real (skewness; zero is
+symmetric about \code{mu}). It is the Gaussian at \code{delta} = 1, \code{eps} = 0, and its
+tails are stretched exponential, of order \eqn{\exp(-c|y|^{2\delta})}, so that
+\code{delta} = 1/2 has Laplace-like tails and smaller values are heavier; unlike
+the Laplace family its density is smooth, so the likelihood is regular. The normal inverse
 Gaussian distribution is \eqn{x = \mu + \sigma(\rho W + \sqrt{W} N)} with
 \eqn{W} inverse Gaussian of mean one and shape \code{shape} and \eqn{N} standard
 normal, and \code{skew} = \eqn{\rho} a scale-free skewness parameter

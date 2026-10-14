@@ -10,7 +10,7 @@
 #' @param x numeric data (the raw observations; non-finite values are
 #'   dropped).
 #' @param families character vector of families to try; by default all the
-#'   available families (`"gauss"`, `"laplace"`, `"slaplace"`, `"st"`, `"sst"`, `"jsu"`, `"nig"`, `"hyp"`, `"gh"`).
+#'   available families (`"gauss"`, `"laplace"`, `"slaplace"`, `"st"`, `"sst"`, `"jsu"`, `"sas"`, `"nig"`, `"hyp"`, `"gh"`).
 #' @param fix a named numeric vector of parameter values held fixed in every
 #'   family that has the parameter, for example `c(mu = 0)` for zero-mean
 #'   margins.

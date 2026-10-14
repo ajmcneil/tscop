@@ -5,6 +5,7 @@ mpars <- list(
   st = c(mu = 0.5, sigma = 0.9, df = 4.5),
   sst = c(mu = -0.3, sigma = 1.1, df = 6, gamma = 1.4),
   jsu = c(mu = 0.2, sigma = 1.5, delta = 2.2, gamma = -0.6),
+  sas = c(mu = 0.1, sigma = 1.3, delta = 0.7, eps = -0.5),
   nig = c(mu = 0.2, sigma = 1.5, shape = 1.2, skew = -0.5),
   hyp = c(mu = -0.1, sigma = 0.9, shape = 0.8, skew = 0.6),
   gh = c(mu = 0.1, sigma = 1.2, lambda = 1.5, shape = 0.8, skew = 0.4)
@@ -156,4 +157,16 @@ test_that("margins agree with the legacy tscopula distribution functions", {
   th <- mpars$slaplace
   expect_equal(mdens(marg("slaplace", th), x), tscopula::dslaplace(x, mu = th[["mu"]], scale = th[["sigma"]], gamma = th[["gamma"]]), tolerance = 1e-8)
   expect_equal(mdf(marg("slaplace", th), x), tscopula::pslaplace(x, mu = th[["mu"]], scale = th[["sigma"]], gamma = th[["gamma"]]), tolerance = 1e-8)
+})
+
+test_that("sinh-arcsinh is Gaussian at delta = 1, eps = 0 and is recovered by fitting", {
+  g <- marg("sas", c(mu = 0.3, sigma = 1.7, delta = 1, eps = 0))
+  x <- c(-5, -1, 0.3, 2, 6)
+  expect_equal(mdens(g, x), stats::dnorm(x, 0.3, 1.7), tolerance = 1e-12)
+  expect_equal(mdf(g, x), stats::pnorm(x, 0.3, 1.7), tolerance = 1e-12)
+  set.seed(11)
+  y <- tssim(marg("sas", c(mu = 0.1, sigma = 1, delta = 0.6, eps = 0.3)), 4000)
+  f <- tsfit(y, marg("sas"))
+  expect_equal(unname(coef(f)[["delta"]]), 0.6, tolerance = 0.1)
+  expect_equal(unname(coef(f)[["eps"]]), 0.3, tolerance = 0.2)
 })

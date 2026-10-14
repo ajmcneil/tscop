@@ -5,7 +5,7 @@
 #' standard deviation) and shape parameters depending on the family. The
 #' families are `"gauss"` (Gaussian), `"laplace"`, `"slaplace"` (skew
 #' Laplace), `"st"` (Student t, `df` degrees of freedom), `"sst"` (skew
-#' Student t), `"jsu"` (Johnson SU), `"nig"` (normal inverse Gaussian), `"hyp"`
+#' Student t), `"jsu"` (Johnson SU), `"sas"` (sinh-arcsinh), `"nig"` (normal inverse Gaussian), `"hyp"`
 #' (hyperbolic) and `"gh"` (generalised hyperbolic). The skew families use the Fernandez-Steel construction with the
 #' skewing parameter `gamma` (`gamma = 1` is symmetric; `mu` is then the mode of
 #' the distribution): the density of the standardised variable is
@@ -15,7 +15,14 @@
 #' \eqn{\gamma + \delta\,\mathrm{asinh}((x - \mu)/\sigma) \sim N(0, 1)}
 #' with `delta` > 0 (smaller values give heavier tails; the Gaussian is the
 #' limit as `delta` tends to infinity with `sigma` proportional to `delta`) and
-#' `gamma` real (skewness; zero is symmetric about `mu`). The normal inverse
+#' `gamma` real (skewness; zero is symmetric about `mu`). The sinh-arcsinh
+#' distribution (Jones and Pewsey, 2009) is defined by
+#' \eqn{\sinh(\delta\,\mathrm{asinh}((x - \mu)/\sigma) - \epsilon) \sim N(0, 1)}
+#' with `delta` > 0 and `eps` (\eqn{\epsilon}) real (skewness; zero is
+#' symmetric about `mu`). It is the Gaussian at `delta` = 1, `eps` = 0, and its
+#' tails are stretched exponential, of order \eqn{\exp(-c|y|^{2\delta})}, so that
+#' `delta` = 1/2 has Laplace-like tails and smaller values are heavier; unlike
+#' the Laplace family its density is smooth, so the likelihood is regular. The normal inverse
 #' Gaussian distribution is \eqn{x = \mu + \sigma(\rho W + \sqrt{W} N)} with
 #' \eqn{W} inverse Gaussian of mean one and shape `shape` and \eqn{N} standard
 #' normal, and `skew` = \eqn{\rho} a scale-free skewness parameter
@@ -69,7 +76,7 @@ setValidity("marg", function(object) {
 #' Constructor for parametric margins
 #'
 #' @param family one of `"gauss"`, `"laplace"`, `"slaplace"`, `"st"`, `"sst"`,
-#'   `"jsu"`, `"nig"`, `"hyp"`, `"gh"`.
+#'   `"jsu"`, `"sas"`, `"nig"`, `"hyp"`, `"gh"`.
 #' @param pars named numeric vector (or list) of parameter values; parameters
 #'   that are omitted are unspecified (`NA`), giving a model structure to be
 #'   fitted. See [marg-class] for the parameters of each family.
