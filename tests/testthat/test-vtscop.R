@@ -100,3 +100,24 @@ test_that("residuals and predictive PITs are uniform", {
   f <- tsfit(u, vtscop(arfactcop(order = 1), udp::v2p(0.5, 1)), pseudo = FALSE)
   expect_equal(resid(f), resid(f@model, u))
 })
+
+test_that("fast predictive df and quantile functions agree with the quadrature reference", {
+  set.seed(7)
+  u <- tssim(vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::v2p(0.45, 0.8)), 300)
+  xg <- c(0.01, 0.05, 0.2, 0.5, 0.8, 0.95, 0.99)
+  ref_df <- function(m, w, x) {
+    pd <- vt_predictive_dist(m@base, vt_transform_data(m@vt, w), 1L)
+    vt_df(m@vt, x, pd$Fy, pd$Qy, 128)
+  }
+  for (m in list(vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::v2p(0.45, 0.8)),
+                 vtscop(arfactcop(lambda = 0.9, w = 0.6), udp::v3b(0.45, 0.8, 1.3)),
+                 vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))), udp::v2p(0.4, 1.2)))) {
+    expect_lt(max(abs(predict(m, u, type = "df", x = xg) - ref_df(m, u, xg))), 5e-5)
+    q <- predict(m, u, type = "qf", x = xg)
+    expect_true(all(diff(q) > 0))
+    expect_lt(max(abs(predict(m, u, type = "df", x = q) - xg)), 1e-9)
+  }
+  # linear v-transforms: explicit quantile function inverts the df
+  ml <- vtscop(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("gumbel"))), udp::vlinear(0.4))
+  expect_lt(max(abs(predict(ml, u, type = "df", x = predict(ml, u, type = "qf", x = xg)) - xg)), 1e-9)
+})

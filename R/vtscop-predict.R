@@ -52,7 +52,7 @@ vt_df <- function(vt, x, Fy, Qy, nodes) {
   I + (x > d) * p0
 }
 
-vt_qf <- function(vt, p, Fy, Qy, nodes) {
+vt_qf_ref <- function(vt, p, Fy, Qy, nodes) {
   lo <- rep(0, length(p))
   hi <- rep(1, length(p))
   for (it in 1:40) {
@@ -61,6 +61,53 @@ vt_qf <- function(vt, p, Fy, Qy, nodes) {
     up <- f < p
     lo <- ifelse(up, mid, lo)
     hi <- ifelse(up, hi, mid)
+  }
+  (lo + hi) / 2
+}
+
+# ---- fast predictive df and qf for ONE conditional law ----------------------
+#
+# For a nonlinear v-transform, F_U(x) = G(p0(x)) + 1{x > d} p0(x), with
+# G(p) = int_p^1 Delta(Q_Y(s)) ds. G depends on the day's conditional law of Y but not on x,
+# so it is tabulated once (Delta(Q_Y) at the knots of a Chebyshev-spaced grid, integrated
+# through its cubic spline interpolant, then interpolated by cubic Hermite with G' = -Delta(Q_Y)),
+# and every later evaluation of the df, and each step of the quantile search, is a lookup plus one
+# evaluation of the base df. The quadrature versions (vt_df(), vt_qf_ref()) are the reference.
+# Linear v-transforms are closed form, and the quantile function is explicit.
+
+vt_table <- function(vt, Qy, n = 128L) {
+  k <- 0:n
+  x <- (1 - cos(pi * k / n)) / 2
+  y <- pmin(pmax(Qy(pmin(pmax(x, 1e-12), 1 - 1e-12), rep(1L, n + 1L)), 1e-10), 1 - 1e-10)
+  h <- vt_delta(vt, y)
+  sp <- stats::splinefun(x, h, method = "fmm")
+  gl <- gl_nodes(4L)                                  # 4-point Gauss-Legendre on each cell
+  a <- x[-(n + 1L)]; w <- diff(x)
+  cell <- vapply(seq_along(a), function(j) sum(sp(a[j] + w[j] * gl$s) * gl$w) * w[j], numeric(1))
+  G <- c(rev(cumsum(rev(cell))), 0)                   # int_{x_k}^1 of the interpolant
+  stats::splinefunH(x, G, -h)
+}
+
+vt_df1 <- function(vt, x, Fy, G) {
+  d <- vt_fulcrum(vt)
+  p0 <- pmin(pmax(Fy(vt_transform_data(vt, x), seq_along(x)), 0), 1)
+  I <- if (vt_is_linear(vt)) d * (1 - p0) else G(p0)
+  I + (x > d) * p0
+}
+
+vt_qf <- function(vt, p, Fy, Qy, nodes) {
+  d <- vt_fulcrum(vt)
+  if (vt_is_linear(vt)) {                             # explicit inverse
+    lower <- p <= d
+    y <- Qy(ifelse(lower, 1 - p / d, (p - d) / (1 - d)), rep(1L, length(p)))
+    return(ifelse(lower, d * (1 - y), d + (1 - d) * y))
+  }
+  G <- vt_table(vt, Qy)
+  lo <- rep(0, length(p)); hi <- rep(1, length(p))
+  for (it in 1:40) {
+    mid <- (lo + hi) / 2
+    up <- vt_df1(vt, mid, Fy, G) < p
+    lo <- ifelse(up, mid, lo); hi <- ifelse(up, hi, mid)
   }
   (lo + hi) / 2
 }
@@ -110,7 +157,7 @@ vt_predict <- function(model, data, h, type, x, nodes) {
   vt0 <- model@vt
   pd <- vt_predictive_dist(model@base, v, h)
   switch(type,
-    df = vt_df(vt0, x, pd$Fy, pd$Qy, nodes),
+    df = vt_df1(vt0, x, pd$Fy, if (vt_is_linear(vt0)) NULL else vt_table(vt0, pd$Qy)),
     qf = vt_qf(vt0, x, pd$Fy, pd$Qy, nodes),
     dens = vt_dens(vt0, x, pd$fy)
   )
