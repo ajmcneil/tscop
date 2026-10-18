@@ -428,6 +428,14 @@ dv_explicit_labels <- function(object) {
   }, character(1))
 }
 
+# Description of the tail family of a model: the base copula of an IVT tail and the rotations of the
+# other non-radial families. Shared by the show methods of sdvinecop and sdvinecopfit.
+dv_tail_label <- function(tail) {
+  paste0(tail@family,
+         if (tail@family == "ivt") paste0(" with base ", tail@base),
+         if (!(tail@family %in% .pc_radial)) sprintf(" (positive: %g, negative: %g)", tail@pos, tail@neg))
+}
+
 #' @rdname tscop-methods
 #' @export
 setMethod("show", "sdvinecop", function(object) {
@@ -435,11 +443,7 @@ setMethod("show", "sdvinecop", function(object) {
   if (!is.null(object@kpacf)) cat("kpacf: ", gc_describe(object@kpacf), "\n", sep = "")
   lab <- dv_explicit_labels(object)
   if (length(lab) > 0L) cat(length(lab), " explicit pair copulas: ", paste(lab, collapse = ", "), "\n", sep = "")
-  if (!is.null(object@tail)) cat("tail family: ", object@tail@family,
-                                 if (object@tail@family == "ivt") paste0(" with base ", object@tail@base),
-                                 if (!(object@tail@family %in% .pc_radial))
-                                   sprintf(" (positive: %g, negative: %g)", object@tail@pos, object@tail@neg),
-                                 "\n", sep = "")
+  if (!is.null(object@tail)) cat("tail family: ", dv_tail_label(object@tail), "\n", sep = "")
   if (is.na(object@K)) {
     cat("effective lag: not yet determined (unspecified kpacf coefficients)\n")
   } else {

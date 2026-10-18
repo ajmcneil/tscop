@@ -288,3 +288,14 @@ test_that("an sdvinecop with Joe-base IVT pairs at the first lags and a Gaussian
   expect_equal(unname(coef(f)[1:2]), c(0.9, 0.5), tolerance = 0.2)
   expect_gt(f@loglik, 0)
 })
+
+test_that("show for a fitted sdvinecop names the base copula of an IVT tail and the explicit pairs", {
+  set.seed(5)
+  m <- sdvinecop(arfactcop(lambda = 0.9, w = 0.5), pairs = list(pc("ivt", base = "joe")), tail = pc("ivt", base = "ast"), vt = c(0.45, 0.55))
+  u <- tssim(m, 600)
+  f <- tsfit(u, sdvinecop(arfactcop(order = 1), pairs = list(pc("ivt", base = "joe")), tail = pc("ivt", base = "ast"), maxlag = 8, tautol = 1e-3), pseudo = FALSE)
+  expect_output(show(f), "1 explicit pair copulas: ivt\\(joe\\)")
+  expect_output(show(f), "tail family: ivt with base ast")
+  g <- tsfit(u, sdvinecop(arfactcop(order = 1), tail = pc("gumbel"), maxlag = 8, tautol = 1e-3), pseudo = FALSE)
+  expect_output(show(g), "tail family: gumbel \\(positive: 0, negative: 90\\)")
+})
