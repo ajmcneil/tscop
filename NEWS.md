@@ -1,3 +1,8 @@
+# tscop (development version)
+
+* `show` for a fitted `sdvinecop` now names the base copula of an inverse-v-transformed (`"ivt"`) tail, like `show` for the model.
+* `vtscop` predictive distribution and quantile functions for a nonlinear v-transform are much faster: the integral over the base law is tabulated once per prediction (quantile functions of linear v-transforms are explicit).
+
 # tscop 0.1.0
 
 First version: a rebuild of the `tscopula` package on top of `udp`.

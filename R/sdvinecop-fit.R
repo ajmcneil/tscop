@@ -575,7 +575,7 @@ setMethod("show", "sdvinecopfit", function(object) {
   cat("kpacf: ", gc_describe(m@kpacf), "\n", sep = "")
   lab <- dv_explicit_labels(m)
   if (length(lab) > 0L) cat(length(lab), " explicit pair copulas: ", paste(lab, collapse = ", "), "\n", sep = "")
-  cat("tail family: ", m@tail@family, "\n", sep = "")
+  if (!is.null(m@tail)) cat("tail family: ", dv_tail_label(m@tail), "\n", sep = "")
   cat("effective lag K = ", m@K, " (tautol = ", m@tautol, ")",
       if (object@nrefit > 0L) paste0("; started at ", object@Kstart, ", ", object@nrefit, " refit(s)"),
       "\n", sep = "")
