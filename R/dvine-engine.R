@@ -244,7 +244,7 @@ dv_from_bicop <- function(b) {
 
 # Kendall's tau of a resolved pair copula.
 dv_pair_ktau <- function(pair) {
-  if (dv_is_ivt(pair)) return(dv_pair_ktau(pair$base)) # the base copula's tau
+  if (dv_is_ivt(pair) || dv_is_ivtnl(pair)) return(dv_pair_ktau(pair$base)) # the base copula's tau
   if (dv_is_ast(pair)) {
     tau0 <- udp::astcopula_tau(pair$parameters[1L])
     return(if (pair$rotation %in% c(90, 270)) -tau0 else tau0)
@@ -360,7 +360,9 @@ dv_loglik_r <- function(u, pairs) {
         x <- xn
         y <- yn
       }
-    } else if (dv_is_ast(pr)) {
+    } else if (dv_is_ivtnl(pr) || dv_is_ast(pr)) {
+      # nonlinear IVT levels are evaluated on the u scale (V(h(a, b)) = h*(V(a), V(b)) holds for linear
+      # v-transforms only), like the ast family
       if (zscale) {
         A <- stats::pnorm(A)
         B <- stats::pnorm(B)
@@ -460,7 +462,9 @@ dv_loglik <- function(u, pairs) {
 dv_clamp <- function(x, eps = 1e-12) pmin(pmax(x, eps), 1 - eps)
 
 dv_h <- function(pr, a, b, cond_var) {
-  if (dv_is_ivt(pr)) {
+  if (dv_is_ivtnl(pr)) {
+    out <- dv_ivtnl_h(pr, a, b, cond_var)
+  } else if (dv_is_ivt(pr)) {
     d1 <- pr$delta[1L]
     d2 <- pr$delta[2L]
     x <- dv_vlin(a, d1)
@@ -485,7 +489,9 @@ dv_h <- function(pr, a, b, cond_var) {
 }
 
 dv_hinv <- function(pr, a, p) {
-  if (dv_is_ivt(pr)) {
+  if (dv_is_ivtnl(pr)) {
+    out <- dv_ivtnl_hinv(pr, a, p)
+  } else if (dv_is_ivt(pr)) {
     d1 <- pr$delta[1L]
     d2 <- pr$delta[2L]
     out <- d2 - dv_alin(p, d2) * dv_hinv(pr$base, dv_vlin(a, d1), dv_vlin(p, d2))
@@ -503,7 +509,9 @@ dv_hinv <- function(pr, a, p) {
 }
 
 dv_dens <- function(pr, a, b) {
-  if (dv_is_ivt(pr)) {
+  if (dv_is_ivtnl(pr)) {
+    dv_ivtnl_dens(pr, a, b)
+  } else if (dv_is_ivt(pr)) {
     dv_dens(pr$base, dv_vlin(a, pr$delta[1L]), dv_vlin(b, pr$delta[2L]))
   } else if (dv_is_ast(pr)) {
     as.numeric(dv_ast_closures(pr)$d(a, b))
