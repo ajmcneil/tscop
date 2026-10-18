@@ -119,3 +119,57 @@ test_that("the number of nonlinear lags follows the kpacf", {
   expect_equal(vapply(pairs, function(p) p$family, ""), c("ivtnl", "ivtnl", "ivtnl", "ivt", "ivt"))
   expect_equal(tscop:::dv_nl_pairs("ast", tau, c(0.6, 0.5), c(1.3, 0.8), L = 2)[[3]]$family, "ivt")
 })
+
+test_that("the compiled kernel evaluates nonlinear IVT levels like the R reference", {
+  set.seed(21)
+  tau <- as.numeric(ktau(arfactcop(lambda = 0.9, w = 0.5), 12))
+  for (b in c("joe", "gumbel", "clayton180", "frank")) for (kp in list(c(1.3, 0.8), c(1, 0.8), c(0.7, 1), c(1, 1))) {
+    pairs <- tscop:::dv_nl_pairs(b, tau, c(0.62, 0.45), kp, L = 5)
+    u <- as.numeric(tscop:::dv_simulate_r(pairs, matrix(runif(500), 500, 1)))
+    e <- tscop:::dv_encode(pairs, ast = TRUE, nl = TRUE)
+    expect_false(is.null(e))
+    expect_equal(tscop:::dv_loglik_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2, e$nl, e$k1, e$k2),
+                 tscop:::dv_loglik_r(u, pairs), tolerance = 1e-8)
+  }
+  # nonlinear levels followed by a plain Gaussian run, a linear IVT run and plain levels (scale changes between runs)
+  pairs <- c(tscop:::dv_nl_pairs("joe", tau[1:3], c(0.62, 0.45), c(1.3, 0.8), L = 3),
+             list(list(family = "gauss", rotation = 0, parameters = 0.05)),
+             list(tscop:::dv_ivt_pair("joe", tau[5], c(0.62, 0.45))),
+             list(list(family = "gumbel", rotation = 0, parameters = 1.05)),
+             list(tscop:::dv_ivtnl_pair("joe", tau[7], c(0.62, 0.45), c(1.3, 0.8))))
+  u <- runif(400)
+  expect_equal(tscop:::dv_loglik(u, pairs), tscop:::dv_loglik_r(u, pairs), tolerance = 1e-8)
+})
+
+test_that("the compiled nonlinear IVT gradient equals finite differences, including the kappa directions", {
+  set.seed(22)
+  tau <- as.numeric(ktau(arfactcop(lambda = 0.95, w = 0.25), 16))
+  for (b in c("joe", "clayton180", "frank")) for (kp in list(c(1.3, 0.8), c(1, 1))) {
+    pairs <- tscop:::dv_nl_pairs(b, tau, c(0.62, 0.45), kp, L = 6)
+    u <- as.numeric(tscop:::dv_simulate_r(tscop:::dv_nl_pairs(b, tau, c(0.62, 0.45), c(1.3, 0.8), L = 6), matrix(runif(400), 400, 1)))
+    e <- tscop:::dv_encode(pairs, ast = TRUE, nl = TRUE)
+    K <- length(e$fam)
+    dbpar <- matrix(0, K, 5)
+    dbpar[, 5] <- e$bpar                       # fifth direction: relative change of the base parameters
+    g <- tscop:::dv_loglik_grad_cpp(u, matrix(0, 0, 5), e$fam, e$rot, e$par, matrix(0, K, 5), e$ivt, e$bfam, e$brot, e$bpar, dbpar,
+                                    e$d1, e$d2, c(1, 0, 0, 0, 0), c(0, 1, 0, 0, 0), e$nl, e$k1, e$k2, c(0, 0, 1, 0, 0), c(0, 0, 0, 1, 0))
+    f <- function(x) tscop:::dv_loglik_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar * (1 + x[5]), x[1], x[2], e$nl, x[3], x[4])
+    x0 <- c(e$d1, e$d2, e$k1, e$k2, 0)
+    h <- 1e-5
+    fd <- vapply(1:5, function(i) { xp <- x0; xp[i] <- xp[i] + h; xm <- x0; xm[i] <- xm[i] - h; (f(xp) - f(xm)) / (2 * h) }, 1)
+    expect_lt(max(abs(g$gradient - fd) / pmax(abs(fd), 1)), 2e-4)
+    expect_equal(g$value, f(x0), tolerance = 1e-6)
+  }
+})
+
+test_that("nonlinear levels are encoded only for the likelihood kernel and only for supported bases", {
+  tau <- as.numeric(ktau(arfactcop(lambda = 0.9, w = 0.5), 5))
+  p <- tscop:::dv_nl_pairs("joe", tau, c(0.6, 0.5), c(1.3, 0.8), L = 3)
+  expect_null(tscop:::dv_encode(p, ast = TRUE))                 # other kernels (simulation, prediction, ktauhat) use the R path
+  expect_false(is.null(tscop:::dv_encode(p, ast = TRUE, nl = TRUE)))
+  pa <- tscop:::dv_nl_pairs("ast", tau, c(0.6, 0.5), c(1.3, 0.8), L = 3)
+  expect_null(tscop:::dv_encode(pa, ast = TRUE, nl = TRUE))     # ast base: R path for now
+  u <- runif(300)
+  expect_true(is.finite(tscop:::dv_loglik(u, pa)))
+  expect_equal(tscop:::dv_loglik(u, pa), tscop:::dv_loglik_r(u, pa))
+})

@@ -17,12 +17,12 @@ arma_loglik_grad_cpp <- function(x, dx, ar, dar, ma, dma, tol) {
     .Call(`_tscop_arma_loglik_grad_cpp`, x, dx, ar, dar, ma, dma, tol)
 }
 
-dv_loglik_cpp <- function(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
-    .Call(`_tscop_dv_loglik_cpp`, u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2)
+dv_loglik_cpp <- function(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nl = NULL, k1 = 1.0, k2 = 1.0) {
+    .Call(`_tscop_dv_loglik_cpp`, u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nl, k1, k2)
 }
 
-dv_loglik_grad_cpp <- function(u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2) {
-    .Call(`_tscop_dv_loglik_grad_cpp`, u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2)
+dv_loglik_grad_cpp <- function(u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2, nl = NULL, k1 = 1.0, k2 = 1.0, dk1 = NULL, dk2 = NULL) {
+    .Call(`_tscop_dv_loglik_grad_cpp`, u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2, nl, k1, k2, dk1, dk2)
 }
 
 dv_level_tau_cpp <- function(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2) {
