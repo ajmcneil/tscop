@@ -231,6 +231,18 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// nl_ast_table_cpp
+NumericMatrix nl_ast_table_cpp(NumericVector v, double nu);
+RcppExport SEXP _tscop_nl_ast_table_cpp(SEXP vSEXP, SEXP nuSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type v(vSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    rcpp_result_gen = Rcpp::wrap(nl_ast_table_cpp(v, nu));
+    return rcpp_result_gen;
+END_RCPP
+}
 // joe_tau_cpp
 List joe_tau_cpp(NumericVector theta, NumericVector c);
 RcppExport SEXP _tscop_joe_tau_cpp(SEXP thetaSEXP, SEXP cSEXP) {
@@ -292,6 +304,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_tscop_dv_rosenblatt_cpp", (DL_FUNC) &_tscop_dv_rosenblatt_cpp, 13},
     {"_tscop_dv_predictive_cpp", (DL_FUNC) &_tscop_dv_predictive_cpp, 15},
     {"_tscop_kendall_tau_cpp", (DL_FUNC) &_tscop_kendall_tau_cpp, 2},
+    {"_tscop_nl_ast_table_cpp", (DL_FUNC) &_tscop_nl_ast_table_cpp, 2},
     {"_tscop_joe_tau_cpp", (DL_FUNC) &_tscop_joe_tau_cpp, 2},
     {"_tscop_frank_tau_cpp", (DL_FUNC) &_tscop_frank_tau_cpp, 2},
     {"_tscop_joe_par_cpp", (DL_FUNC) &_tscop_joe_par_cpp, 2},

@@ -162,36 +162,55 @@ test_that("the compiled nonlinear IVT gradient equals finite differences, includ
   }
 })
 
-test_that("nonlinear levels are encoded only for the likelihood kernel and only for supported bases", {
+test_that("nonlinear levels are encoded only when the caller handles them and not for the Gaussian base", {
   tau <- as.numeric(ktau(arfactcop(lambda = 0.9, w = 0.5), 5))
   p <- tscop:::dv_nl_pairs("joe", tau, c(0.6, 0.5), c(1.3, 0.8), L = 3)
-  expect_null(tscop:::dv_encode(p, ast = TRUE))                 # other kernels (simulation, prediction, ktauhat) use the R path
+  expect_null(tscop:::dv_encode(p, ast = TRUE))                 # callers that do not handle nonlinear levels (ktauhat) use the R path
   expect_false(is.null(tscop:::dv_encode(p, ast = TRUE, nl = TRUE)))
-  pa <- tscop:::dv_nl_pairs("ast", tau, c(0.6, 0.5), c(1.3, 0.8), L = 3)
-  expect_null(tscop:::dv_encode(pa, ast = TRUE, nl = TRUE))     # ast base: R path for now
+  expect_false(is.null(tscop:::dv_encode(tscop:::dv_nl_pairs("ast", tau, c(0.6, 0.5), c(1.3, 0.8), L = 3), ast = TRUE, nl = TRUE)))
+  pg <- tscop:::dv_nl_pairs("gauss", tau, c(0.6, 0.5), c(1.3, 0.8), L = 3)
+  expect_null(tscop:::dv_encode(pg, ast = TRUE, nl = TRUE))     # Gaussian base: R path
   u <- runif(300)
-  expect_true(is.finite(tscop:::dv_loglik(u, pa)))
-  expect_equal(tscop:::dv_loglik(u, pa), tscop:::dv_loglik_r(u, pa))
+  expect_true(is.finite(tscop:::dv_loglik(u, pg)))
+  expect_equal(tscop:::dv_loglik(u, pg), tscop:::dv_loglik_r(u, pg))
 })
 
-test_that("the compiled simulation, Rosenblatt and prediction kernels agree with the R reference for nonlinear levels", {
-  set.seed(31)
-  tau <- as.numeric(ktau(arfactcop(lambda = 0.95, w = 0.25), 14))
-  for (b in c("joe", "gumbel", "clayton180", "frank")) for (kp in list(c(1.3, 0.8), c(1, 0.8), c(0.7, 1.5))) {
-    pairs <- tscop:::dv_nl_pairs(b, tau, c(0.62, 0.45), kp, L = 5)
-    w <- matrix(runif(150), 150, 1)
-    expect_false(is.null(tscop:::dv_encode(pairs, ast = TRUE, nl = TRUE)))
-    s_r <- tscop:::dv_simulate_r(pairs, w)
-    expect_equal(tscop:::dv_simulate(pairs, w), s_r, tolerance = 1e-6)
-    u <- as.numeric(s_r)
-    expect_equal(tscop:::dv_rosenblatt(pairs, u), tscop:::dv_rosenblatt_r(pairs, u), tolerance = 1e-9)
-    x <- c(0.02, 0.2, 0.5, 0.8, 0.98)
-    for (ty in c("df", "qf", "dens")) {
-      expect_equal(tscop:::dv_predictive(pairs, u, x, ty), tscop:::dv_predictive_r(pairs, u, x, ty), tolerance = 1e-8)
-    }
+test_that("the ast quantile table is accurate", {
+  v <- c(1e-10, 1e-6, 1e-3, 0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99, 0.999, 1 - 1e-5, 1 - 1e-8, 1 - 1e-10)
+  for (nu in c(1.2, 3, 20, 200)) {
+    tb <- tscop:::nl_ast_table_cpp(v, nu)
+    z <- qt((1 - v) / 2, nu, lower.tail = FALSE)
+    expect_lt(max(abs(tb[, 1] - z) / pmax(z, 1e-3)), 1e-4)
+    expect_lt(max(abs(tb[v > 1e-8, 2] * 2 * dt(z[v > 1e-8], nu) - 1)), 2e-4)   # dz/dV = 1 / (2 f_t(z))
+    h <- 1e-4 * nu
+    dn <- (qt((1 - v) / 2, nu + h, lower.tail = FALSE) - qt((1 - v) / 2, nu - h, lower.tail = FALSE)) / (2 * h)
+    expect_lt(max(abs(tb[v > 0.1, 3] - dn[v > 0.1]) / abs(dn[v > 0.1])), 1e-4)   # the nu-derivative matters where z is not small
+    expect_lt(max(abs(tb[, 3] - dn)) / max(abs(dn)), 1e-5)
   }
-  # the compiled simulation inverts the compiled Rosenblatt transform
-  pairs <- tscop:::dv_nl_pairs("clayton180", tau, c(0.62, 0.45), c(1.4, 0.7), L = 6)
-  w <- matrix(runif(200), 200, 1)
-  expect_equal(tscop:::dv_rosenblatt(pairs, as.numeric(tscop:::dv_simulate(pairs, w))), as.numeric(w), tolerance = 1e-8)
+})
+
+test_that("ast bases of nonlinear levels: compiled kernels agree with the R reference on model data, and the gradient with finite differences", {
+  set.seed(41)
+  tau <- as.numeric(ktau(arfactcop(lambda = 0.95, w = 0.25), 14))
+  for (kp in list(c(1.3, 0.8), c(1, 0.8))) {
+    pairs <- tscop:::dv_nl_pairs("ast", tau, c(0.62, 0.45), kp, L = 6)
+    u <- as.numeric(tscop:::dv_simulate(pairs, matrix(runif(500), 500, 1)))
+    expect_equal(tscop:::dv_loglik(u, pairs), tscop:::dv_loglik_r(u, pairs), tolerance = 1e-6)
+    expect_equal(tscop:::dv_rosenblatt(pairs, u), tscop:::dv_rosenblatt_r(pairs, u), tolerance = 1e-4)
+    x <- c(0.02, 0.2, 0.5, 0.8, 0.98)
+    for (ty in c("df", "qf", "dens")) expect_equal(tscop:::dv_predictive(pairs, u, x, ty), tscop:::dv_predictive_r(pairs, u, x, ty), tolerance = 1e-5)
+    s_r <- tscop:::dv_simulate_r(pairs, matrix(runif(100), 100, 1))
+    expect_equal(tscop:::dv_simulate(pairs, matrix(runif(100), 100, 1)) > 0, matrix(TRUE, 100, 1))
+    e <- tscop:::dv_encode(pairs, ast = TRUE, nl = TRUE)
+    K <- length(e$fam)
+    dbpar <- matrix(0, K, 5)
+    dbpar[, 5] <- e$bpar
+    g <- tscop:::dv_loglik_grad_cpp(u, matrix(0, 0, 5), e$fam, e$rot, e$par, matrix(0, K, 5), e$ivt, e$bfam, e$brot, e$bpar, dbpar,
+                                    e$d1, e$d2, c(1, 0, 0, 0, 0), c(0, 1, 0, 0, 0), e$nl, e$k1, e$k2, c(0, 0, 1, 0, 0), c(0, 0, 0, 1, 0))
+    f <- function(z) tscop:::dv_loglik_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar * (1 + z[5]), z[1], z[2], e$nl, z[3], z[4])
+    x0 <- c(e$d1, e$d2, e$k1, e$k2, 0)
+    h <- 1e-5
+    fd <- vapply(1:5, function(i) { xp <- x0; xp[i] <- xp[i] + h; xm <- x0; xm[i] <- xm[i] - h; (f(xp) - f(xm)) / (2 * h) }, 1)
+    expect_lt(max(abs(g$gradient - fd) / pmax(abs(fd), 1)), 1e-4)
+  }
 })

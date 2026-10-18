@@ -45,6 +45,10 @@ kendall_tau_cpp <- function(x, y) {
     .Call(`_tscop_kendall_tau_cpp`, x, y)
 }
 
+nl_ast_table_cpp <- function(v, nu) {
+    .Call(`_tscop_nl_ast_table_cpp`, v, nu)
+}
+
 joe_tau_cpp <- function(theta, c) {
     .Call(`_tscop_joe_tau_cpp`, theta, c)
 }

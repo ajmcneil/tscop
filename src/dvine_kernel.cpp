@@ -2,7 +2,7 @@
 // copulas (independence, Gauss, Clayton, Gumbel, Joe, Frank, all four
 // rotations) and inverse-v-transformed (IVT) pair copulas with linear
 // v-transforms and these bases, and IVT levels with nonlinear (v2p) v-transforms (src/nl.h; Clayton,
-// Gumbel, Joe and Frank bases, rotations; the ast and Gaussian bases use the R path), evaluated by the same level recursion as the R
+// Gumbel, Joe, Frank and ast bases; the Gaussian base uses the R path), evaluated by the same level recursion as the R
 // reference implementation dv_loglik_r (R/dvine-engine.R). The recursion is a
 // template over the scalar type: double gives the log-likelihood, and a
 // forward-mode dual number with P derivative directions gives the
@@ -12,6 +12,7 @@
 #include "kendall.h"
 #include "nl.h"
 #include <type_traits>
+#include <memory>
 
 namespace {
 
@@ -234,15 +235,34 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
       }
       rec();
       std::vector<T> tA(m), tB(m);
-      for (int i = 0; i < m; i++) { tA[i] = v2p_T(A[i], d1, k1); tB[i] = v2p_T(B[i], d2, k2); }
-      for (int i = 0; i < m; i++) ll = ll + nl_base_ld(bfam[j], brot[j], bpar[j], bpar[j], tA[i], tB[i]);
-      if (!last) {
-        for (int i = 0; i < m - 1; i++) {
-          h2[i] = nl_cdf(bfam[j], brot[j], bpar[j], bpar[j], d1, k1, A[i], tB[i], true);          // P(U1 <= a_i | U2 = b_i)
-          h1[i + 1] = nl_cdf(bfam[j], brot[j], bpar[j], bpar[j], d2, k2, B[i + 1], tA[i + 1], false);  // P(U2 <= b | U1 = a), pair i + 1
+      // the base-scale values are clamped at 1e-10 like the arguments of the rvinecopulib families, and at 1e-12 for
+      // the ast base (as the R reference does)
+      const double eps = bfam[j] == AST ? EPS : EPS_IN;
+      for (int i = 0; i < m; i++) { tA[i] = v2p_T(A[i], d1, k1, eps); tB[i] = v2p_T(B[i], d2, k2, eps); }
+      // the level for a base given by its log density ld(a, b) and h-functions hb(a, b, h1, h2) on the base scale
+      auto level = [&](const auto &ld, const auto &hb) {
+        for (int i = 0; i < m; i++) ll = ll + ld(tA[i], tB[i]);
+        if (!last) {
+          for (int i = 0; i < m - 1; i++) {
+            h2[i] = nl_cdf_g(d1, k1, A[i], tB[i], true, ld, hb, eps);             // P(U1 <= a_i | U2 = b_i)
+            h1[i + 1] = nl_cdf_g(d2, k2, B[i + 1], tA[i + 1], false, ld, hb, eps);  // P(U2 <= b | U1 = a), pair i + 1
+          }
+          for (int i = 0; i < m - 1; i++) { A[i] = h2[i]; B[i] = h1[i + 1]; }
+          m -= 1;
         }
-        for (int i = 0; i < m - 1; i++) { A[i] = h2[i]; B[i] = h1[i + 1]; }
-        m -= 1;
+      };
+      if (bfam[j] == AST) {
+        // ast base: t quantiles of the base-scale values from a table built for this level's degrees of freedom
+        std::unique_ptr<AstZTab> tab(new AstZTab());
+        tab->build(val(bpar[j]), !std::is_same<T, double>::value);
+        const T nu = bpar[j];
+        const T c0 = lgamma_((nu + 2.0) / 2.0) - 2.0 * lgamma_((nu + 1.0) / 2.0) + lgamma_(nu / 2.0);
+        const AstPolicy<T> ap{tab.get(), nu, c0};
+        level([&](const T &a, const T &b) { return ap.ld(a, b); },
+              [&](const T &a, const T &b, T &x1, T &x2) { ap.hb(a, b, x1, x2); });
+      } else {
+        level([&](const T &a, const T &b) { return nl_base_ld(bfam[j], brot[j], bpar[j], bpar[j], a, b); },
+              [&](const T &a, const T &b, T &x1, T &x2) { T lc; pair_eval(bfam[j], brot[j], bpar[j], bpar[j], a, b, true, true, lc, x1, x2); });
       }
       continue;
     }

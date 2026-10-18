@@ -7,6 +7,7 @@
 #include "pair.h"
 #include "ast.h"
 #include "nl.h"
+#include <memory>
 
 namespace {
 
@@ -16,6 +17,8 @@ struct Level {
   bool nl = false;               // nonlinear IVT level (base in bfam, brot, bth; shapes k1, k2 of the v2p transforms)
   double th, th2, bth, d1, d2;   // th2: the second parameter of a plain BB1 level
   double k1 = 1.0, k2 = 1.0;
+  std::shared_ptr<AstZTab> tab;  // t-quantile table of an ast base of a nonlinear level
+  double c0 = 0.0;               // its log density constant
 };
 
 inline double pn(double x) { return R::pnorm(x, 0, 1, 1, 0); }
@@ -123,10 +126,25 @@ inline double hinv_plain(int fam, int rot, double th, double th2, double a, doub
 inline double vl(double x, double d) { return vlin(x, d); }
 inline double al(double x, double d) { return alin(x, d); }
 
+// run f(ld, hb) with the log density and h-functions of the base copula of a nonlinear level
+template <class F> inline double nl_run(const Level &L, F &&f) {
+  if (L.bfam == AST) {
+    const AstPolicy<double> ap{L.tab.get(), L.bth, L.c0};
+    return f([&](double a, double b) { return ap.ld(a, b); }, [&](double a, double b, double &h1, double &h2) { ap.hb(a, b, h1, h2); });
+  }
+  return f([&](double a, double b) { return nl_base_ld(L.bfam, L.brot, L.bth, L.bth, a, b); },
+           [&](double a, double b, double &h1, double &h2) { double lc; pair_eval(L.bfam, L.brot, L.bth, L.bth, a, b, true, true, lc, h1, h2); });
+}
+
+inline double nl_eps(const Level &L) { return L.bfam == AST ? EPS : EPS_IN; }
+
 inline double lv_h(const Level &L, double a, double b, int cv) {
   if (L.nl) {
-    if (cv == 1) return nl_cdf(L.bfam, L.brot, L.bth, L.bth, L.d2, L.k2, b, v2p_T(a, L.d1, L.k1), false);
-    return nl_cdf(L.bfam, L.brot, L.bth, L.bth, L.d1, L.k1, a, v2p_T(b, L.d2, L.k2), true);
+    const double eps = nl_eps(L);
+    return nl_run(L, [&](const auto &ld, const auto &hb) {
+      if (cv == 1) return nl_cdf_g(L.d2, L.k2, b, v2p_T(a, L.d1, L.k1, eps), false, ld, hb, eps);
+      return nl_cdf_g(L.d1, L.k1, a, v2p_T(b, L.d2, L.k2, eps), true, ld, hb, eps);
+    });
   }
   if (!L.ivt) return clampu(h_plain(L.fam, L.rot, L.th, L.th2, a, b, cv));
   const double x = vl(a, L.d1), y = vl(b, L.d2);
@@ -138,18 +156,21 @@ inline double lv_h(const Level &L, double a, double b, int cv) {
 // function, with the density c_V(T1(a), T2(b)) as derivative and bisection whenever a step leaves the bracket
 inline double nl_hinv(const Level &L, double a, double p) {
   a = clampu(a); p = clampu(p);
-  const double ta = v2p_T(a, L.d1, L.k1);
-  double lo = 0.0, hi = 1.0, b = p;
-  for (int it = 0; it < 80; it++) {
-    const double f = nl_cdf(L.bfam, L.brot, L.bth, L.bth, L.d2, L.k2, b, ta, false) - p;
-    if (f > 0) hi = b; else lo = b;
-    if (std::fabs(f) < 1e-13 || hi - lo < 1e-13) break;
-    const double dens = std::exp(nl_base_ld(L.bfam, L.brot, L.bth, L.bth, ta, v2p_T(b, L.d2, L.k2)));
-    double bn = b - f / dens;
-    if (!std::isfinite(bn) || bn <= lo || bn >= hi) bn = 0.5 * (lo + hi);
-    b = bn;
-  }
-  return b;
+  const double eps = nl_eps(L);
+  const double ta = v2p_T(a, L.d1, L.k1, eps);
+  return nl_run(L, [&](const auto &ld, const auto &hb) {
+    double lo = 0.0, hi = 1.0, b = p;
+    for (int it = 0; it < 80; it++) {
+      const double f = nl_cdf_g(L.d2, L.k2, b, ta, false, ld, hb, eps) - p;
+      if (f > 0) hi = b; else lo = b;
+      if (std::fabs(f) < 1e-13 || hi - lo < 1e-13) break;
+      const double dens = std::exp(ld(ta, v2p_T(b, L.d2, L.k2, eps)));
+      double bn = b - f / dens;
+      if (!std::isfinite(bn) || bn <= lo || bn >= hi) bn = 0.5 * (lo + hi);
+      b = bn;
+    }
+    return b;
+  });
 }
 
 inline double lv_hinv(const Level &L, double a, double p) {
@@ -173,7 +194,10 @@ inline double dens_plain(int fam, int rot, double th, double th2, double a, doub
 }
 
 inline double lv_dens(const Level &L, double a, double b) {
-  if (L.nl) return std::exp(nl_base_ld(L.bfam, L.brot, L.bth, L.bth, v2p_T(a, L.d1, L.k1), v2p_T(b, L.d2, L.k2)));
+  if (L.nl) {
+    const double eps = nl_eps(L);
+    return nl_run(L, [&](const auto &ld, const auto &) { return std::exp(ld(v2p_T(a, L.d1, L.k1, eps), v2p_T(b, L.d2, L.k2, eps))); });
+  }
   if (!L.ivt) return dens_plain(L.fam, L.rot, L.th, L.th2, a, b);
   return dens_plain(L.bfam, L.brot, L.bth, 0.0, vl(a, L.d1), vl(b, L.d2));
 }
@@ -186,6 +210,12 @@ std::vector<Level> make_levels(const IntegerVector &fam, const IntegerVector &ro
   std::vector<Level> lv(K);
   for (int j = 0; j < K; j++) {
     lv[j].nl = (j < nl.size() && nl[j] != 0); lv[j].k1 = k1; lv[j].k2 = k2;
+    if (lv[j].nl && bfam[j] == AST) {
+      lv[j].tab = std::make_shared<AstZTab>();
+      lv[j].tab->build(bpar[j], false);
+      const double nu = bpar[j];
+      lv[j].c0 = R::lgammafn((nu + 2.0) / 2.0) - 2.0 * R::lgammafn((nu + 1.0) / 2.0) + R::lgammafn(nu / 2.0);
+    }
     lv[j].fam = fam[j]; lv[j].rot = rot[j]; lv[j].th = par[j];
     lv[j].ivt = ivt[j] != 0; lv[j].bfam = bfam[j]; lv[j].brot = brot[j]; lv[j].bth = bpar[j]; lv[j].th2 = bpar[j];
     lv[j].d1 = d1; lv[j].d2 = d2;
