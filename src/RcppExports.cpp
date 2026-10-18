@@ -219,6 +219,31 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// dv_holdout_cpp
+List dv_holdout_cpp(NumericVector u, IntegerVector origins, NumericVector levels, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2, Nullable<IntegerVector> nl, double k1, double k2);
+RcppExport SEXP _tscop_dv_holdout_cpp(SEXP uSEXP, SEXP originsSEXP, SEXP levelsSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP, SEXP nlSEXP, SEXP k1SEXP, SEXP k2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type u(uSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type origins(originsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type levels(levelsSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type fam(famSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type rot(rotSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type par(parSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type ivt(ivtSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type bfam(bfamSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type brot(brotSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type bpar(bparSEXP);
+    Rcpp::traits::input_parameter< double >::type d1(d1SEXP);
+    Rcpp::traits::input_parameter< double >::type d2(d2SEXP);
+    Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type nl(nlSEXP);
+    Rcpp::traits::input_parameter< double >::type k1(k1SEXP);
+    Rcpp::traits::input_parameter< double >::type k2(k2SEXP);
+    rcpp_result_gen = Rcpp::wrap(dv_holdout_cpp(u, origins, levels, fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nl, k1, k2));
+    return rcpp_result_gen;
+END_RCPP
+}
 // kendall_tau_cpp
 double kendall_tau_cpp(Rcpp::NumericVector x, Rcpp::NumericVector y);
 RcppExport SEXP _tscop_kendall_tau_cpp(SEXP xSEXP, SEXP ySEXP) {
@@ -303,6 +328,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_tscop_dv_simulate_cpp", (DL_FUNC) &_tscop_dv_simulate_cpp, 13},
     {"_tscop_dv_rosenblatt_cpp", (DL_FUNC) &_tscop_dv_rosenblatt_cpp, 13},
     {"_tscop_dv_predictive_cpp", (DL_FUNC) &_tscop_dv_predictive_cpp, 15},
+    {"_tscop_dv_holdout_cpp", (DL_FUNC) &_tscop_dv_holdout_cpp, 15},
     {"_tscop_kendall_tau_cpp", (DL_FUNC) &_tscop_kendall_tau_cpp, 2},
     {"_tscop_nl_ast_table_cpp", (DL_FUNC) &_tscop_nl_ast_table_cpp, 2},
     {"_tscop_joe_tau_cpp", (DL_FUNC) &_tscop_joe_tau_cpp, 2},

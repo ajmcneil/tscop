@@ -80,6 +80,8 @@ Collate:
     'tsmod.R'
     'tsmod-joint.R'
     'tsmod-predict.R'
+    'tsforecast.R'
+    'tsscore.R'
     'ktauhat.R'
     'tscop-package.R'
     'RcppExports.R'
