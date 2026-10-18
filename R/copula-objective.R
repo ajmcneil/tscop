@@ -94,7 +94,8 @@ setMethod("cop_obj", "sdvinecop", function(model, u) {
       e <- g$e
       pad <- function(m) cbind(matrix(0, nrow(m), nx), m)
       r <- dv_loglik_grad_cpp(u, cbind(du, matrix(0, nrow(du), length(z))), e$fam, e$rot, e$par, pad(g$dpar), e$ivt, e$bfam, e$brot,
-                              e$bpar, pad(g$dbpar), e$d1, e$d2, c(numeric(nx), g$dd1), c(numeric(nx), g$dd2))
+                              e$bpar, pad(g$dbpar), e$d1, e$d2, c(numeric(nx), g$dd1), c(numeric(nx), g$dd2),
+                              e$nl, e$k1, e$k2, c(numeric(nx), g$dk1), c(numeric(nx), g$dk2))
       if (!is.finite(r$value) || any(!is.finite(r$gradient))) return(NULL)
       -r$gradient
     }

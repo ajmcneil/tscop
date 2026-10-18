@@ -40,7 +40,25 @@
 #'   (`delta1` applies to the earlier and `delta2` to the later variable of
 #'   a pair); empty if the model has no such pair copula.
 #' @slot vtpar which fulcrums are parameters: `"both"`, `"common"` (one
-#'   parameter, equal fulcrums) or `"none"` (fixed).
+#'   parameter, equal fulcrums; deprecated) or `"none"` (fixed). Derived from
+#'   `vtfix`.
+#' @slot vttype the type of the v-transforms of the IVT pair copulas: `"linear"`
+#'   or `"v2p"` (two-parameter nonlinear transforms of [udp::v2p()]).
+#' @slot vtshape the shape parameters `c(kappa1, kappa2)` of the `"v2p"`
+#'   transforms (`kappa = 1` is the linear transform); empty for linear
+#'   transforms.
+#' @slot vtfix the v-transform parameters held fixed at their given values: a
+#'   subset of `"delta1"`, `"delta2"`, `"kappa1"`, `"kappa2"`.
+#' @slot nl the number of nonlinear lags: `NA` (determined by the rule with
+#'   `nltau`) or a positive whole number.
+#' @slot nltau tolerance on the absolute Kendall's tau defining the number of
+#'   nonlinear lags when `nl` is `NA`.
+#' @slot L the number of nonlinear lags (lags `1, ..., L` use the nonlinear
+#'   transforms, the others linear transforms with the same fulcrums); `NA` for
+#'   linear transforms and for a model structure whose ARMA coefficients are not
+#'   yet specified.
+#' @slot Llimit what determined `L`: `"rule"` (the `nltau` rule), `"given"`
+#'   (`nl`), `"cap"` (capped at `K`) or `"none"`.
 #' @slot K the effective lag (`NA` for a model structure whose ARMA
 #'   coefficients are not yet specified).
 #' @slot Klimit what determined `K`: `"ar"` (pure AR order), `"tol"`,
@@ -69,7 +87,9 @@
 setClass("sdvinecop", slots = c(
   name = "character", mode = "character", kpacf = "gausscopOrNULL",
   pairs = "list", tail = "pcOrNULL", tautol = "numeric", maxlag = "numeric",
-  K = "integer", Klimit = "character", vt = "numeric", vtpar = "character"
+  K = "integer", Klimit = "character", vt = "numeric", vtpar = "character",
+  vttype = "character", vtshape = "numeric", vtfix = "character", nl = "numeric", nltau = "numeric",
+  L = "integer", Llimit = "character"
 ))
 
 # Does the model contain an inverse-v-transformed pair copula?
@@ -113,6 +133,26 @@ setValidity("sdvinecop", function(object) {
   } else if (length(object@vt) > 0L) {
     return("'vt' is only used with inverse-v-transformed pair copulas")
   }
+  if (length(object@vttype) != 1L || !(object@vttype %in% c("linear", "v2p"))) {
+    return("'vttype' must be \"linear\" or \"v2p\"")
+  }
+  if (!all(object@vtfix %in% c("delta1", "delta2", "kappa1", "kappa2"))) {
+    return("'vtfix' must name v-transform parameters: \"delta1\", \"delta2\", \"kappa1\" or \"kappa2\"")
+  }
+  if (object@vttype == "v2p") {
+    if (!dv_has_ivt(object)) return("'vttype = \"v2p\"' needs inverse-v-transformed pair copulas")
+    if (length(object@vtshape) != 2L || anyNA(object@vtshape) || any(object@vtshape <= 0)) {
+      return("the shape parameters 'vtshape' must be two positive numbers")
+    }
+    if (object@vtpar == "common") return("'vtpar = \"common\"' is not available with nonlinear v-transforms")
+  } else {
+    if (length(object@vtshape) > 0L) return("'vtshape' is only used with 'vttype = \"v2p\"'")
+    if (any(object@vtfix %in% c("kappa1", "kappa2"))) return("the shape parameters exist only with 'vttype = \"v2p\"'")
+  }
+  if (length(object@nltau) != 1L || !(object@nltau >= 0)) return("'nltau' must be a non-negative number")
+  if (length(object@nl) != 1L || (!is.na(object@nl) && (object@nl < 1 || object@nl != round(object@nl)))) {
+    return("'nl' must be \"auto\" or a positive whole number")
+  }
   TRUE
 })
 
@@ -144,10 +184,32 @@ setValidity("sdvinecop", function(object) {
 #' @param vt the fulcrums of the linear v-transforms of the `"ivt"` pair
 #'   copulas, two numbers in (0, 1) (default `c(0.5, 0.5)` when the model has an
 #'   `"ivt"` pair copula; an error otherwise). They are starting values when
-#'   the model is fitted, unless `vtpar = "none"`.
-#' @param vtpar `"both"` (default): both fulcrums are estimated; `"common"`:
-#'   one fulcrum for both (the vt-D-vine of Bladt and McNeil, with `vt` equal in
-#'   its two components); `"none"`: the fulcrums are fixed at `vt`.
+#'   the model is fitted, unless they are in `vtfix`.
+#' @param vttype `"linear"` (default) or `"v2p"`: the v-transforms of the IVT
+#'   pair copulas are the linear ones (fulcrum `delta`) or the two-parameter
+#'   nonlinear transforms of [udp::v2p()] with fulcrum `delta` and shape
+#'   `kappa` (`kappa = 1` is the linear transform), `v2p(delta1, kappa1)` for
+#'   the earlier and `v2p(delta2, kappa2)` for the later variable of a pair.
+#'   The nonlinear transforms are used at lags `1, ..., L`, the linear ones with
+#'   the same fulcrums beyond (see `nl`). Only the `v2p` transform is available.
+#' @param vtshape the shape parameters `c(kappa1, kappa2)` of the `"v2p"`
+#'   transforms: the known values, or the starting values when the model is
+#'   fitted (default `c(1, 1)`, the linear model). During fitting `kappa` is
+#'   bounded to (0.25, 4) and, for `"v2p"`, `delta` to (0.02, 0.98).
+#' @param vtfix the v-transform parameters held fixed at their given values
+#'   rather than estimated, a subset of `"delta1"`, `"delta2"`, `"kappa1"` and
+#'   `"kappa2"` (default none). For example `vtfix = "kappa2"` estimates
+#'   `kappa1` and keeps `kappa2` at its value in `vtshape` (1 by default).
+#' @param nl the lags with nonlinear v-transforms when `vttype = "v2p"`:
+#'   `"auto"` (default), lags `1, ..., L` with `L` the last lag at which the
+#'   absolute Kendall's tau of the kpacf exceeds `nltau` (at least 1, at most
+#'   `K`), or a positive whole number `L` (capped at `K`).
+#' @param nltau the tolerance on the absolute Kendall's tau of the kpacf that
+#'   defines `L` for `nl = "auto"` (default 0.02).
+#' @param vtpar deprecated: use `vtfix`. `"both"` (the default behaviour) is
+#'   `vtfix = character(0)`; `"none"` is `vtfix = c("delta1", "delta2")`;
+#'   `"common"` ties the two (linear) fulcrums, which is the process-level
+#'   model of [vtscop()] with a linear v-transform.
 #' @param tautol tolerance on the absolute Kendall's tau defining the
 #'   effective lag.
 #' @param maxlag cap on the effective lag (`Inf` for none).
@@ -178,7 +240,8 @@ setValidity("sdvinecop", function(object) {
 #' # AR(2) with a t copula at lag 1: a finite-order d-vine
 #' sdvinecop(armacop(ar = c(0.5, 0.2)), pairs = list(pc("t", aux = 6)))
 sdvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
-                     tautol = 1e-4, maxlag = Inf, vt = NULL, vtpar = "both") {
+                     tautol = 1e-4, maxlag = Inf, vt = NULL, vttype = c("linear", "v2p"), vtshape = NULL,
+                     vtfix = character(0), nl = "auto", nltau = 0.02, vtpar = NULL) {
   if (!is.null(kpacf) && !is(kpacf, "gausscop")) {
     stop("'kpacf' must be a Gaussian copula process (an armacop or arfactcop object)")
   }
@@ -220,7 +283,18 @@ sdvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
   } else {
     sprintf("d-vine(free, %d explicit%s)", K0, if (is.null(kpacf)) "" else paste0(", ", kpacf@name, " tail"))
   }
-  vtpar <- match.arg(vtpar, c("both", "common", "none"))
+  vttype <- match.arg(vttype)
+  vtfix <- unique(as.character(vtfix))
+  common <- FALSE
+  if (!is.null(vtpar)) {
+    warning("'vtpar' is deprecated: use 'vtfix' (vtpar = \"none\" is vtfix = c(\"delta1\", \"delta2\"))", call. = FALSE)
+    vtpar <- match.arg(vtpar, c("both", "common", "none"))
+    if (vtpar == "none") vtfix <- union(vtfix, c("delta1", "delta2"))
+    common <- vtpar == "common"
+  }
+  if (!all(vtfix %in% c("delta1", "delta2", "kappa1", "kappa2"))) {
+    stop("'vtfix' must name v-transform parameters: \"delta1\", \"delta2\", \"kappa1\" or \"kappa2\"")
+  }
   has_ivt <- any(vapply(pairs, function(sp) is(sp, "pc") && sp@family == "ivt", logical(1))) ||
     (!is.null(tailspec) && tailspec@family == "ivt")
   if (has_ivt) {
@@ -230,11 +304,37 @@ sdvinecop <- function(kpacf = NULL, pairs = list(), tail = "gauss",
     names(vt) <- c("delta1", "delta2")
   } else {
     if (!is.null(vt)) stop("'vt' is only used with inverse-v-transformed pair copulas (pc(\"ivt\", ...))")
+    if (vttype != "linear") stop("'vttype = \"v2p\"' needs inverse-v-transformed pair copulas (pc(\"ivt\", ...))")
+    if (length(vtfix) > 0L) stop("'vtfix' is only used with inverse-v-transformed pair copulas (pc(\"ivt\", ...))")
     vt <- numeric(0)
   }
+  if (vttype == "v2p") {
+    if (common) stop("'vtpar = \"common\"' is not available with nonlinear v-transforms")
+    if (is.null(vtshape)) vtshape <- c(1, 1)
+    if (!is.numeric(vtshape) || length(vtshape) != 2L || anyNA(vtshape) || any(vtshape <= 0)) {
+      stop("'vtshape' must be two positive shape parameters (kappa1, kappa2)")
+    }
+    vtshape <- as.numeric(vtshape)
+    names(vtshape) <- c("kappa1", "kappa2")
+    if (all(c("kappa1", "kappa2") %in% vtfix) && all(vtshape == 1)) {
+      stop("both shape parameters fixed at 1 is the model with linear v-transforms: use vttype = \"linear\"")
+    }
+  } else {
+    if (!is.null(vtshape)) stop("'vtshape' is only used with vttype = \"v2p\"")
+    if (any(vtfix %in% c("kappa1", "kappa2"))) stop("the shape parameters exist only with vttype = \"v2p\"")
+    vtshape <- numeric(0)
+  }
+  vtpar_slot <- if (common) "common" else if (all(c("delta1", "delta2") %in% vtfix)) "none" else "both"
+  if (identical(nl, "auto")) {
+    nl <- NA_real_
+  } else if (!is.numeric(nl) || length(nl) != 1L || is.na(nl) || nl < 1 || nl != round(nl)) {
+    stop("'nl' must be \"auto\" or a positive whole number")
+  }
+  Lres <- dv_nl_L_value(kpacf, K, nl, nltau, vttype)
   new("sdvinecop", name = name, mode = mode, kpacf = kpacf, pairs = pairs, tail = tailspec,
       tautol = as.numeric(tautol), maxlag = as.numeric(maxlag), K = as.integer(K),
-      Klimit = limit, vt = vt, vtpar = vtpar)
+      Klimit = limit, vt = vt, vtpar = vtpar_slot, vttype = vttype, vtshape = vtshape, vtfix = vtfix,
+      nl = as.numeric(nl), nltau = as.numeric(nltau), L = Lres$L, Llimit = Lres$limit)
 }
 
 # Kendall's tau of the kpacf at lags 1..K for a specified Gaussian copula
@@ -261,6 +361,7 @@ dv_resolve <- function(object) {
       if (is.null(tl)) return(NULL)
       pairs[(K0 + 1L):K] <- tl
     }
+    if (object@vttype == "v2p") pairs <- dv_nlify(pairs, object@L, object@vtshape)
   } else {
     for (j in seq_len(min(K0, K))) pairs[[j]] <- dv_from_bicop(object@pairs[[j]])
     if (K > K0) {
@@ -294,8 +395,13 @@ setMethod("coef", "sdvinecop", function(object) {
         out <- c(out, aux)
       }
     }
-    if (length(object@vt) > 0L && object@vtpar != "none") {
-      out <- c(out, if (object@vtpar == "common") c(delta = object@vt[[1L]]) else object@vt)
+    if (length(object@vt) > 0L) {
+      if (object@vtpar == "common") {
+        out <- c(out, c(delta = object@vt[[1L]]))
+      } else {
+        vtall <- c(object@vt, object@vtshape)
+        out <- c(out, vtall[setdiff(names(vtall), object@vtfix)])
+      }
     }
   }
   out
@@ -352,7 +458,13 @@ setMethod("show", "sdvinecop", function(object) {
   }
   if (length(object@vt) > 0L) {
     cat("v-transform deltas: ", paste(format(object@vt, digits = 4), collapse = ", "),
-        switch(object@vtpar, both = "", common = " (common)", none = " (fixed)"), "\n", sep = "")
+        if (object@vtpar == "common") " (common)" else if (all(c("delta1", "delta2") %in% object@vtfix)) " (fixed)", "\n", sep = "")
+    if (object@vttype == "v2p") {
+      cat("v-transform shapes (v2p): ", paste(format(object@vtshape, digits = 4), collapse = ", "),
+          if (all(c("kappa1", "kappa2") %in% object@vtfix)) " (fixed)" else if (length(intersect(object@vtfix, c("kappa1", "kappa2"))) > 0L)
+            paste0(" (", paste(intersect(object@vtfix, c("kappa1", "kappa2")), collapse = ", "), " fixed)"),
+          "; nonlinear lags 1-", object@L, "\n", sep = "")
+    }
   }
   cf <- coef(object)
   if (length(cf) > 0L) {

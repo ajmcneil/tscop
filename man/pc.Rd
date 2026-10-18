@@ -69,7 +69,7 @@ process the Frank or Gaussian tail can lose over a hundred log-likelihood
 units against \code{"joe"} at all lags. With the compiled likelihood the cost of
 \code{"joe"} at all lags is similar to that of a \code{"joe"} first part with a \code{"frank"}
 tail. If a \code{"gumbel"} or \code{"gauss"} base is needed, fix the fulcrums
-(\code{vtpar = "none"} in \code{\link[=sdvinecop]{sdvinecop()}}) at values from a fit with a regular base.
+(\code{vtfix = c("delta1", "delta2")} in \code{\link[=sdvinecop]{sdvinecop()}}) at values from a fit with a regular base.
 }
 
 \examples{

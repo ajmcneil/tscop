@@ -30,6 +30,10 @@
 #'   otherwise `NULL`.
 #' @slot path for a model selected by [autodvinecop()], a data frame with one
 #'   row per lag examined; an empty data frame otherwise.
+#' @slot loglik_linear for a model with nonlinear (`"v2p"`) v-transforms, the
+#'   maximised log-likelihood of the first (linear) stage of the fit, so that
+#'   `2 * (loglik - loglik_linear)` is the likelihood-ratio statistic of the
+#'   shape parameters; `NA` for linear models.
 #'
 #' @exportClass sdvinecopfit
 setClass("sdvinecopfit", slots = c(
@@ -38,7 +42,7 @@ setClass("sdvinecopfit", slots = c(
   boot = "matrix", loglik = "numeric", nobs = "integer", npar = "integer",
   convergence = "integer", message = "character", start = "sdvinecop",
   Kstart = "integer", nrefit = "integer", dloglik = "numeric", template = "ANY",
-  path = "data.frame"
+  path = "data.frame", loglik_linear = "numeric"
 ))
 
 # ---- parameter layout ----------------------------------------------------
@@ -49,6 +53,10 @@ setClass("sdvinecopfit", slots = c(
 dv_layout <- function(object) {
   ops <- gc_free_ops(object@kpacf)
   aux_lags <- which(vapply(object@pairs, function(sp) sp@family %in% .pc_aux_families, logical(1)))
+  has_ivt <- dv_has_ivt(object)
+  vt_names <- dv_vt_free_names(object)
+  Lenv <- new.env(parent = emptyenv())
+  Lenv$L <- object@L
   list(
     ops = ops, nk = ops$nfree,
     K0 = length(object@pairs), aux_lags = aux_lags,
@@ -56,9 +64,76 @@ dv_layout <- function(object) {
     explicit = lapply(object@pairs, function(sp) list(family = sp@family, pos = sp@pos, neg = sp@neg,
                                                       base = sp@base)),
     tail = object@tail,
-    has_ivt = dv_has_ivt(object), vtpar = object@vtpar, vt_fixed = object@vt,
-    nvt = if (!dv_has_ivt(object)) 0L else switch(object@vtpar, both = 2L, common = 1L, none = 0L)
+    has_ivt = has_ivt, vtpar = object@vtpar, vt_fixed = object@vt,
+    vttype = object@vttype, vt_names = vt_names,
+    vt_all = if (has_ivt) c(object@vt, if (object@vttype == "v2p") object@vtshape else c(kappa1 = 1, kappa2 = 1)) else numeric(0),
+    nl_given = object@nl, nltau = object@nltau, Lenv = Lenv,
+    nvt = length(vt_names)
   )
+}
+
+# Names of the free v-transform parameters, in the order of the free vector and of coef().
+dv_vt_free_names <- function(object) {
+  if (!dv_has_ivt(object)) return(character(0))
+  if (object@vtpar == "common") return("delta")
+  setdiff(c("delta1", "delta2", if (object@vttype == "v2p") c("kappa1", "kappa2")), object@vtfix)
+}
+
+# Natural value, and derivative with respect to the free-scale value z, of one v-transform parameter: the
+# fulcrums by a logistic map (onto (0.02, 0.98) for nonlinear transforms, (0, 1) for linear ones), the shapes
+# by kappa = 0.25 * 16^plogis(z), bounded to (0.25, 4).
+dv_vt_one_from_z <- function(nm, z, vttype) {
+  p <- stats::plogis(z)
+  if (nm %in% c("delta", "delta1", "delta2")) {
+    if (vttype == "v2p") 0.02 + 0.96 * p else p
+  } else {
+    0.25 * 16^p
+  }
+}
+dv_vt_one_dz <- function(nm, z, vttype) {
+  p <- stats::plogis(z)
+  if (nm %in% c("delta", "delta1", "delta2")) {
+    (if (vttype == "v2p") 0.96 else 1) * p * (1 - p)
+  } else {
+    0.25 * 16^p * log(16) * p * (1 - p)
+  }
+}
+dv_vt_one_to_z <- function(nm, value, vttype) {
+  clamp <- function(x) pmin(pmax(x, 1e-3), 1 - 1e-3)
+  if (nm %in% c("delta", "delta1", "delta2")) {
+    stats::qlogis(clamp(if (vttype == "v2p") (value - 0.02) / 0.96 else value))
+  } else {
+    stats::qlogis(clamp(log(value / 0.25) / log(16)))
+  }
+}
+
+# All four v-transform parameters (delta1, delta2, kappa1, kappa2) at the free vector z: the free ones from z, the
+# others at their given values.
+dv_vt_values <- function(z, lay) {
+  v <- lay$vt_all
+  if (lay$nvt > 0L) {
+    zv <- z[dv_vt_index(lay)]
+    for (i in seq_along(lay$vt_names)) {
+      nm <- lay$vt_names[i]
+      val <- dv_vt_one_from_z(nm, zv[i], lay$vttype)
+      if (nm == "delta") v[c("delta1", "delta2")] <- val else v[nm] <- val
+    }
+  }
+  v
+}
+
+# Free-scale values of the free v-transform parameters from the four values (delta1, delta2, kappa1, kappa2).
+dv_vt_to_free <- function(lay, values) {
+  vapply(lay$vt_names, function(nm) dv_vt_one_to_z(nm, if (nm == "delta") values[["delta1"]] else values[[nm]], lay$vttype), numeric(1),
+         USE.NAMES = FALSE)
+}
+
+# Number of nonlinear lags at the free vector z and effective lag K (the rule of the spec, or the given number).
+dv_L_at <- function(z, lay, K) {
+  if (lay$vttype != "v2p") return(NA_integer_)
+  if (!is.na(lay$nl_given)) return(as.integer(min(lay$nl_given, K)))
+  tau <- (2 / pi) * asin(lay$ops$pacf(z[seq_len(lay$nk)], K))
+  as.integer(dv_nl_lags(tau, lay$nltau))
 }
 
 # Index of the v-transform parameters in the free vector (after the kpacf and
@@ -67,14 +142,9 @@ dv_vt_index <- function(lay) lay$nk + length(lay$aux_lags) + seq_len(lay$nvt)
 
 dv_vt_from_free <- function(z, lay) {
   if (!lay$has_ivt) return(NULL)
-  zv <- z[dv_vt_index(lay)]
-  switch(lay$vtpar, both = stats::plogis(zv), common = rep(stats::plogis(zv), 2L), none = unname(lay$vt_fixed))
+  unname(dv_vt_values(z, lay)[1:2])
 }
-
-dv_vt_to_free <- function(vt, vtpar) {
-  clamp <- function(x) pmin(pmax(x, 1e-3), 1 - 1e-3)
-  switch(vtpar, both = stats::qlogis(clamp(vt)), common = stats::qlogis(clamp(vt[1L])), none = numeric(0))
-}
+dv_kappa_from_free <- function(z, lay) unname(dv_vt_values(z, lay)[3:4])
 
 dv_aux_from_free <- function(z, fam) ifelse(fam == "t", 2 + exp(z), 1 + exp(z))
 dv_aux_to_free <- function(aux, fam) log(pmax(aux - ifelse(fam == "t", 2, 1), 1e-3))
@@ -85,7 +155,10 @@ dv_free_to_coef <- function(z, lay) {
   na <- lay$nk
   c(lay$ops$coef(z[seq_len(na)]),
     dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam),
-    if (lay$nvt > 0L) stats::plogis(z[dv_vt_index(lay)]))
+    if (lay$nvt > 0L) {
+      vv <- dv_vt_values(z, lay)
+      unname(vapply(lay$vt_names, function(nm) if (nm == "delta") vv[["delta1"]] else vv[[nm]], numeric(1)))
+    })
 }
 
 # Resolved pair copulas of length K at the free vector z; NULL if infeasible.
@@ -93,12 +166,12 @@ dv_make_pairs <- function(z, lay, K) {
   na <- lay$nk
   tau <- (2 / pi) * asin(lay$ops$pacf(z[seq_len(na)], K))
   aux <- dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam)
-  dv_make_pairs_tau(tau, aux, dv_vt_from_free(z, lay), lay, K)
+  dv_make_pairs_tau(tau, aux, dv_vt_from_free(z, lay), lay, K, dv_kappa_from_free(z, lay))
 }
 
 # The same from the Kendall's tau values of lags 1..K (and the auxiliary
 # parameters and fulcrums).
-dv_make_pairs_tau <- function(tau, aux, vt, lay, K) {
+dv_make_pairs_tau <- function(tau, aux, vt, lay, K, kappa = c(1, 1)) {
   K0 <- lay$K0
   pairs <- vector("list", K)
   for (j in seq_len(min(K0, K))) {
@@ -114,6 +187,12 @@ dv_make_pairs_tau <- function(tau, aux, vt, lay, K) {
     tl <- dv_resolve_tail(lay$tail, tau[(K0 + 1L):K], vt)
     if (is.null(tl)) return(NULL)
     pairs[(K0 + 1L):K] <- tl
+  }
+  if (lay$vttype == "v2p") {
+    # nonlinear v-transforms at lags 1..L: L is held fixed during an optimisation (lay$Lenv$L), otherwise it follows the rule
+    L <- lay$Lenv$L
+    if (is.na(L)) L <- if (!is.na(lay$nl_given)) min(lay$nl_given, K) else dv_nl_lags(tau, lay$nltau)
+    pairs <- dv_nlify(pairs, min(L, K), kappa)
   }
   pairs
 }
@@ -185,9 +264,9 @@ dv_grad_pieces <- function(z, lay, K) {
   tau <- tau_of(zk)
   vt <- dv_vt_from_free(z, lay)
   aux <- dv_aux_from_free(z[na + seq_along(lay$aux_lags)], lay$aux_fam)
-  pairs <- dv_make_pairs_tau(tau, aux, vt, lay, K)
+  pairs <- dv_make_pairs_tau(tau, aux, vt, lay, K, dv_kappa_from_free(z, lay))
   if (is.null(pairs)) return(NULL)
-  e <- dv_encode(pairs, ast = TRUE)
+  e <- dv_encode(pairs, ast = TRUE, nl = TRUE)
   if (is.null(e)) return(NULL)
   # d tau / d z (K x P)
   dtau <- matrix(0, K, P)
@@ -201,7 +280,7 @@ dv_grad_pieces <- function(z, lay, K) {
   dpar_dtau <- dv_dpar_dtau(e$fam, e$rot, e$par, tau, ivt = FALSE, par2 = e$bpar)
   dbpar_dtau <- dv_dpar_dtau(e$bfam, e$brot, e$bpar, tau, ivt = TRUE)
   dpar_dtau[e$ivt == 1L] <- 0
-  dbpar_dtau[e$ivt == 0L] <- 0
+  dbpar_dtau[e$ivt == 0L & e$nl == 0L] <- 0
   dpar <- dtau * dpar_dtau
   dbpar <- dtau * dbpar_dtau
   # BB1 pairs: theta = 2 / ((1 - |tau|) delta) - 2 also depends on the free auxiliary parameter
@@ -216,18 +295,17 @@ dv_grad_pieces <- function(z, lay, K) {
       dbpar[j, na + i] <- e$bpar[j] - 2      # nu = 2 + exp(z)
     }
   }
-  dd1 <- dd2 <- numeric(P)
+  dd1 <- dd2 <- dk1 <- dk2 <- numeric(P)
   if (lay$nvt > 0L) {
     iv <- dv_vt_index(lay)
-    if (lay$vtpar == "both") {
-      dd1[iv[1L]] <- e$d1 * (1 - e$d1)
-      dd2[iv[2L]] <- e$d2 * (1 - e$d2)
-    } else {  # common
-      dd1[iv[1L]] <- e$d1 * (1 - e$d1)
-      dd2[iv[1L]] <- e$d2 * (1 - e$d2)
+    for (i in seq_along(lay$vt_names)) {
+      nm <- lay$vt_names[i]
+      d <- dv_vt_one_dz(nm, z[iv[i]], lay$vttype)
+      switch(nm, delta = { dd1[iv[i]] <- d; dd2[iv[i]] <- d }, delta1 = dd1[iv[i]] <- d, delta2 = dd2[iv[i]] <- d,
+             kappa1 = dk1[iv[i]] <- d, kappa2 = dk2[iv[i]] <- d)
     }
   }
-  list(e = e, dpar = dpar, dbpar = dbpar, dd1 = dd1, dd2 = dd2)
+  list(e = e, dpar = dpar, dbpar = dbpar, dd1 = dd1, dd2 = dd2, dk1 = dk1, dk2 = dk2)
 }
 
 dv_negll_grad <- function(z, lay, K, u) {
@@ -235,7 +313,7 @@ dv_negll_grad <- function(z, lay, K, u) {
   if (is.null(g)) return(NULL)
   e <- g$e
   r <- dv_loglik_grad_cpp(u, matrix(0, 0, length(z)), e$fam, e$rot, e$par, g$dpar, e$ivt, e$bfam, e$brot, e$bpar, g$dbpar,
-                          e$d1, e$d2, g$dd1, g$dd2)
+                          e$d1, e$d2, g$dd1, g$dd2, e$nl, e$k1, e$k2, g$dk1, g$dk2)
   if (!is.finite(r$value) || any(!is.finite(r$gradient))) return(NULL)
   -r$gradient
 }
@@ -322,6 +400,7 @@ dv_start <- function(object, init, u, control) {
   na <- lay$nk
   kp <- object@kpacf
   specaux <- vapply(object@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
+  vtv <- lay$vt_all          # (delta1, delta2, kappa1, kappa2)
   vt <- if (lay$has_ivt) object@vt else numeric(0)
   if (!is.null(init)) {
     if (is(init, "sdvinecop")) {
@@ -332,11 +411,22 @@ dv_start <- function(object, init, u, control) {
       if (!gc_is_specified(init@kpacf)) stop("'init' has unspecified kpacf coefficients")
       kp <- init@kpacf
       specaux <- vapply(init@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
-      if (lay$has_ivt) vt <- init@vt
+      if (lay$has_ivt) {
+        vt <- init@vt
+        vtv[1:2] <- init@vt
+        if (length(init@vtshape) == 2L && lay$vttype == "v2p") vtv[3:4] <- init@vtshape
+      }
     } else if (is.numeric(init) && length(init) == na + length(lay$aux_lags) + lay$nvt) {
       kp <- gc_from_coef(kp, as.numeric(init[seq_len(na)]))
       specaux <- as.numeric(init[na + seq_along(lay$aux_lags)])
-      if (lay$nvt > 0L) vt <- rep(as.numeric(init[na + length(lay$aux_lags) + seq_len(lay$nvt)]), length.out = 2L)
+      if (lay$nvt > 0L) {
+        iv <- init[na + length(lay$aux_lags) + seq_len(lay$nvt)]
+        for (i in seq_along(lay$vt_names)) {
+          nm <- lay$vt_names[i]
+          if (nm == "delta") vtv[1:2] <- iv[[i]] else vtv[nm] <- iv[[i]]
+        }
+        vt <- unname(vtv[1:2])
+      }
     } else {
       stop("'init' must be a sdvinecop model or a numeric vector of coefficients")
     }
@@ -350,7 +440,7 @@ dv_start <- function(object, init, u, control) {
   tau <- gc_tau(kp, max(lay$K0, 1L))
   aux <- dv_default_aux(specaux, lay$aux_fam, tau[lay$aux_lags])
   z0 <- c(lay$ops$to_free(kp), dv_aux_to_free(aux, lay$aux_fam),
-          if (lay$has_ivt) dv_vt_to_free(vt, lay$vtpar))
+          if (lay$nvt > 0L) dv_vt_to_free(lay, vtv))
   list(z0 = z0, lay = lay, kpacf = kp, aux = aux)
 }
 
@@ -366,10 +456,20 @@ dv_build_model <- function(object, z, lay, K, limit) {
   }
   vt <- dv_vt_from_free(z, lay)
   if (!is.null(vt)) names(vt) <- c("delta1", "delta2")
+  v2p <- lay$vttype == "v2p"
   m <- sdvinecop(kp, pairs = pairs, tail = object@tail, tautol = object@tautol,
-                maxlag = object@maxlag, vt = vt, vtpar = object@vtpar)
+                maxlag = object@maxlag, vt = vt, vttype = lay$vttype,
+                vtshape = if (v2p) dv_kappa_from_free(z, lay) else NULL, vtfix = object@vtfix,
+                nl = if (is.na(object@nl)) "auto" else object@nl, nltau = object@nltau)
+  m@vtpar <- object@vtpar
   m@K <- as.integer(K)
   m@Klimit <- limit
+  if (v2p) {
+    L <- lay$Lenv$L
+    if (is.na(L)) L <- dv_L_at(z, lay, K)
+    m@L <- as.integer(min(L, K))
+    m@Llimit <- if (!is.na(object@nl)) (if (object@nl > K) "cap" else "given") else "rule"
+  }
   m
 }
 
@@ -378,6 +478,30 @@ dv_build_model <- function(object, z, lay, K, limit) {
 # Full fitting procedure on complete data u: starting values, the K rule and
 # the optimisation. Returns the pieces needed to build a sdvinecopfit.
 dv_fit_all <- function(u, object, init, control) {
+  if (object@vttype == "v2p" && is.null(init)) {
+    # staged fit: the linear model first (cheap, closed form), then the shape parameters are released from the linear
+    # optimum (v2p with kappa = 1 is the linear transform); the log-likelihood of the first stage is kept
+    lin <- object
+    lin@vttype <- "linear"
+    lin@vtshape <- numeric(0)
+    lin@vtfix <- setdiff(object@vtfix, c("kappa1", "kappa2"))
+    lin@L <- NA_integer_
+    f1 <- dv_fit_core(u, lin, NULL, control)
+    m1 <- dv_build_model(lin, f1$z, f1$lay, f1$K, f1$limit)
+    start <- sdvinecop(m1@kpacf, pairs = m1@pairs, tail = m1@tail, tautol = m1@tautol, maxlag = m1@maxlag, vt = m1@vt,
+                       vttype = "v2p", vtshape = object@vtshape, vtfix = object@vtfix,
+                       nl = if (is.na(object@nl)) "auto" else object@nl, nltau = object@nltau)
+    start@vtpar <- object@vtpar
+    res <- dv_fit_core(u, object, start, control)
+    res$loglik_linear <- f1$loglik
+    return(res)
+  }
+  res <- dv_fit_core(u, object, init, control)
+  res$loglik_linear <- NA_real_
+  res
+}
+
+dv_fit_core <- function(u, object, init, control) {
   stageK <- control$stageK
   control$stageK <- NULL
   st <- dv_start(object, init, u, control)
@@ -392,6 +516,8 @@ dv_fit_all <- function(u, object, init, control) {
   ctrl <- modifyList(list(maxit = 500, reltol = 1e-10), control)
   fit_fixed <- function(K, z, reltol = ctrl$reltol) {
     npar <- length(z)
+    # the number of nonlinear lags is held fixed during an optimisation, like K
+    if (lay$vttype == "v2p") lay$Lenv$L <- dv_L_at(z, lay, K)
     if (npar == 0L) return(list(z = z, value = dv_negll(z, lay, K, u), convergence = 0L, message = ""))
     c1 <- modifyList(ctrl, list(ndeps = rep(1e-6, npar), reltol = reltol))
     opt <- stats::optim(z, dv_negll, gr = dv_negll_gr, lay = lay, K = K, u = u, method = "BFGS", control = c1)
@@ -415,6 +541,14 @@ dv_fit_all <- function(u, object, init, control) {
     if (st1$convergence == 0L && st1$value < 1e10 && dv_negll(st1$z, lay, K_start, u) < 1e10) z0 <- st1$z
   }
   res <- dv_k_rule(fit_fixed, K_of, ll_of, K_of(z0), z0)
+  if (lay$vttype == "v2p" && is.na(lay$nl_given)) {
+    # the number of nonlinear lags at the optimum: refit from there if the rule gives another one (at most twice)
+    for (it in 1:2) {
+      Lnew <- dv_L_at(res$z, lay, res$K)
+      if (Lnew == lay$Lenv$L) break
+      res <- dv_k_rule(fit_fixed, K_of, ll_of, res$K, res$z)
+    }
+  }
   limit <- dv_K_at(res$z, lay, tautol, maxlag)$limit
   if (res$K != K_of(res$z)) limit <- "tol"
   c(res, list(lay = lay, st = st, limit = limit, loglik = ll_of(res$z, res$K), u = u))
@@ -546,7 +680,7 @@ setMethod("tsfit", signature(U = "ANY", object = "sdvinecop"),
       start = start_model, Kstart = as.integer(fit$Kstart), nrefit = as.integer(fit$nrefit),
       dloglik = fit$dloglik,
       template = if (inherits(U, c("ts", "zoo", "xts"))) U else NULL,
-      path = data.frame()
+      path = data.frame(), loglik_linear = if (is.null(fit$loglik_linear)) NA_real_ else fit$loglik_linear
     )
   }
 )

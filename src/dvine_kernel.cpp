@@ -1,7 +1,8 @@
 // C++ kernel for the d-vine likelihood of tied sdvinecop models: plain pair
 // copulas (independence, Gauss, Clayton, Gumbel, Joe, Frank, all four
 // rotations) and inverse-v-transformed (IVT) pair copulas with linear
-// v-transforms and these bases, evaluated by the same level recursion as the R
+// v-transforms and these bases, and IVT levels with nonlinear (v2p) v-transforms (src/nl.h; Clayton,
+// Gumbel, Joe, Frank and ast bases; the Gaussian base uses the R path), evaluated by the same level recursion as the R
 // reference implementation dv_loglik_r (R/dvine-engine.R). The recursion is a
 // template over the scalar type: double gives the log-likelihood, and a
 // forward-mode dual number with P derivative directions gives the
@@ -9,7 +10,9 @@
 #include "pair.h"
 #include "ast.h"
 #include "kendall.h"
+#include "nl.h"
 #include <type_traits>
+#include <memory>
 
 namespace {
 
@@ -108,7 +111,7 @@ template <class T>
 T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const IntegerVector &rot,
               const std::vector<T> &par, const IntegerVector &ivt, const IntegerVector &bfam,
               const IntegerVector &brot, const std::vector<T> &bpar, const T &d1, const T &d2,
-              std::vector<double> *tau_out = nullptr) {
+              const IntegerVector &nl, const T &k1, const T &k2, std::vector<double> *tau_out = nullptr) {
   using std::sqrt; using std::log1p;
   const int n = udat.size();
   const int K = std::min<int>(fam.size(), n - 1);
@@ -224,6 +227,45 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
         continue;
       }
     }
+    if (j < nl.size() && nl[j]) {
+      // ---- nonlinear IVT level (v2p transforms, shared fulcrums d1, d2 and shapes k1, k2): evaluated on the u scale ----
+      if (zs) {
+        for (int i = 0; i < m; i++) { A[i] = pnorm_(A[i]); B[i] = pnorm_(B[i]); }
+        zs = false;
+      }
+      rec();
+      std::vector<T> tA(m), tB(m);
+      // the base-scale values are clamped at 1e-10 like the arguments of the rvinecopulib families, and at 1e-12 for
+      // the ast base (as the R reference does)
+      const double eps = bfam[j] == AST ? EPS : EPS_IN;
+      for (int i = 0; i < m; i++) { tA[i] = v2p_T(A[i], d1, k1, eps); tB[i] = v2p_T(B[i], d2, k2, eps); }
+      // the level for a base given by its log density ld(a, b) and h-functions hb(a, b, h1, h2) on the base scale
+      auto level = [&](const auto &ld, const auto &hb) {
+        for (int i = 0; i < m; i++) ll = ll + ld(tA[i], tB[i]);
+        if (!last) {
+          for (int i = 0; i < m - 1; i++) {
+            h2[i] = nl_cdf_g(d1, k1, A[i], tB[i], true, ld, hb, eps);             // P(U1 <= a_i | U2 = b_i)
+            h1[i + 1] = nl_cdf_g(d2, k2, B[i + 1], tA[i + 1], false, ld, hb, eps);  // P(U2 <= b | U1 = a), pair i + 1
+          }
+          for (int i = 0; i < m - 1; i++) { A[i] = h2[i]; B[i] = h1[i + 1]; }
+          m -= 1;
+        }
+      };
+      if (bfam[j] == AST) {
+        // ast base: t quantiles of the base-scale values from a table built for this level's degrees of freedom
+        std::unique_ptr<AstZTab> tab(new AstZTab());
+        tab->build(val(bpar[j]), !std::is_same<T, double>::value);
+        const T nu = bpar[j];
+        const T c0 = lgamma_((nu + 2.0) / 2.0) - 2.0 * lgamma_((nu + 1.0) / 2.0) + lgamma_(nu / 2.0);
+        const AstPolicy<T> ap{tab.get(), nu, c0};
+        level([&](const T &a, const T &b) { return ap.ld(a, b); },
+              [&](const T &a, const T &b, T &x1, T &x2) { ap.hb(a, b, x1, x2); });
+      } else {
+        level([&](const T &a, const T &b) { return nl_base_ld(bfam[j], brot[j], bpar[j], bpar[j], a, b); },
+              [&](const T &a, const T &b, T &x1, T &x2) { T lc; pair_eval(bfam[j], brot[j], bpar[j], bpar[j], a, b, true, true, lc, x1, x2); });
+      }
+      continue;
+    }
     const bool plain_gauss = !ivt[j] && fam[j] == GAUSS;
     if (plain_gauss) {
       if (!zs) {
@@ -317,15 +359,20 @@ List grad_impl(const NumericVector &u, const NumericMatrix &du, const IntegerVec
                const NumericVector &par, const NumericMatrix &dpar, const IntegerVector &ivt,
                const IntegerVector &bfam, const IntegerVector &brot, const NumericVector &bpar,
                const NumericMatrix &dbpar, double d1, double d2, const NumericVector &dd1,
-               const NumericVector &dd2) {
+               const NumericVector &dd2, const IntegerVector &nl, double k1, double k2,
+               const NumericVector &dk1, const NumericVector &dk2) {
   const int K = fam.size();
   std::vector<Dual<P> > p(K), bp(K);
   for (int j = 0; j < K; j++) {
     p[j].v = par[j]; bp[j].v = bpar[j];
     for (int k = 0; k < P; k++) { p[j].d[k] = dpar(j, k); bp[j].d[k] = dbpar(j, k); }
   }
-  Dual<P> D1(d1), D2(d2);
-  for (int k = 0; k < P; k++) { D1.d[k] = dd1[k]; D2.d[k] = dd2[k]; }
+  Dual<P> D1(d1), D2(d2), K1(k1), K2(k2);
+  for (int k = 0; k < P; k++) {
+    D1.d[k] = dd1[k]; D2.d[k] = dd2[k];
+    if (dk1.size() == P) K1.d[k] = dk1[k];
+    if (dk2.size() == P) K2.d[k] = dk2[k];
+  }
   // the data enter with their own derivatives when du (n x P) is supplied (data that depend on the
   // parameters, for example a v-transformed series); otherwise they are constants
   const int n = u.size();
@@ -335,7 +382,7 @@ List grad_impl(const NumericVector &u, const NumericMatrix &du, const IntegerVec
     ud[i].v = u[i];
     if (dd) for (int k = 0; k < P; k++) ud[i].d[k] = du(i, k);
   }
-  Dual<P> ll = loglik_impl<Dual<P> >(ud, fam, rot, p, ivt, bfam, brot, bp, D1, D2);
+  Dual<P> ll = loglik_impl<Dual<P> >(ud, fam, rot, p, ivt, bfam, brot, bp, D1, D2, nl, K1, K2);
   NumericVector g(P);
   for (int k = 0; k < P; k++) g[k] = ll.d[k];
   if (!std::isfinite(ll.v)) return List::create(_["value"] = R_NegInf, _["gradient"] = g);
@@ -348,12 +395,13 @@ List grad_impl(const NumericVector &u, const NumericMatrix &du, const IntegerVec
 // [[Rcpp::export]]
 double dv_loglik_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par,
                      IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar,
-                     double d1, double d2) {
+                     double d1, double d2, Nullable<IntegerVector> nl = R_NilValue, double k1 = 1.0, double k2 = 1.0) {
   const int K = fam.size();
   std::vector<double> p(par.begin(), par.end()), bp(bpar.begin(), bpar.end());
   (void)K;
   const std::vector<double> ud(u.begin(), u.end());
-  const double ll = loglik_impl<double>(ud, fam, rot, p, ivt, bfam, brot, bp, d1, d2);
+  const IntegerVector nlv = nl.isNotNull() ? IntegerVector(nl) : IntegerVector(0);
+  const double ll = loglik_impl<double>(ud, fam, rot, p, ivt, bfam, brot, bp, d1, d2, nlv, k1, k2);
   return std::isfinite(ll) ? ll : R_NegInf;
 }
 
@@ -364,10 +412,15 @@ double dv_loglik_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, Nume
 List dv_loglik_grad_cpp(NumericVector u, NumericMatrix du, IntegerVector fam, IntegerVector rot, NumericVector par,
                         NumericMatrix dpar, IntegerVector ivt, IntegerVector bfam, IntegerVector brot,
                         NumericVector bpar, NumericMatrix dbpar, double d1, double d2,
-                        NumericVector dd1, NumericVector dd2) {
+                        NumericVector dd1, NumericVector dd2, Nullable<IntegerVector> nl = R_NilValue,
+                        double k1 = 1.0, double k2 = 1.0, Nullable<NumericVector> dk1 = R_NilValue,
+                        Nullable<NumericVector> dk2 = R_NilValue) {
   const int P = dpar.ncol();
+  const IntegerVector nlv = nl.isNotNull() ? IntegerVector(nl) : IntegerVector(0);
+  const NumericVector dk1v = dk1.isNotNull() ? NumericVector(dk1) : NumericVector(0);
+  const NumericVector dk2v = dk2.isNotNull() ? NumericVector(dk2) : NumericVector(0);
   switch (P) {
-#define CASE(PP) case PP: return grad_impl<PP>(u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2);
+#define CASE(PP) case PP: return grad_impl<PP>(u, du, fam, rot, par, dpar, ivt, bfam, brot, bpar, dbpar, d1, d2, dd1, dd2, nlv, k1, k2, dk1v, dk2v);
     CASE(1) CASE(2) CASE(3) CASE(4) CASE(5) CASE(6) CASE(7) CASE(8) CASE(9) CASE(10) CASE(11) CASE(12)
 #undef CASE
     default: stop("the kernel gradient supports 1 to 12 directions");
@@ -384,6 +437,6 @@ NumericVector dv_level_tau_cpp(NumericVector u, IntegerVector fam, IntegerVector
   std::vector<double> p(par.begin(), par.end()), bp(bpar.begin(), bpar.end());
   const std::vector<double> ud(u.begin(), u.end());
   std::vector<double> tau(fam.size(), NA_REAL);
-  loglik_impl<double>(ud, fam, rot, p, ivt, bfam, brot, bp, d1, d2, &tau);
+  loglik_impl<double>(ud, fam, rot, p, ivt, bfam, brot, bp, d1, d2, IntegerVector(0), 1.0, 1.0, &tau);
   return wrap(tau);
 }

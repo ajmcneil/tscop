@@ -20,7 +20,7 @@ dv_model_z <- function(model) {
   lay <- dv_layout(model)
   aux <- vapply(model@pairs[lay$aux_lags], function(sp) sp@aux, numeric(1))
   c(lay$ops$to_free(model@kpacf), dv_aux_to_free(aux, lay$aux_fam),
-    if (lay$has_ivt) dv_vt_to_free(model@vt, lay$vtpar))
+    if (lay$nvt > 0L) dv_vt_to_free(lay, lay$vt_all))
 }
 
 # Candidate pair copula specifications at a lag where Kendall's tau is
@@ -203,6 +203,10 @@ autodvinecop <- function(U, start, nreplace = 10, choices = .auto_choices, aux =
   n <- length(u)
   if (is(start, "sdvinecop") && start@mode != "tied") stop("'start' must be a tied d-vine model")
   if (is(start, "sdvinecopfit") && start@model@mode != "tied") stop("'start' must be a tied d-vine model")
+  sm <- if (is(start, "sdvinecopfit")) start@model else if (is(start, "sdvinecop")) start else NULL
+  if (!is.null(sm) && sm@vttype == "v2p") {
+    stop("autodvinecop does not support models with nonlinear v-transforms (vttype = \"v2p\")", call. = FALSE)
+  }
 
   best <- dv_auto_start(U, start, tautol, maxlag, pseudo, control)
   K0 <- length(best@model@pairs)
@@ -257,7 +261,8 @@ autodvinecop <- function(U, start, nreplace = 10, choices = .auto_choices, aux =
     fit_with <- function(sp) {
       m <- sdvinecop(cur@kpacf, pairs = c(base_pairs, list(sp)), tail = cur@tail,
                     tautol = cur@tautol, maxlag = cur@maxlag,
-                    vt = if (length(cur@vt)) cur@vt else NULL, vtpar = cur@vtpar)
+                    vt = if (length(cur@vt)) cur@vt else NULL, vtfix = cur@vtfix)
+      m@vtpar <- cur@vtpar
       tryCatch(suppressWarnings(tsfit(u, m, pseudo = pseudo, control = control)),
                error = function(err) NULL)
     }

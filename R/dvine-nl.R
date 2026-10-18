@@ -114,3 +114,23 @@ dv_ivtnl_hinv <- function(pr, a, p, tol = 1e-13, maxit = 80L) {
   }
   b
 }
+
+# Convert the first L resolved IVT pair copulas to nonlinear ones with the shapes `kappa`.
+dv_nlify <- function(pairs, L, kappa) {
+  for (j in seq_len(min(L, length(pairs)))) {
+    pr <- pairs[[j]]
+    if (dv_is_ivt(pr)) pairs[[j]] <- list(family = "ivtnl", rotation = 0, parameters = numeric(0), base = pr$base,
+                                          delta = pr$delta, kappa = as.numeric(kappa))
+  }
+  pairs
+}
+
+# Number of nonlinear lags of a model with kpacf `kpacf` and effective lag K: NA until they are known.
+dv_nl_L_value <- function(kpacf, K, nl, nltau, vttype) {
+  if (vttype != "v2p" || is.na(K) || is.null(kpacf) || !gc_is_specified(kpacf)) return(list(L = NA_integer_, limit = "none"))
+  if (!is.na(nl)) {
+    L <- as.integer(min(nl, K))
+    return(list(L = L, limit = if (nl > K) "cap" else "given"))
+  }
+  list(L = as.integer(dv_nl_lags(gc_tau(kpacf, K), nltau)), limit = "rule")
+}

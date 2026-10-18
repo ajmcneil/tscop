@@ -75,9 +75,11 @@ section("4. Gaussian alternative and fulcrum options")
 # and its AIC about 4; the IVT d-vine captures the dependence. Fixed (0.5) or
 # common fulcrums need fewer parameters when the data are (nearly) symmetric.
 gfit <- tsfit(pobs, sdvinecop(arfactcop(order = 1), maxlag = 20, tautol = 1e-3), pseudo = TRUE)
-cfit <- tsfit(pobs, sdvinecop(arfactcop(order = 1), vtpar = "common", maxlag = 20, tautol = 1e-3,
-                             tail = pc("ivt", base = "ast")), pseudo = TRUE)       # one common fulcrum
-sfit <- tsfit(pobs, sdvinecop(arfactcop(order = 1), vtpar = "none", maxlag = 20, tautol = 1e-3,
+# (one common fulcrum is the process-level model: use vtscop() with a linear v-transform; the deprecated
+# vtpar = "common" of sdvinecop() gives the same fit)
+cfit <- tsfit(pobs, vtscop(sdvinecop(arfactcop(order = 1), maxlag = 20, tautol = 1e-3, tail = pc("ast")),
+                           udp::vlinear(0.5)), pseudo = TRUE)                     # one common fulcrum
+sfit <- tsfit(pobs, sdvinecop(arfactcop(order = 1), vtfix = c("delta1", "delta2"), maxlag = 20, tautol = 1e-3,
                              tail = pc("ivt", base = "ast")), pseudo = TRUE)       # fulcrums fixed at 0.5
 c(gaussian = AIC(gfit), ivt_both = AIC(fit), ivt_common = AIC(cfit), ivt_fixed = AIC(sfit))
 

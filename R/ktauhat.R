@@ -73,7 +73,9 @@ dv_level_tau_r <- function(pairs, u, keep = 0L) {
   kept <- list()
   for (j in seq_len(K)) {
     pr <- pairs[[j]]
-    tau[j] <- if (dv_is_ivt(pr)) kendall_tau(dv_vlin(A, pr$delta[1L]), dv_vlin(B, pr$delta[2L])) else kendall_tau(A, B)
+    tau[j] <- if (dv_is_ivt(pr)) kendall_tau(dv_vlin(A, pr$delta[1L]), dv_vlin(B, pr$delta[2L]))
+              else if (dv_is_ivtnl(pr)) kendall_tau(dv_v2p(A, pr$delta[1L], pr$kappa[1L]), dv_v2p(B, pr$delta[2L], pr$kappa[2L]))
+              else kendall_tau(A, B)
     if (j <= keep) kept[[j]] <- cbind(A, B)
     if (j < K) {
       m <- length(A)

@@ -86,7 +86,8 @@ test_that("residuals and predictive PITs are uniform", {
   pit <- vapply(seq_len(1500), function(j) predict(m, U[1:29, j], type = "df", x = U[30, j]), numeric(1))
   expect_gt(stats::ks.test(pit, "punif")$p.value, 0.001)
   r <- resid(m, U[, 1])
-  expect_equal(r[30], pit[1], tolerance = 1e-8)
+  # predict() tabulates the integral over the base law (accuracy about 1e-5), resid() integrates by quadrature at each point
+  expect_equal(r[30], pit[1], tolerance = 1e-5)
   u <- tssim(m, 3000)
   expect_gt(stats::ks.test(resid(m, u), "punif")$p.value, 0.001)
   expect_equal(resid(m, u, scale = "normal"), qnorm(resid(m, u)))

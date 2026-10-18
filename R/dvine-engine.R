@@ -411,14 +411,30 @@ dv_loglik_r <- function(u, pairs) {
 # or NULL if some pair copula is not supported. The absolute spherical t (ast) copula (code 7,
 # rotation 0 only, plain or as an IVT base) is supported by the likelihood kernel alone, so it
 # is encoded only when `ast = TRUE`.
-dv_encode <- function(pairs, ast = FALSE) {
+dv_encode <- function(pairs, ast = FALSE, nl = FALSE) {
   K <- length(pairs)
-  fam <- rot <- ivt <- bfam <- brot <- integer(K)
+  fam <- rot <- ivt <- bfam <- brot <- nlv <- integer(K)
   par <- bpar <- numeric(K)
   d1 <- d2 <- 0.5
+  k1 <- k2 <- 1
   for (j in seq_len(K)) {
     pr <- pairs[[j]]
-    if (identical(pr$family, "ivt")) {
+    if (identical(pr$family, "ivtnl")) {
+      # nonlinear IVT levels: supported by the kernels for the Clayton, Gumbel, Joe, Frank and ast bases when the
+      # caller handles them (nl = TRUE); the Gaussian base, and callers that do not (ktauhat), use the R implementation
+      if (!nl) return(NULL)
+      b <- pr$base
+      code <- .cpp_family_codes[b$family]
+      if (is.na(code) || code == 1L || (code == 7L && !ast)) return(NULL)
+      nlv[j] <- 1L
+      bfam[j] <- code
+      brot[j] <- as.integer(b$rotation)
+      bpar[j] <- if (length(b$parameters)) b$parameters[1L] else 0
+      d1 <- pr$delta[1L]
+      d2 <- pr$delta[2L]
+      k1 <- pr$kappa[1L]
+      k2 <- pr$kappa[2L]
+    } else if (identical(pr$family, "ivt")) {
       b <- pr$base
       code <- .cpp_family_codes[b$family]
       if (is.na(code) || (code == 7L && !ast)) return(NULL)
@@ -438,14 +454,15 @@ dv_encode <- function(pairs, ast = FALSE) {
       if (code == 6L || code == 8L) bpar[j] <- pr$parameters[2L]   # BB1: delta; t: the degrees of freedom
     }
   }
-  list(fam = fam, rot = rot, par = par, ivt = ivt, bfam = bfam, brot = brot, bpar = bpar, d1 = d1, d2 = d2)
+  list(fam = fam, rot = rot, par = par, ivt = ivt, bfam = bfam, brot = brot, bpar = bpar, d1 = d1, d2 = d2,
+       nl = nlv, k1 = k1, k2 = k2)
 }
 
 dv_loglik <- function(u, pairs) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
-    e <- dv_encode(pairs, ast = TRUE)
+    e <- dv_encode(pairs, ast = TRUE, nl = TRUE)
     if (!is.null(e)) {
-      return(dv_loglik_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+      return(dv_loglik_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2, e$nl, e$k1, e$k2))
     }
   }
   dv_loglik_r(u, pairs)
@@ -599,16 +616,16 @@ dv_simulate_r <- function(pairs, w) {
 # dv_encode); the R implementations above are the reference.
 dv_simulate <- function(pairs, w) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
-    e <- dv_encode(pairs, ast = TRUE)
-    if (!is.null(e)) return(dv_simulate_cpp(w, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+    e <- dv_encode(pairs, ast = TRUE, nl = TRUE)
+    if (!is.null(e)) return(dv_simulate_cpp(w, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2, e$nl, e$k1, e$k2))
   }
   dv_simulate_r(pairs, w)
 }
 
 dv_rosenblatt <- function(pairs, u) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
-    e <- dv_encode(pairs, ast = TRUE)
-    if (!is.null(e)) return(dv_rosenblatt_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+    e <- dv_encode(pairs, ast = TRUE, nl = TRUE)
+    if (!is.null(e)) return(dv_rosenblatt_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2, e$nl, e$k1, e$k2))
   }
   dv_rosenblatt_r(pairs, u)
 }
@@ -681,10 +698,11 @@ dv_predictive_r <- function(pairs, u, x, type) {
 # by the kernels (dv_encode), otherwise the R reference above.
 dv_predictive <- function(pairs, u, x, type) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L && length(u) > 0L) {
-    e <- dv_encode(pairs, ast = TRUE)
+    e <- dv_encode(pairs, ast = TRUE, nl = TRUE)
     if (!is.null(e)) {
       code <- match(type, c("df", "qf", "dens"))
-      return(dv_predictive_cpp(as.numeric(u), as.numeric(x), code, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+      return(dv_predictive_cpp(as.numeric(u), as.numeric(x), code, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2,
+                               e$nl, e$k1, e$k2))
     }
   }
   dv_predictive_r(pairs, u, x, type)
