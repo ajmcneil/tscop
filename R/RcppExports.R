@@ -41,6 +41,10 @@ dv_predictive_cpp <- function(u, x, type, fam, rot, par, ivt, bfam, brot, bpar, 
     .Call(`_tscop_dv_predictive_cpp`, u, x, type, fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nl, k1, k2)
 }
 
+dv_holdout_cpp <- function(u, origins, levels, fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nl = NULL, k1 = 1.0, k2 = 1.0) {
+    .Call(`_tscop_dv_holdout_cpp`, u, origins, levels, fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nl, k1, k2)
+}
+
 kendall_tau_cpp <- function(x, y) {
     .Call(`_tscop_kendall_tau_cpp`, x, y)
 }
