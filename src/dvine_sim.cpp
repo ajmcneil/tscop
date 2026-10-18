@@ -2,17 +2,20 @@
 // inverting the forward chain) and the forward Rosenblatt transform of tied
 // sdvinecop models, with the same pair copulas as the likelihood kernel
 // (independence, Gauss, Clayton, Gumbel, Joe, Frank with rotations, and IVT
-// pairs with these bases). They follow dv_simulate_r and dv_rosenblatt_r
+// pairs with these bases, and nonlinear IVT levels with the Clayton, Gumbel, Joe and Frank bases, see nl.h). They follow dv_simulate_r and dv_rosenblatt_r
 // (R/dvine-engine.R) step by step.
 #include "pair.h"
 #include "ast.h"
+#include "nl.h"
 
 namespace {
 
 struct Level {
   int fam, rot, bfam, brot;
   bool ivt;
+  bool nl = false;               // nonlinear IVT level (base in bfam, brot, bth; shapes k1, k2 of the v2p transforms)
   double th, th2, bth, d1, d2;   // th2: the second parameter of a plain BB1 level
+  double k1 = 1.0, k2 = 1.0;
 };
 
 inline double pn(double x) { return R::pnorm(x, 0, 1, 1, 0); }
@@ -121,13 +124,36 @@ inline double vl(double x, double d) { return vlin(x, d); }
 inline double al(double x, double d) { return alin(x, d); }
 
 inline double lv_h(const Level &L, double a, double b, int cv) {
+  if (L.nl) {
+    if (cv == 1) return nl_cdf(L.bfam, L.brot, L.bth, L.bth, L.d2, L.k2, b, v2p_T(a, L.d1, L.k1), false);
+    return nl_cdf(L.bfam, L.brot, L.bth, L.bth, L.d1, L.k1, a, v2p_T(b, L.d2, L.k2), true);
+  }
   if (!L.ivt) return clampu(h_plain(L.fam, L.rot, L.th, L.th2, a, b, cv));
   const double x = vl(a, L.d1), y = vl(b, L.d2);
   const double hb = clampu(h_plain(L.bfam, L.brot, L.bth, 0.0, x, y, cv));
   return clampu(cv == 1 ? L.d2 - al(b, L.d2) * hb : L.d1 - al(a, L.d1) * hb);
 }
 
+// inverse of h(a, .) (cv = 1) of a nonlinear IVT level: safeguarded Newton iteration on the monotone distribution
+// function, with the density c_V(T1(a), T2(b)) as derivative and bisection whenever a step leaves the bracket
+inline double nl_hinv(const Level &L, double a, double p) {
+  a = clampu(a); p = clampu(p);
+  const double ta = v2p_T(a, L.d1, L.k1);
+  double lo = 0.0, hi = 1.0, b = p;
+  for (int it = 0; it < 80; it++) {
+    const double f = nl_cdf(L.bfam, L.brot, L.bth, L.bth, L.d2, L.k2, b, ta, false) - p;
+    if (f > 0) hi = b; else lo = b;
+    if (std::fabs(f) < 1e-13 || hi - lo < 1e-13) break;
+    const double dens = std::exp(nl_base_ld(L.bfam, L.brot, L.bth, L.bth, ta, v2p_T(b, L.d2, L.k2)));
+    double bn = b - f / dens;
+    if (!std::isfinite(bn) || bn <= lo || bn >= hi) bn = 0.5 * (lo + hi);
+    b = bn;
+  }
+  return b;
+}
+
 inline double lv_hinv(const Level &L, double a, double p) {
+  if (L.nl) return clampu(nl_hinv(L, a, p));
   if (!L.ivt) return clampu(hinv_plain(L.fam, L.rot, L.th, L.th2, a, p));
   const double hb = clampu(hinv_plain(L.bfam, L.brot, L.bth, 0.0, vl(a, L.d1), vl(p, L.d2)));
   return clampu(L.d2 - al(p, L.d2) * hb);
@@ -147,16 +173,19 @@ inline double dens_plain(int fam, int rot, double th, double th2, double a, doub
 }
 
 inline double lv_dens(const Level &L, double a, double b) {
+  if (L.nl) return std::exp(nl_base_ld(L.bfam, L.brot, L.bth, L.bth, v2p_T(a, L.d1, L.k1), v2p_T(b, L.d2, L.k2)));
   if (!L.ivt) return dens_plain(L.fam, L.rot, L.th, L.th2, a, b);
   return dens_plain(L.bfam, L.brot, L.bth, 0.0, vl(a, L.d1), vl(b, L.d2));
 }
 
 std::vector<Level> make_levels(const IntegerVector &fam, const IntegerVector &rot, const NumericVector &par,
                                const IntegerVector &ivt, const IntegerVector &bfam, const IntegerVector &brot,
-                               const NumericVector &bpar, double d1, double d2) {
+                               const NumericVector &bpar, double d1, double d2, const IntegerVector &nl, double k1,
+                               double k2) {
   const int K = fam.size();
   std::vector<Level> lv(K);
   for (int j = 0; j < K; j++) {
+    lv[j].nl = (j < nl.size() && nl[j] != 0); lv[j].k1 = k1; lv[j].k2 = k2;
     lv[j].fam = fam[j]; lv[j].rot = rot[j]; lv[j].th = par[j];
     lv[j].ivt = ivt[j] != 0; lv[j].bfam = bfam[j]; lv[j].brot = brot[j]; lv[j].bth = bpar[j]; lv[j].th2 = bpar[j];
     lv[j].d1 = d1; lv[j].d2 = d2;
@@ -170,9 +199,11 @@ std::vector<Level> make_levels(const IntegerVector &fam, const IntegerVector &ro
 // [[Rcpp::export]]
 NumericMatrix dv_simulate_cpp(NumericMatrix w, IntegerVector fam, IntegerVector rot, NumericVector par,
                               IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar,
-                              double d1, double d2) {
+                              double d1, double d2, Nullable<IntegerVector> nl = R_NilValue, double k1 = 1.0,
+                              double k2 = 1.0) {
   const int n = w.nrow(), nrep = w.ncol(), K = fam.size();
-  const std::vector<Level> lv = make_levels(fam, rot, par, ivt, bfam, brot, bpar, d1, d2);
+  const IntegerVector nlv = nl.isNotNull() ? IntegerVector(nl) : IntegerVector(0);
+  const std::vector<Level> lv = make_levels(fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nlv, k1, k2);
   NumericMatrix u(n, nrep);
   std::vector<double> Bprev(K + 1), Bnew(K + 1), Fm(K + 1);
   for (int r = 0; r < nrep; r++) {
@@ -198,12 +229,14 @@ NumericMatrix dv_simulate_cpp(NumericMatrix w, IntegerVector fam, IntegerVector 
 // [[Rcpp::export]]
 NumericVector dv_rosenblatt_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par,
                                 IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar,
-                                double d1, double d2) {
+                                double d1, double d2, Nullable<IntegerVector> nl = R_NilValue, double k1 = 1.0,
+                                double k2 = 1.0) {
   const int n = u.size();
   const int K = std::min<int>(fam.size(), n - 1);
   NumericVector r = clone(u);
   if (K < 1) return r;
-  const std::vector<Level> lv = make_levels(fam, rot, par, ivt, bfam, brot, bpar, d1, d2);
+  const IntegerVector nlv = nl.isNotNull() ? IntegerVector(nl) : IntegerVector(0);
+  const std::vector<Level> lv = make_levels(fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nlv, k1, k2);
   std::vector<double> A(u.begin(), u.end() - 1), B(u.begin() + 1, u.end()), An(n), Bn(n);
   int m = n - 1;
   for (int j = 1; j <= K; j++) {
@@ -228,7 +261,8 @@ NumericVector dv_rosenblatt_cpp(NumericVector u, IntegerVector fam, IntegerVecto
 // [[Rcpp::export]]
 NumericVector dv_predictive_cpp(NumericVector u, NumericVector x, int type, IntegerVector fam, IntegerVector rot,
                                 NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot,
-                                NumericVector bpar, double d1, double d2) {
+                                NumericVector bpar, double d1, double d2, Nullable<IntegerVector> nl = R_NilValue,
+                                double k1 = 1.0, double k2 = 1.0) {
   const int n = u.size(), K = fam.size();
   const int k = std::min(K, n);
   const int nx = x.size();
@@ -237,7 +271,8 @@ NumericVector dv_predictive_cpp(NumericVector u, NumericVector x, int type, Inte
     for (int i = 0; i < nx; i++) out[i] = type == 3 ? 1.0 : x[i];
     return out;
   }
-  const std::vector<Level> lv = make_levels(fam, rot, par, ivt, bfam, brot, bpar, d1, d2);
+  const IntegerVector nlv = nl.isNotNull() ? IntegerVector(nl) : IntegerVector(0);
+  const std::vector<Level> lv = make_levels(fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nlv, k1, k2);
   // backward variables B_i(n - i), i = 0, ..., k - 1, of the last k values
   std::vector<double> Bt(k), A(k), B(k), An(k), Bn(k);
   for (int i = 0; i < k; i++) A[i] = u[n - k + i];

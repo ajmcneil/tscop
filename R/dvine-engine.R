@@ -616,16 +616,16 @@ dv_simulate_r <- function(pairs, w) {
 # dv_encode); the R implementations above are the reference.
 dv_simulate <- function(pairs, w) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
-    e <- dv_encode(pairs, ast = TRUE)
-    if (!is.null(e)) return(dv_simulate_cpp(w, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+    e <- dv_encode(pairs, ast = TRUE, nl = TRUE)
+    if (!is.null(e)) return(dv_simulate_cpp(w, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2, e$nl, e$k1, e$k2))
   }
   dv_simulate_r(pairs, w)
 }
 
 dv_rosenblatt <- function(pairs, u) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L) {
-    e <- dv_encode(pairs, ast = TRUE)
-    if (!is.null(e)) return(dv_rosenblatt_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+    e <- dv_encode(pairs, ast = TRUE, nl = TRUE)
+    if (!is.null(e)) return(dv_rosenblatt_cpp(u, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2, e$nl, e$k1, e$k2))
   }
   dv_rosenblatt_r(pairs, u)
 }
@@ -698,10 +698,11 @@ dv_predictive_r <- function(pairs, u, x, type) {
 # by the kernels (dv_encode), otherwise the R reference above.
 dv_predictive <- function(pairs, u, x, type) {
   if (isTRUE(getOption("tscop.cpp", TRUE)) && length(pairs) > 0L && length(u) > 0L) {
-    e <- dv_encode(pairs, ast = TRUE)
+    e <- dv_encode(pairs, ast = TRUE, nl = TRUE)
     if (!is.null(e)) {
       code <- match(type, c("df", "qf", "dens"))
-      return(dv_predictive_cpp(as.numeric(u), as.numeric(x), code, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2))
+      return(dv_predictive_cpp(as.numeric(u), as.numeric(x), code, e$fam, e$rot, e$par, e$ivt, e$bfam, e$brot, e$bpar, e$d1, e$d2,
+                               e$nl, e$k1, e$k2))
     }
   }
   dv_predictive_r(pairs, u, x, type)

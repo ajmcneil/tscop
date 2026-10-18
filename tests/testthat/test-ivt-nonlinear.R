@@ -173,3 +173,25 @@ test_that("nonlinear levels are encoded only for the likelihood kernel and only 
   expect_true(is.finite(tscop:::dv_loglik(u, pa)))
   expect_equal(tscop:::dv_loglik(u, pa), tscop:::dv_loglik_r(u, pa))
 })
+
+test_that("the compiled simulation, Rosenblatt and prediction kernels agree with the R reference for nonlinear levels", {
+  set.seed(31)
+  tau <- as.numeric(ktau(arfactcop(lambda = 0.95, w = 0.25), 14))
+  for (b in c("joe", "gumbel", "clayton180", "frank")) for (kp in list(c(1.3, 0.8), c(1, 0.8), c(0.7, 1.5))) {
+    pairs <- tscop:::dv_nl_pairs(b, tau, c(0.62, 0.45), kp, L = 5)
+    w <- matrix(runif(150), 150, 1)
+    expect_false(is.null(tscop:::dv_encode(pairs, ast = TRUE, nl = TRUE)))
+    s_r <- tscop:::dv_simulate_r(pairs, w)
+    expect_equal(tscop:::dv_simulate(pairs, w), s_r, tolerance = 1e-6)
+    u <- as.numeric(s_r)
+    expect_equal(tscop:::dv_rosenblatt(pairs, u), tscop:::dv_rosenblatt_r(pairs, u), tolerance = 1e-9)
+    x <- c(0.02, 0.2, 0.5, 0.8, 0.98)
+    for (ty in c("df", "qf", "dens")) {
+      expect_equal(tscop:::dv_predictive(pairs, u, x, ty), tscop:::dv_predictive_r(pairs, u, x, ty), tolerance = 1e-8)
+    }
+  }
+  # the compiled simulation inverts the compiled Rosenblatt transform
+  pairs <- tscop:::dv_nl_pairs("clayton180", tau, c(0.62, 0.45), c(1.4, 0.7), L = 6)
+  w <- matrix(runif(200), 200, 1)
+  expect_equal(tscop:::dv_rosenblatt(pairs, as.numeric(tscop:::dv_simulate(pairs, w))), as.numeric(w), tolerance = 1e-8)
+})

@@ -149,8 +149,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // dv_simulate_cpp
-NumericMatrix dv_simulate_cpp(NumericMatrix w, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2);
-RcppExport SEXP _tscop_dv_simulate_cpp(SEXP wSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP) {
+NumericMatrix dv_simulate_cpp(NumericMatrix w, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2, Nullable<IntegerVector> nl, double k1, double k2);
+RcppExport SEXP _tscop_dv_simulate_cpp(SEXP wSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP, SEXP nlSEXP, SEXP k1SEXP, SEXP k2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -164,13 +164,16 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type bpar(bparSEXP);
     Rcpp::traits::input_parameter< double >::type d1(d1SEXP);
     Rcpp::traits::input_parameter< double >::type d2(d2SEXP);
-    rcpp_result_gen = Rcpp::wrap(dv_simulate_cpp(w, fam, rot, par, ivt, bfam, brot, bpar, d1, d2));
+    Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type nl(nlSEXP);
+    Rcpp::traits::input_parameter< double >::type k1(k1SEXP);
+    Rcpp::traits::input_parameter< double >::type k2(k2SEXP);
+    rcpp_result_gen = Rcpp::wrap(dv_simulate_cpp(w, fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nl, k1, k2));
     return rcpp_result_gen;
 END_RCPP
 }
 // dv_rosenblatt_cpp
-NumericVector dv_rosenblatt_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2);
-RcppExport SEXP _tscop_dv_rosenblatt_cpp(SEXP uSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP) {
+NumericVector dv_rosenblatt_cpp(NumericVector u, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2, Nullable<IntegerVector> nl, double k1, double k2);
+RcppExport SEXP _tscop_dv_rosenblatt_cpp(SEXP uSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP, SEXP nlSEXP, SEXP k1SEXP, SEXP k2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -184,13 +187,16 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type bpar(bparSEXP);
     Rcpp::traits::input_parameter< double >::type d1(d1SEXP);
     Rcpp::traits::input_parameter< double >::type d2(d2SEXP);
-    rcpp_result_gen = Rcpp::wrap(dv_rosenblatt_cpp(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2));
+    Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type nl(nlSEXP);
+    Rcpp::traits::input_parameter< double >::type k1(k1SEXP);
+    Rcpp::traits::input_parameter< double >::type k2(k2SEXP);
+    rcpp_result_gen = Rcpp::wrap(dv_rosenblatt_cpp(u, fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nl, k1, k2));
     return rcpp_result_gen;
 END_RCPP
 }
 // dv_predictive_cpp
-NumericVector dv_predictive_cpp(NumericVector u, NumericVector x, int type, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2);
-RcppExport SEXP _tscop_dv_predictive_cpp(SEXP uSEXP, SEXP xSEXP, SEXP typeSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP) {
+NumericVector dv_predictive_cpp(NumericVector u, NumericVector x, int type, IntegerVector fam, IntegerVector rot, NumericVector par, IntegerVector ivt, IntegerVector bfam, IntegerVector brot, NumericVector bpar, double d1, double d2, Nullable<IntegerVector> nl, double k1, double k2);
+RcppExport SEXP _tscop_dv_predictive_cpp(SEXP uSEXP, SEXP xSEXP, SEXP typeSEXP, SEXP famSEXP, SEXP rotSEXP, SEXP parSEXP, SEXP ivtSEXP, SEXP bfamSEXP, SEXP brotSEXP, SEXP bparSEXP, SEXP d1SEXP, SEXP d2SEXP, SEXP nlSEXP, SEXP k1SEXP, SEXP k2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -206,7 +212,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type bpar(bparSEXP);
     Rcpp::traits::input_parameter< double >::type d1(d1SEXP);
     Rcpp::traits::input_parameter< double >::type d2(d2SEXP);
-    rcpp_result_gen = Rcpp::wrap(dv_predictive_cpp(u, x, type, fam, rot, par, ivt, bfam, brot, bpar, d1, d2));
+    Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type nl(nlSEXP);
+    Rcpp::traits::input_parameter< double >::type k1(k1SEXP);
+    Rcpp::traits::input_parameter< double >::type k2(k2SEXP);
+    rcpp_result_gen = Rcpp::wrap(dv_predictive_cpp(u, x, type, fam, rot, par, ivt, bfam, brot, bpar, d1, d2, nl, k1, k2));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -279,9 +288,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_tscop_dv_loglik_cpp", (DL_FUNC) &_tscop_dv_loglik_cpp, 13},
     {"_tscop_dv_loglik_grad_cpp", (DL_FUNC) &_tscop_dv_loglik_grad_cpp, 20},
     {"_tscop_dv_level_tau_cpp", (DL_FUNC) &_tscop_dv_level_tau_cpp, 10},
-    {"_tscop_dv_simulate_cpp", (DL_FUNC) &_tscop_dv_simulate_cpp, 10},
-    {"_tscop_dv_rosenblatt_cpp", (DL_FUNC) &_tscop_dv_rosenblatt_cpp, 10},
-    {"_tscop_dv_predictive_cpp", (DL_FUNC) &_tscop_dv_predictive_cpp, 12},
+    {"_tscop_dv_simulate_cpp", (DL_FUNC) &_tscop_dv_simulate_cpp, 13},
+    {"_tscop_dv_rosenblatt_cpp", (DL_FUNC) &_tscop_dv_rosenblatt_cpp, 13},
+    {"_tscop_dv_predictive_cpp", (DL_FUNC) &_tscop_dv_predictive_cpp, 15},
     {"_tscop_kendall_tau_cpp", (DL_FUNC) &_tscop_kendall_tau_cpp, 2},
     {"_tscop_joe_tau_cpp", (DL_FUNC) &_tscop_joe_tau_cpp, 2},
     {"_tscop_frank_tau_cpp", (DL_FUNC) &_tscop_frank_tau_cpp, 2},
