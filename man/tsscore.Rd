@@ -22,7 +22,7 @@ tsscore(
 one column per level.}
 
 \item{...}{further forecasts of the same observations (each a \link[=tsforecast-class]{tsforecast} object or quantile matrix),
-named for the output.}
+named for the output (an unnamed argument that is a plain object name is labelled with it).}
 
 \item{observed}{the observations, for forecasts given as matrices.}
 

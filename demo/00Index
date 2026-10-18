@@ -6,3 +6,5 @@ vtscop     Process-level v-transform copula processes: any udp v-transform on an
 marg       Parametric margins: gauss, laplace, slaplace, st, sst, jsu, sas, nig, hyp, gh; simulation, fitting with standard errors, fixed parameters, residuals, automatic selection among the families (automarg), empirical margins (emarg)
 tsmod      Full time series models: a margin and a copula process; simulation, two-stage and semiparametric estimation, residuals, prediction and risk measures (tsrisk), choosing the margin, volatile series with a v-transform copula
 speed      Compiled kernels: the supported pair copulas, fits with and without the compiled likelihood, exact gradients, simulation of IVT-ast series, bootstrap standard errors on several cores, joint maximum likelihood
+ivt-nonlinear  Nonlinear (v2p) v-transforms in IVT d-vines: shapes of the lag dependence, simulation, staged fitting, fixed parameters, diagnostics, prediction
+forecast   Out-of-sample forecasting with tsroll() (fixed parameters or periodic re-estimation) and forecast evaluation with tsscore(): quantile scores, VaR and ES backtests, Diebold-Mariano tests
