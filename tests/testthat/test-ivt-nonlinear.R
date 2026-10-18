@@ -214,3 +214,120 @@ test_that("ast bases of nonlinear levels: compiled kernels agree with the R refe
     expect_lt(max(abs(g$gradient - fd) / pmax(abs(fd), 1)), 1e-4)
   }
 })
+
+# ---- the sdvinecop class with nonlinear v-transforms --------------------------------------------------------
+
+nl_model <- function(base = "joe", vt = c(0.62, 0.45), shape = c(1.4, 0.7), ...) {
+  sdvinecop(arfactcop(lambda = 0.95, w = 0.3), tail = pc("ivt", base = base), vt = vt, vttype = "v2p", vtshape = shape,
+            maxlag = 14, tautol = 1e-3, ...)
+}
+
+test_that("the constructor validates the nonlinear v-transform arguments and records L", {
+  m <- nl_model()
+  expect_equal(m@vttype, "v2p")
+  expect_equal(unname(m@vtshape), c(1.4, 0.7))
+  expect_equal(m@K, 14L)
+  tau <- as.numeric(ktau(arfactcop(lambda = 0.95, w = 0.3), 14))
+  expect_equal(m@L, as.integer(max(1L, max(which(abs(tau) > 0.02)))))
+  expect_equal(nl_model(nl = 3)@L, 3L)
+  expect_equal(nl_model(nl = 99)@L, 14L)
+  expect_equal(nl_model(nltau = 0.05)@L, as.integer(max(1L, max(which(abs(tau) > 0.05)))))
+  expect_equal(names(coef(m)), c("lambda1", "w1", "delta1", "delta2", "kappa1", "kappa2"))
+  expect_equal(names(coef(nl_model(vtfix = "kappa2"))), c("lambda1", "w1", "delta1", "delta2", "kappa1"))
+  expect_equal(names(coef(nl_model(vtfix = c("delta1", "delta2", "kappa1")))), c("lambda1", "w1", "kappa2"))
+  expect_output(show(m), "v-transform shapes \\(v2p\\): 1.4, 0.7; nonlinear lags 1-")
+  expect_output(show(nl_model(vtfix = "kappa2")), "kappa2 fixed")
+  expect_equal(sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), vttype = "v2p")@L, NA_integer_)   # not yet specified
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.3), tail = pc("ivt", base = "joe"), vtshape = c(1.2, 1)), "vttype")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.3), tail = pc("ivt", base = "joe"), vtfix = "kappa1"), "v2p")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.3), tail = pc("ivt", base = "joe"), vttype = "v2p", vtshape = c(-1, 1)), "positive")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.3), tail = pc("ivt", base = "joe"), vttype = "v2p", vtfix = c("kappa1", "kappa2")), "linear")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.3), tail = pc("joe"), vttype = "v2p"), "inverse-v-transformed")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.3), tail = pc("ivt", base = "joe"), vttype = "v2p", nl = 0), "nl")
+  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.3), tail = pc("ivt", base = "joe"), vtfix = "kappa9"), "vtfix")
+  expect_error(suppressWarnings(sdvinecop(arfactcop(lambda = 0.9, w = 0.3), tail = pc("ivt", base = "joe"), vttype = "v2p", vtpar = "common")), "common")
+  expect_warning(sdvinecop(arfactcop(lambda = 0.9, w = 0.3), tail = pc("ivt", base = "joe"), vtpar = "none"), "deprecated")
+})
+
+test_that("simulation, residuals and prediction of a nonlinear IVT sdvinecop use the nonlinear pair copulas", {
+  set.seed(51)
+  m <- nl_model("ast")
+  pairs <- tscop:::dv_resolve(m)
+  expect_equal(vapply(pairs, function(p) p$family, ""), c(rep("ivtnl", m@L), rep("ivt", 14 - m@L)))
+  u <- tssim(m, 1200)
+  expect_true(all(u > 0 & u < 1))
+  r <- resid(m, u)
+  expect_gt(stats::ks.test(r[-(1:14)], "punif")$p.value, 0.001)
+  z <- qnorm(r[-(1:14)])
+  expect_lt(abs(cor(abs(z[-1]), abs(z[-length(z)]))), 0.1)
+  x <- c(0.05, 0.3, 0.7, 0.95)
+  q <- predict(m, u, type = "qf", x = x)
+  expect_equal(predict(m, u, type = "df", x = q), x, tolerance = 1e-6)
+  expect_true(all(predict(m, u, type = "dens", x = x) > 0))
+  expect_equal(tscop:::dv_model_loglik(m, u), tscop:::dv_loglik_r(u, pairs), tolerance = 1e-6)
+})
+
+test_that("the exact gradient of the nonlinear IVT fit equals finite differences on the free scale, for every vtfix", {
+  set.seed(52)
+  m <- nl_model("joe")
+  u <- as.numeric(tssim(m, 500))
+  for (vf in list(character(0), "kappa2", "kappa1", c("delta1", "kappa2"), c("delta1", "delta2"))) {
+    spec <- nl_model("joe", vt = c(0.55, 0.5), shape = c(1.2, 0.8), vtfix = vf)
+    st <- tscop:::dv_start(spec, NULL, u, list())
+    lay <- st$lay
+    lay$Lenv$L <- spec@L
+    z <- st$z0 + 0.05
+    expect_equal(length(z), lay$nk + lay$nvt)
+    g <- tscop:::dv_negll_grad(z, lay, 14L, u)
+    expect_false(is.null(g))
+    fd <- vapply(seq_along(z), function(k) {
+      h <- 1e-6; zp <- z; zp[k] <- zp[k] + h; zm <- z; zm[k] <- zm[k] - h
+      (tscop:::dv_negll(zp, lay, 14L, u) - tscop:::dv_negll(zm, lay, 14L, u)) / (2 * h)
+    }, 1)
+    expect_lt(max(abs(g - fd) / pmax(abs(fd), 1)), 1e-4)
+  }
+})
+
+test_that("a nonlinear IVT fit is staged, stores the linear log-likelihood, and recovers the parameters", {
+  skip_on_cran()
+  set.seed(53)
+  truth <- nl_model("joe", vt = c(0.65, 0.45), shape = c(1.4, 0.7))
+  u <- tssim(truth, 700)
+  spec <- sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), vttype = "v2p", maxlag = 10, tautol = 1e-3)
+  f <- tsfit(u, spec, pseudo = FALSE)
+  lin <- tsfit(u, sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), maxlag = 10, tautol = 1e-3), pseudo = FALSE)
+  expect_s4_class(f, "sdvinecopfit")
+  expect_equal(f@loglik_linear, lin@loglik, tolerance = 1e-4)
+  expect_gt(f@loglik, f@loglik_linear)
+  expect_true(is.na(lin@loglik_linear))
+  expect_equal(f@npar, 6L)
+  expect_equal(names(coef(f)), c("lambda1", "w1", "delta1", "delta2", "kappa1", "kappa2"))
+  expect_equal(f@model@vttype, "v2p")
+  expect_gte(f@model@L, 1L)
+  k <- coef(f)[c("kappa1", "kappa2")]
+  expect_gt(k[["kappa1"]], 1)
+  expect_lt(k[["kappa2"]], 1)
+  expect_gt(2 * (f@loglik - f@loglik_linear), 6)
+  # kappa2 fixed at 1: kappa1 free only
+  f1 <- tsfit(u, sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), vttype = "v2p", vtfix = "kappa2", maxlag = 10, tautol = 1e-3), pseudo = FALSE)
+  expect_equal(f1@npar, 5L)
+  expect_equal(unname(f1@model@vtshape[2]), 1)
+  expect_lte(f1@loglik, f@loglik + 1e-3)
+  expect_equal(f1@loglik_linear, lin@loglik, tolerance = 1e-4)
+  # a fit started from a model is not staged
+  f2 <- tsfit(u, spec, pseudo = FALSE, init = f@model)
+  expect_true(is.na(f2@loglik_linear))
+  expect_equal(f2@loglik, f@loglik, tolerance = 1e-4)
+  # a model with an AIC that counts the shape parameters
+  expect_equal(AIC(f), -2 * f@loglik + 2 * 6)
+})
+
+test_that("autodvinecop refuses nonlinear v-transforms and ktauhat supports them", {
+  set.seed(54)
+  m <- nl_model("joe")
+  u <- tssim(m, 600)
+  expect_error(autodvinecop(u, m, nreplace = 2, verbose = FALSE), "nonlinear")
+  kh <- ktauhat(m, u, lagmax = 6)
+  expect_equal(nrow(kh), 6L)
+  expect_true(all(is.finite(kh[, 1])))
+})

@@ -1,3 +1,8 @@
+# tscop (development version)
+
+* `sdvinecop` models with inverse-v-transformed (`"ivt"`) pair copulas accept two-parameter nonlinear v-transforms: `vttype = "v2p"` gives each pair the transforms `v2p(delta1, kappa1)` of the earlier and `v2p(delta2, kappa2)` of the later variable at lags `1, ..., L` (`L` from the kpacf, `nl` and `nltau`), linear ones with the same fulcrums beyond. `vtshape` holds the shape parameters (1 is the linear transform) and `vtfix` the parameters held fixed (any of `delta1`, `delta2`, `kappa1`, `kappa2`; for example `vtfix = "kappa2"`). Fits are staged (linear model first) and store the linear log-likelihood in `loglik_linear`. Density, h-functions, gradient, simulation, residuals and prediction are compiled for the Clayton, Gumbel, Joe, Frank and ast bases (the Gaussian base uses the R implementation). `vtpar` is deprecated: use `vtfix`; `vtpar = "common"` is the process-level model of `vtscop` with a linear v-transform. `autodvinecop` does not accept `vttype = "v2p"`.
+* `vtscop` predictive distribution and quantile functions for a nonlinear v-transform are much faster: the integral over the base law is tabulated once per prediction (quantile functions of linear v-transforms are explicit).
+
 # tscop 0.1.0
 
 First version: a rebuild of the `tscopula` package on top of `udp`.

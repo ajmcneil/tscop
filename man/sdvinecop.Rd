@@ -11,7 +11,12 @@ sdvinecop(
   tautol = 1e-04,
   maxlag = Inf,
   vt = NULL,
-  vtpar = "both"
+  vttype = c("linear", "v2p"),
+  vtshape = NULL,
+  vtfix = character(0),
+  nl = "auto",
+  nltau = 0.02,
+  vtpar = NULL
 )
 }
 \arguments{
@@ -45,11 +50,38 @@ effective lag.}
 \item{vt}{the fulcrums of the linear v-transforms of the \code{"ivt"} pair
 copulas, two numbers in (0, 1) (default \code{c(0.5, 0.5)} when the model has an
 \code{"ivt"} pair copula; an error otherwise). They are starting values when
-the model is fitted, unless \code{vtpar = "none"}.}
+the model is fitted, unless they are in \code{vtfix}.}
 
-\item{vtpar}{\code{"both"} (default): both fulcrums are estimated; \code{"common"}:
-one fulcrum for both (the vt-D-vine of Bladt and McNeil, with \code{vt} equal in
-its two components); \code{"none"}: the fulcrums are fixed at \code{vt}.}
+\item{vttype}{\code{"linear"} (default) or \code{"v2p"}: the v-transforms of the IVT
+pair copulas are the linear ones (fulcrum \code{delta}) or the two-parameter
+nonlinear transforms of \code{\link[udp:v2p]{udp::v2p()}} with fulcrum \code{delta} and shape
+\code{kappa} (\code{kappa = 1} is the linear transform), \code{v2p(delta1, kappa1)} for
+the earlier and \code{v2p(delta2, kappa2)} for the later variable of a pair.
+The nonlinear transforms are used at lags \verb{1, ..., L}, the linear ones with
+the same fulcrums beyond (see \code{nl}). Only the \code{v2p} transform is available.}
+
+\item{vtshape}{the shape parameters \code{c(kappa1, kappa2)} of the \code{"v2p"}
+transforms: the known values, or the starting values when the model is
+fitted (default \code{c(1, 1)}, the linear model). During fitting \code{kappa} is
+bounded to (0.25, 4) and, for \code{"v2p"}, \code{delta} to (0.02, 0.98).}
+
+\item{vtfix}{the v-transform parameters held fixed at their given values
+rather than estimated, a subset of \code{"delta1"}, \code{"delta2"}, \code{"kappa1"} and
+\code{"kappa2"} (default none). For example \code{vtfix = "kappa2"} estimates
+\code{kappa1} and keeps \code{kappa2} at its value in \code{vtshape} (1 by default).}
+
+\item{nl}{the lags with nonlinear v-transforms when \code{vttype = "v2p"}:
+\code{"auto"} (default), lags \verb{1, ..., L} with \code{L} the last lag at which the
+absolute Kendall's tau of the kpacf exceeds \code{nltau} (at least 1, at most
+\code{K}), or a positive whole number \code{L} (capped at \code{K}).}
+
+\item{nltau}{the tolerance on the absolute Kendall's tau of the kpacf that
+defines \code{L} for \code{nl = "auto"} (default 0.02).}
+
+\item{vtpar}{deprecated: use \code{vtfix}. \code{"both"} (the default behaviour) is
+\code{vtfix = character(0)}; \code{"none"} is \code{vtfix = c("delta1", "delta2")};
+\code{"common"} ties the two (linear) fulcrums, which is the process-level
+model of \code{\link[=vtscop]{vtscop()}} with a linear v-transform.}
 }
 \value{
 An object of class \link[=sdvinecop-class]{sdvinecop}.

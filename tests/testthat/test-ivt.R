@@ -125,12 +125,14 @@ test_that("sdvinecop constructor handles the v-transform parameters", {
   m0 <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), pairs = list(pc("ivt", base = "joe")))
   expect_equal(unname(m0@vt), c(0.5, 0.5))
   # common and fixed
-  mc <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.4), vtpar = "common")
+  expect_warning(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.4), vtpar = "common"), "deprecated")
+  mc <- suppressWarnings(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.4), vtpar = "common"))
   expect_equal(names(coef(mc)), c("lambda1", "w1", "delta"))
-  mn <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vtpar = "none")
+  mn <- sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vtfix = c("delta1", "delta2"))
+  expect_equal(mn@vtpar, "none")
   expect_equal(names(coef(mn)), c("lambda1", "w1"))
   expect_output(show(mn), "\\(fixed\\)")
-  expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.5), vtpar = "common"), "equal")
+  expect_error(suppressWarnings(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0.4, 0.5), vtpar = "common")), "equal")
   expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = c(0, 0.5)), "\\(0, 1\\)")
   expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), vt = c(0.4, 0.6)), "only used")
   expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.6), tail = pc("ivt", base = "ast"), vt = 0.5), "two deltas")
@@ -185,14 +187,14 @@ test_that("tsfit recovers the fulcrums and the kpacf of an IVT d-vine", {
   fg <- tsfit(u, sdvinecop(arfactcop(order = 1), tautol = 1e-3), pseudo = FALSE)
   expect_gt(f@loglik, fg@loglik + 20)
   # common and fixed fulcrums
-  fc <- tsfit(u, sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3, vtpar = "common"),
-              pseudo = FALSE)
+  fc <- suppressWarnings(tsfit(u, sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3, vtpar = "common"),
+                               pseudo = FALSE))
   expect_equal(names(coef(fc)), c("lambda1", "w1", "delta"))
   expect_equal(fc@npar, 3L)
   expect_equal(unname(fc@model@vt[1]), unname(fc@model@vt[2]))
   expect_lte(fc@loglik, f@loglik + 1e-6)
   fn <- tsfit(u, sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), tautol = 1e-3, vt = c(0.5, 0.5),
-                          vtpar = "none"), pseudo = FALSE)
+                          vtfix = c("delta1", "delta2")), pseudo = FALSE)
   expect_equal(fn@npar, 2L)
   expect_lte(fn@loglik, fc@loglik + 1e-6)
   # standard errors

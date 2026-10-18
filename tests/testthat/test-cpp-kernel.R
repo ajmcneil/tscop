@@ -154,8 +154,8 @@ test_that("dv_negll_grad equals finite differences of dv_negll on the free scale
   K <- 20L
   cases <- list(
     sdvinecop(arfactcop(lambda = 0.95, w = 0.5), tail = pc("ivt", base = "gumbel"), vt = c(0.4, 0.6), maxlag = K, tautol = 1e-6),
-    sdvinecop(arfactcop(lambda = 0.95, w = 0.5), tail = pc("ivt", base = "clayton180"), vt = c(0.4, 0.4),
-              vtpar = "common", maxlag = K, tautol = 1e-6),
+    suppressWarnings(sdvinecop(arfactcop(lambda = 0.95, w = 0.5), tail = pc("ivt", base = "clayton180"), vt = c(0.4, 0.4),
+                               vtpar = "common", maxlag = K, tautol = 1e-6)),
     sdvinecop(arfactcop(lambda = c(0.98, 0.6), w = c(0.3, 0.3)), tail = pc("ivt", base = "gauss"), vt = c(0.5, 0.5),
               maxlag = K, tautol = 1e-6),
     sdvinecop(armacop(ar = 0.7, ma = 0.2), pairs = list(pc("gumbel")), tail = pc("clayton"), maxlag = K, tautol = 1e-6),

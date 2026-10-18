@@ -56,7 +56,32 @@ of the inverse-v-transformed (\code{"ivt"}) pair copulas, shared by all of them
 a pair); empty if the model has no such pair copula.}
 
 \item{\code{vtpar}}{which fulcrums are parameters: \code{"both"}, \code{"common"} (one
-parameter, equal fulcrums) or \code{"none"} (fixed).}
+parameter, equal fulcrums; deprecated) or \code{"none"} (fixed). Derived from
+\code{vtfix}.}
+
+\item{\code{vttype}}{the type of the v-transforms of the IVT pair copulas: \code{"linear"}
+or \code{"v2p"} (two-parameter nonlinear transforms of \code{\link[udp:v2p]{udp::v2p()}}).}
+
+\item{\code{vtshape}}{the shape parameters \code{c(kappa1, kappa2)} of the \code{"v2p"}
+transforms (\code{kappa = 1} is the linear transform); empty for linear
+transforms.}
+
+\item{\code{vtfix}}{the v-transform parameters held fixed at their given values: a
+subset of \code{"delta1"}, \code{"delta2"}, \code{"kappa1"}, \code{"kappa2"}.}
+
+\item{\code{nl}}{the number of nonlinear lags: \code{NA} (determined by the rule with
+\code{nltau}) or a positive whole number.}
+
+\item{\code{nltau}}{tolerance on the absolute Kendall's tau defining the number of
+nonlinear lags when \code{nl} is \code{NA}.}
+
+\item{\code{L}}{the number of nonlinear lags (lags \verb{1, ..., L} use the nonlinear
+transforms, the others linear transforms with the same fulcrums); \code{NA} for
+linear transforms and for a model structure whose ARMA coefficients are not
+yet specified.}
+
+\item{\code{Llimit}}{what determined \code{L}: \code{"rule"} (the \code{nltau} rule), \code{"given"}
+(\code{nl}), \code{"cap"} (capped at \code{K}) or \code{"none"}.}
 
 \item{\code{K}}{the effective lag (\code{NA} for a model structure whose ARMA
 coefficients are not yet specified).}

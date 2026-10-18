@@ -54,5 +54,10 @@ otherwise \code{NULL}.}
 
 \item{\code{path}}{for a model selected by \code{\link[=autodvinecop]{autodvinecop()}}, a data frame with one
 row per lag examined; an empty data frame otherwise.}
+
+\item{\code{loglik_linear}}{for a model with nonlinear (\code{"v2p"}) v-transforms, the
+maximised log-likelihood of the first (linear) stage of the fit, so that
+\code{2 * (loglik - loglik_linear)} is the likelihood-ratio statistic of the
+shape parameters; \code{NA} for linear models.}
 }}
 

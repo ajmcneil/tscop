@@ -119,7 +119,7 @@ setValidity("pc", function(object) {
 #' units against `"joe"` at all lags. With the compiled likelihood the cost of
 #' `"joe"` at all lags is similar to that of a `"joe"` first part with a `"frank"`
 #' tail. If a `"gumbel"` or `"gauss"` base is needed, fix the fulcrums
-#' (`vtpar = "none"` in [sdvinecop()]) at values from a fit with a regular base.
+#' (`vtfix = c("delta1", "delta2")` in [sdvinecop()]) at values from a fit with a regular base.
 #'
 #' @details Both rotations are always stored. Which one is used at a lag is
 #'   decided by the sign of Kendall's tau at the current parameter values, so
