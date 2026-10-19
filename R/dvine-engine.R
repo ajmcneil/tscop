@@ -420,12 +420,12 @@ dv_encode <- function(pairs, ast = FALSE, nl = FALSE) {
   for (j in seq_len(K)) {
     pr <- pairs[[j]]
     if (identical(pr$family, "ivtnl")) {
-      # nonlinear IVT levels: supported by the kernels for the Clayton, Gumbel, Joe, Frank and ast bases when the
-      # caller handles them (nl = TRUE); the Gaussian base, and callers that do not (ktauhat), use the R implementation
+      # nonlinear IVT levels: supported by the kernels for the Gauss, Clayton, Gumbel, Joe, Frank and ast bases when the
+      # caller handles them (nl = TRUE); callers that do not (ktauhat) use the R implementation
       if (!nl) return(NULL)
       b <- pr$base
       code <- .cpp_family_codes[b$family]
-      if (is.na(code) || code == 1L || (code == 7L && !ast)) return(NULL)
+      if (is.na(code) || (code == 7L && !ast)) return(NULL)
       nlv[j] <- 1L
       bfam[j] <- code
       brot[j] <- as.integer(b$rotation)

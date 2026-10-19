@@ -208,4 +208,15 @@ template <class T> struct AstPolicy {
   }
 };
 
+// Quadrature policy of a Gaussian base: closed forms through the normal quantiles of the base-scale values
+template <class T> struct GaussPolicy {
+  T rho, s;   // correlation and sqrt(1 - rho^2)
+  inline T ld(const T &a, const T &b) const { return gauss_ll(qnorm_(a), qnorm_(b), rho); }
+  inline void hb(const T &a, const T &b, T &h1, T &h2) const {
+    const T za = qnorm_(a), zb = qnorm_(b);
+    h1 = clampu(pnorm_((zb - rho * za) / s));   // P(V2 <= b | V1 = a)
+    h2 = clampu(pnorm_((za - rho * zb) / s));   // P(V1 <= a | V2 = b)
+  }
+};
+
 }  // namespace

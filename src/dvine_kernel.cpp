@@ -260,6 +260,10 @@ T loglik_impl(const std::vector<T> &udat, const IntegerVector &fam, const Intege
         const AstPolicy<T> ap{tab.get(), nu, c0};
         level([&](const T &a, const T &b) { return ap.ld(a, b); },
               [&](const T &a, const T &b, T &x1, T &x2) { ap.hb(a, b, x1, x2); });
+      } else if (bfam[j] == GAUSS) {
+        const GaussPolicy<T> gp{bpar[j], sqrt(1.0 - bpar[j] * bpar[j])};
+        level([&](const T &a, const T &b) { return gp.ld(a, b); },
+              [&](const T &a, const T &b, T &x1, T &x2) { gp.hb(a, b, x1, x2); });
       } else {
         level([&](const T &a, const T &b) { return nl_base_ld(bfam[j], brot[j], bpar[j], bpar[j], a, b); },
               [&](const T &a, const T &b, T &x1, T &x2) { T lc; pair_eval(bfam[j], brot[j], bpar[j], bpar[j], a, b, true, true, lc, x1, x2); });
