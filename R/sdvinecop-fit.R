@@ -620,8 +620,9 @@ setMethod("tsfit", signature(U = "ANY", object = "sdvinecop"),
     boot <- matrix(NA_real_, 0L, npar, dimnames = list(NULL, cn))
     se_method <- "none"
     if (identical(se, "hessian") && npar > 0L) {
-      H <- num_hessian(function(v) dv_negll(v, lay, K, u), z)
-      Vz <- tryCatch(solve(H), error = function(e) NULL)
+      # central differences of the exact gradient (same step as of the value before): about 4 times cheaper
+      H <- num_hessian_gr(function(v) dv_negll_gr(v, lay, K, u), z, h = 1e-3)
+      Vz <- if (all(is.finite(H))) tryCatch(solve(H), error = function(e) NULL)
       if (is.null(Vz) || any(!is.finite(Vz)) || any(diag(Vz) <= 0) ||
           any(eigen(H, symmetric = TRUE, only.values = TRUE)$values <= 0)) {
         warning("the information matrix is not positive definite; standard errors not available")

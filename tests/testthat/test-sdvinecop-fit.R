@@ -194,6 +194,17 @@ test_that("Hessian standard errors are positive and carried to the coefficients"
   expect_output(show(f), "standard errors: hessian")
 })
 
+test_that("the Hessian from the exact gradient agrees with that from the value", {
+  set.seed(9)
+  specs <- list(pc("t", aux = 6), pc("gumbel"))
+  u <- tssim(sdvinecop(armacop(ar = c(0.5, -0.2)), pairs = specs), 1000)
+  fit <- dv_fit_all(u, sdvinecop(armacop(order = c(2, 0)), pairs = specs), NULL, list())
+  lay <- fit$lay
+  Hg <- num_hessian_gr(function(v) dv_negll_gr(v, lay, fit$K, u), fit$z, h = 1e-3)
+  Hv <- num_hessian(function(v) dv_negll(v, lay, fit$K, u), fit$z)
+  expect_equal(Hg, Hv, tolerance = 1e-2)
+})
+
 test_that("bootstrap standard errors have the right shape and agree roughly with Hessian ones", {
   set.seed(10)
   specs <- list(pc("gumbel"))
