@@ -11,9 +11,9 @@
 # positive definite, for example at a boundary or a cusp of the likelihood) are
 # refitted by BFGS as before. options(tscop.bootnewton = FALSE) forces BFGS.
 
-# Hessian of the objective at z by central differences of the gradient `gr`,
-# or NULL when it is not positive definite or the gradient is not finite.
-boot_hessian <- function(gr, z, h = 1e-4) {
+# Hessian of the objective at z by central differences of the gradient `gr`
+# (symmetrised); may contain non-finite values.
+num_hessian_gr <- function(gr, z, h = 1e-4) {
   nz <- length(z)
   H <- matrix(0, nz, nz)
   for (k in seq_len(nz)) {
@@ -21,7 +21,12 @@ boot_hessian <- function(gr, z, h = 1e-4) {
     zm <- z; zm[k] <- zm[k] - h
     H[, k] <- (gr(zp) - gr(zm)) / (2 * h)
   }
-  H <- (H + t(H)) / 2
+  (H + t(H)) / 2
+}
+
+# That Hessian, or NULL when it is not positive definite or the gradient is not finite.
+boot_hessian <- function(gr, z, h = 1e-4) {
+  H <- num_hessian_gr(gr, z, h)
   if (any(!is.finite(H))) return(NULL)
   ev <- eigen(H, symmetric = TRUE, only.values = TRUE)$values
   if (min(ev) <= 1e-8 * max(ev)) return(NULL)

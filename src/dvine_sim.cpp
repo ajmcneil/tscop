@@ -132,6 +132,10 @@ template <class F> inline double nl_run(const Level &L, F &&f) {
     const AstPolicy<double> ap{L.tab.get(), L.bth, L.c0};
     return f([&](double a, double b) { return ap.ld(a, b); }, [&](double a, double b, double &h1, double &h2) { ap.hb(a, b, h1, h2); });
   }
+  if (L.bfam == GAUSS) {
+    const GaussPolicy<double> gp{L.bth, std::sqrt(1.0 - L.bth * L.bth)};
+    return f([&](double a, double b) { return gp.ld(a, b); }, [&](double a, double b, double &h1, double &h2) { gp.hb(a, b, h1, h2); });
+  }
   return f([&](double a, double b) { return nl_base_ld(L.bfam, L.brot, L.bth, L.bth, a, b); },
            [&](double a, double b, double &h1, double &h2) { double lc; pair_eval(L.bfam, L.brot, L.bth, L.bth, a, b, true, true, lc, h1, h2); });
 }

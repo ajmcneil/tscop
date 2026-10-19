@@ -504,6 +504,8 @@ dv_fit_all <- function(u, object, init, control) {
 dv_fit_core <- function(u, object, init, control) {
   stageK <- control$stageK
   control$stageK <- NULL
+  pscale <- control$pscale
+  control$pscale <- NULL
   st <- dv_start(object, init, u, control)
   lay <- st$lay
   z0 <- st$z0
@@ -513,13 +515,18 @@ dv_fit_core <- function(u, object, init, control) {
   if (dv_negll(z0, lay, K_start, u) >= 1e10) {
     stop("the starting values are infeasible for these data (a BB1 copula needs |tau| >= 1 - 1/delta at its lag)")
   }
-  ctrl <- modifyList(list(maxit = 500, reltol = 1e-10), control)
+  # The v2p fits are expensive and their likelihood is only smooth to about 1e-6: a looser tolerance and parameters
+  # scaled to the size of their standard errors (about 1 / sqrt(n)) save about half of the evaluations.
+  v2p <- lay$vttype == "v2p"
+  if (is.null(pscale) && v2p) pscale <- 6
+  ctrl <- modifyList(list(maxit = 500, reltol = if (v2p) 1e-8 else 1e-10), control)
   fit_fixed <- function(K, z, reltol = ctrl$reltol) {
     npar <- length(z)
     # the number of nonlinear lags is held fixed during an optimisation, like K
     if (lay$vttype == "v2p") lay$Lenv$L <- dv_L_at(z, lay, K)
     if (npar == 0L) return(list(z = z, value = dv_negll(z, lay, K, u), convergence = 0L, message = ""))
     c1 <- modifyList(ctrl, list(ndeps = rep(1e-6, npar), reltol = reltol))
+    if (!is.null(pscale)) c1$parscale <- rep(pscale / sqrt(length(u)), npar)
     opt <- stats::optim(z, dv_negll, gr = dv_negll_gr, lay = lay, K = K, u = u, method = "BFGS", control = c1)
     if (opt$convergence != 0L || opt$value >= 1e10) {
       alt <- stats::optim(opt$par, dv_negll, lay = lay, K = K, u = u, method = "Nelder-Mead",
@@ -542,10 +549,17 @@ dv_fit_core <- function(u, object, init, control) {
   }
   res <- dv_k_rule(fit_fixed, K_of, ll_of, K_of(z0), z0)
   if (lay$vttype == "v2p" && is.na(lay$nl_given)) {
-    # the number of nonlinear lags at the optimum: refit from there if the rule gives another one (at most twice)
+    # the number of nonlinear lags at the optimum: if the rule gives another one, compare the log-likelihoods at the
+    # optimum (no re-optimisation) and refit from there only if they differ by 0.01 or more, as in the K rule (at
+    # most twice)
     for (it in 1:2) {
+      Lold <- lay$Lenv$L
       Lnew <- dv_L_at(res$z, lay, res$K)
-      if (Lnew == lay$Lenv$L) break
+      if (Lnew == Lold) break
+      ll_old <- ll_of(res$z, res$K)
+      lay$Lenv$L <- Lnew
+      if (abs(ll_of(res$z, res$K) - ll_old) < 0.01) break   # keep Lnew; the log-likelihood below uses it
+      lay$Lenv$L <- Lold
       res <- dv_k_rule(fit_fixed, K_of, ll_of, res$K, res$z)
     }
   }
@@ -580,6 +594,18 @@ dv_fit_core <- function(u, object, init, control) {
 #'   starting values of the fit at the full lag, which reduces the number of
 #'   expensive evaluations. `control = list(stageK = 0)` switches this off, and
 #'   `stageK` sets the number of pair copulas of the first stage.
+#'
+#'   For `vttype = "v2p"` the number of nonlinear lags `L` is held fixed during an
+#'   optimisation and recomputed at its optimum like `K`: the model is refitted
+#'   with the new `L` only if the log-likelihood at the optimum changes by 0.01
+#'   or more, otherwise the new `L` is kept without refitting.
+#'
+#'   The optimisation uses BFGS with relative tolerance `control$reltol`
+#'   (default `1e-10`; `1e-8` for `vttype = "v2p"`, whose evaluations are
+#'   expensive and whose likelihood is rough below that level). For `v2p` the
+#'   free parameters are scaled by `control$pscale / sqrt(n)` (default `pscale = 6`,
+#'   about twice the scale of their standard errors), which avoids
+#'   most of the backtracking in the line searches.
 #'
 #'   Free-mode models cannot be fitted. The data must be complete.
 #'   `se = "bootstrap"` is recommended: the Hessian standard errors are
@@ -620,8 +646,9 @@ setMethod("tsfit", signature(U = "ANY", object = "sdvinecop"),
     boot <- matrix(NA_real_, 0L, npar, dimnames = list(NULL, cn))
     se_method <- "none"
     if (identical(se, "hessian") && npar > 0L) {
-      H <- num_hessian(function(v) dv_negll(v, lay, K, u), z)
-      Vz <- tryCatch(solve(H), error = function(e) NULL)
+      # central differences of the exact gradient (same step as of the value before): about 4 times cheaper
+      H <- num_hessian_gr(function(v) dv_negll_gr(v, lay, K, u), z, h = 1e-3)
+      Vz <- if (all(is.finite(H))) tryCatch(solve(H), error = function(e) NULL)
       if (is.null(Vz) || any(!is.finite(Vz)) || any(diag(Vz) <= 0) ||
           any(eigen(H, symmetric = TRUE, only.values = TRUE)$values <= 0)) {
         warning("the information matrix is not positive definite; standard errors not available")
@@ -636,7 +663,7 @@ setMethod("tsfit", signature(U = "ANY", object = "sdvinecop"),
       Ub <- dv_simulate(pairs_hat, matrix(stats::runif(n * B), n, B))
       if (pseudo) Ub <- apply(Ub, 2L, function(v) rank(v, ties.method = "random") / (n + 1))
       boot <- matrix(NA_real_, B, npar, dimnames = list(NULL, cn))
-      ctrl <- modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, length(z))), control)
+      ctrl <- modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, length(z))), control[setdiff(names(control), c("pscale", "stageK"))])
       Hinv <- if (bootstart == "fitted") boot_prepare(function(zz) dv_negll_gr(zz, lay, K, u), z) else NULL
       refit <- function(b) {
         ub <- Ub[, b]
