@@ -130,4 +130,7 @@ test_that("the joint objective rejects margins that collapse the PITs onto the b
   th <- jt$theta0
   th[match("mu", jt$free)] <- 50                      # location far outside the data: every PIT is ~ 0
   expect_equal(jt$negll(th, x), 1e10)
+  th <- jt$theta0
+  th[match("mu", jt$free)] <- 8 * stats::sd(x)         # all PITs inside (0, 1) but crowded at the upper end
+  expect_equal(jt$negll(th, x), 1e10)
 })
