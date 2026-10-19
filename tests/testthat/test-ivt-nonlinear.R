@@ -235,7 +235,8 @@ test_that("the constructor validates the nonlinear v-transform arguments and rec
   expect_equal(names(coef(m)), c("lambda1", "w1", "delta1", "delta2", "kappa1", "kappa2"))
   expect_equal(names(coef(nl_model(vtfix = "kappa2"))), c("lambda1", "w1", "delta1", "delta2", "kappa1"))
   expect_equal(names(coef(nl_model(vtfix = c("delta1", "delta2", "kappa1")))), c("lambda1", "w1", "kappa2"))
-  expect_output(show(m), "v-transform shapes \\(v2p\\): 1.4, 0.7; nonlinear lags 1-")
+  expect_output(show(m), "v-transform shapes \\(v2p\\): 1.4, 0.7")
+  expect_output(show(m), "nonlinear lags L = [0-9]+ \\(nltau = 0.02\\)")
   expect_output(show(nl_model(vtfix = "kappa2")), "kappa2 fixed")
   expect_equal(sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), vttype = "v2p")@L, NA_integer_)   # not yet specified
   expect_error(sdvinecop(arfactcop(lambda = 0.9, w = 0.3), tail = pc("ivt", base = "joe"), vtshape = c(1.2, 1)), "vttype")

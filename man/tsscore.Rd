@@ -39,8 +39,8 @@ object). For a matrix, VaR backtests need a column at level \code{p} and ES back
 \item{relative}{for the \code{plot} method: show the difference from the first forecast.}
 }
 \value{
-An object of class \code{tsscore}, a list with \code{summary} (a data frame with a row per forecast: AQS, log
-score and FZ0 by \code{p}), \code{profile} (matrix of the mean quantile score by level and forecast), \code{var} and
+An object of class \code{tsscore}, a list with \code{summary} (a data frame with a row per forecast: AQS, negative
+log score and FZ0 by \code{p}), \code{profile} (matrix of the mean quantile score by level and forecast), \code{var} and
 \code{es} (lists by \code{p} of data frames of the tests per forecast), \code{dm} (data frame of Diebold-Mariano
 tests against the first forecast), \code{levels}, \code{weights} and \code{n}. It has \code{print} and \code{plot} methods; the
 plot shows the profile of quantile scores by level, or with \code{relative = TRUE} the difference from
@@ -48,7 +48,7 @@ the first forecast.
 }
 \description{
 Evaluates one or several sets of one-step-ahead forecasts of the same observations: the average quantile
-score (AQS) over a grid of probability levels together with its profile by level, the log score,
+score (AQS) over a grid of probability levels together with its profile by level, the negative log score,
 backtests of the value-at-risk (Kupiec and Christoffersen likelihood-ratio tests of the breach indicators),
 backtests of the expected shortfall (the Fissler-Ziegel loss FZ0 and the Acerbi-Szekely statistics Z1
 and Z2), and Diebold-Mariano tests of equal predictive accuracy against the first forecast, with
@@ -68,6 +68,9 @@ expected shortfall is underestimated, with z-tests (Newey-West for \code{z2}). T
 tests compare per-forecast losses (AQS, the negative log score and FZ0 at each \code{p}): the statistic is
 the mean of the loss of the first forecast minus the loss of the other, so positive values mean the other
 forecast is better.
+
+All scores in the \code{summary} are losses: smaller (or more negative) is better. The log score is therefore
+reported as the negative log score \eqn{-\log f(y)}, averaged over the forecasts and named \code{neglogscore}.
 }
 \examples{
 \donttest{

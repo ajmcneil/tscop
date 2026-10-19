@@ -66,7 +66,7 @@ ts_pinball <- function(y, Q, lev) {
 #' Scores and backtests of out-of-sample forecasts
 #'
 #' Evaluates one or several sets of one-step-ahead forecasts of the same observations: the average quantile
-#' score (AQS) over a grid of probability levels together with its profile by level, the log score,
+#' score (AQS) over a grid of probability levels together with its profile by level, the negative log score,
 #' backtests of the value-at-risk (Kupiec and Christoffersen likelihood-ratio tests of the breach indicators),
 #' backtests of the expected shortfall (the Fissler-Ziegel loss FZ0 and the Acerbi-Szekely statistics Z1
 #' and Z2), and Diebold-Mariano tests of equal predictive accuracy against the first forecast, with
@@ -87,6 +87,9 @@ ts_pinball <- function(y, Q, lev) {
 #' the mean of the loss of the first forecast minus the loss of the other, so positive values mean the other
 #' forecast is better.
 #'
+#' All scores in the `summary` are losses: smaller (or more negative) is better. The log score is therefore
+#' reported as the negative log score \eqn{-\log f(y)}, averaged over the forecasts and named `neglogscore`.
+#'
 #' @param x a [tsforecast-class] object, or a matrix of predictive quantiles with one row per observation and
 #'   one column per level.
 #' @param ... further forecasts of the same observations (each a [tsforecast-class] object or quantile matrix),
@@ -99,8 +102,8 @@ ts_pinball <- function(y, Q, lev) {
 #' @param weights the level weights of the AQS (see Details).
 #' @param lag truncation lag of the Newey-West variance (default \eqn{\lfloor n^{1/3}\rfloor}).
 #'
-#' @return An object of class `tsscore`, a list with `summary` (a data frame with a row per forecast: AQS, log
-#'   score and FZ0 by `p`), `profile` (matrix of the mean quantile score by level and forecast), `var` and
+#' @return An object of class `tsscore`, a list with `summary` (a data frame with a row per forecast: AQS, negative
+#'   log score and FZ0 by `p`), `profile` (matrix of the mean quantile score by level and forecast), `var` and
 #'   `es` (lists by `p` of data frames of the tests per forecast), `dm` (data frame of Diebold-Mariano
 #'   tests against the first forecast), `levels`, `weights` and `n`. It has `print` and `plot` methods; the
 #'   plot shows the profile of quantile scores by level, or with `relative = TRUE` the difference from
@@ -148,7 +151,7 @@ tsscore <- function(x, ..., observed = NULL, levels = NULL, p = NULL, weights = 
     }, numeric(n))
   })
   logs <- vapply(u, function(f) mean(f$logdens), 0)
-  summ <- data.frame(forecast = nm, aqs = vapply(qs_t, mean, 0), logscore = logs, stringsAsFactors = FALSE)
+  summ <- data.frame(forecast = nm, aqs = vapply(qs_t, mean, 0), neglogscore = -logs, stringsAsFactors = FALSE)
   for (i in seq_len(np)) summ[[paste0("fz0_", format(p[i]))]] <- vapply(fz0_t, function(m) mean(m[, i]), 0)
   var_tab <- es_tab <- list()
   for (i in seq_len(np)) {
@@ -175,7 +178,7 @@ tsscore <- function(x, ..., observed = NULL, levels = NULL, p = NULL, weights = 
     for (k in 2:K) {
       add <- function(loss, d) rows[[length(rows) + 1L]] <<- data.frame(forecast = nm[k], loss = loss, t(ts_mean_test(d, lag)), stringsAsFactors = FALSE)
       add("aqs", qs_t[[1L]] - qs_t[[k]])
-      if (!anyNA(u[[1L]]$logdens) && !anyNA(u[[k]]$logdens)) add("logscore", u[[k]]$logdens - u[[1L]]$logdens)
+      if (!anyNA(u[[1L]]$logdens) && !anyNA(u[[k]]$logdens)) add("neglogscore", u[[k]]$logdens - u[[1L]]$logdens)
       for (i in seq_len(np)) if (!anyNA(fz0_t[[1L]][, i]) && !anyNA(fz0_t[[k]][, i])) add(paste0("fz0_", format(p[i])), fz0_t[[1L]][, i] - fz0_t[[k]][, i])
     }
     dm <- do.call(rbind, rows)
@@ -193,6 +196,7 @@ print.tsscore <- function(x, digits = 4, ...) {
   num <- vapply(s, is.numeric, TRUE)
   s[num] <- lapply(s[num], function(v) signif(v, digits))
   print(s, row.names = FALSE)
+  cat("(all scores are losses: smaller is better; neglogscore = minus the mean log predictive density)\n")
   for (key in names(x$var)) {
     cat("\nVaR backtests, p = ", key, "\n", sep = "")
     v <- x$var[[key]]; nn <- vapply(v, is.numeric, TRUE); v[nn] <- lapply(v[nn], function(z) signif(z, digits))
