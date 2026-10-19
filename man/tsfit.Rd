@@ -183,6 +183,11 @@ starting values of the fit at the full lag, which reduces the number of
 expensive evaluations. \code{control = list(stageK = 0)} switches this off, and
 \code{stageK} sets the number of pair copulas of the first stage.
 
+For \code{vttype = "v2p"} the number of nonlinear lags \code{L} is held fixed during an
+optimisation and recomputed at its optimum like \code{K}: the model is refitted
+with the new \code{L} only if the log-likelihood at the optimum changes by 0.01
+or more, otherwise the new \code{L} is kept without refitting.
+
 Free-mode models cannot be fitted. The data must be complete.
 \code{se = "bootstrap"} is recommended: the Hessian standard errors are
 unreliable where a rotated copula switches rotation (Kendall's tau near

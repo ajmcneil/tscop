@@ -1,6 +1,7 @@
 # tscop (development version)
 
 * `tsfit(se = "hessian")` for `sdvinecop` models uses central differences of the exact gradient instead of the value, which is about four times faster for nonlinear (v2p) models.
+* The fitting rule for the number of nonlinear lags `L` (v2p) refits only if the log-likelihood at the optimum changes by 0.01 or more with the new `L`, like the rule for `K`.
 * `show` for `sdvinecop` models and fits with `vttype = "v2p"` gives the number of nonlinear lags `L` and what determined it (`nltau`, `nl`) on its own line under the effective lag.
 * `tsscore()` reports the negative log score (`neglogscore`) so that every score in the summary is a loss (smaller is better); the printed output says so. Diebold-Mariano comparisons are unchanged.
 * `show` for a fitted `sdvinecop` now names the base copula of an inverse-v-transformed (`"ivt"`) tail, like `show` for the model.

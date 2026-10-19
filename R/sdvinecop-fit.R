@@ -542,10 +542,17 @@ dv_fit_core <- function(u, object, init, control) {
   }
   res <- dv_k_rule(fit_fixed, K_of, ll_of, K_of(z0), z0)
   if (lay$vttype == "v2p" && is.na(lay$nl_given)) {
-    # the number of nonlinear lags at the optimum: refit from there if the rule gives another one (at most twice)
+    # the number of nonlinear lags at the optimum: if the rule gives another one, compare the log-likelihoods at the
+    # optimum (no re-optimisation) and refit from there only if they differ by 0.01 or more, as in the K rule (at
+    # most twice)
     for (it in 1:2) {
+      Lold <- lay$Lenv$L
       Lnew <- dv_L_at(res$z, lay, res$K)
-      if (Lnew == lay$Lenv$L) break
+      if (Lnew == Lold) break
+      ll_old <- ll_of(res$z, res$K)
+      lay$Lenv$L <- Lnew
+      if (abs(ll_of(res$z, res$K) - ll_old) < 0.01) break   # keep Lnew; the log-likelihood below uses it
+      lay$Lenv$L <- Lold
       res <- dv_k_rule(fit_fixed, K_of, ll_of, res$K, res$z)
     }
   }
@@ -580,6 +587,11 @@ dv_fit_core <- function(u, object, init, control) {
 #'   starting values of the fit at the full lag, which reduces the number of
 #'   expensive evaluations. `control = list(stageK = 0)` switches this off, and
 #'   `stageK` sets the number of pair copulas of the first stage.
+#'
+#'   For `vttype = "v2p"` the number of nonlinear lags `L` is held fixed during an
+#'   optimisation and recomputed at its optimum like `K`: the model is refitted
+#'   with the new `L` only if the log-likelihood at the optimum changes by 0.01
+#'   or more, otherwise the new `L` is kept without refitting.
 #'
 #'   Free-mode models cannot be fitted. The data must be complete.
 #'   `se = "bootstrap"` is recommended: the Hessian standard errors are
