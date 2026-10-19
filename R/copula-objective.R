@@ -10,6 +10,8 @@
 #   build(z)   the copula model with free vector z
 #   coef(z)    the natural coefficient vector (named) at z
 #   K          effective lag held fixed in the objective (NA if none)
+#   L, Lat, setL  (nonlinear v-transforms only) the number of nonlinear lags held fixed in the objective,
+#              its rule value at z, and a setter; absent otherwise
 #   grad       NULL, or function(z, u, du) returning the gradient of the negative
 #              log-likelihood with respect to nm directions along which the data u
 #              vary (the columns of the n x nm matrix du) followed by z; NULL when
@@ -86,6 +88,10 @@ setMethod("cop_obj", "sdvinecop", function(model, u) {
     build = function(z) dv_build_model(model, z, lay, K, limit),
     coef = function(z) stats::setNames(dv_free_to_coef(z, lay), names(coef(model))),
     K = K,
+    # number of nonlinear lags (v2p): held fixed during an optimisation; the rule value at z, and a setter
+    L = if (lay$vttype == "v2p") function() lay$Lenv$L else NULL,
+    Lat = if (lay$vttype == "v2p") function(z) dv_L_at(z, lay, K) else NULL,
+    setL = if (lay$vttype == "v2p") function(L) { lay$Lenv$L <- as.integer(L); invisible(NULL) } else NULL,
     grad = function(z, u, du) {
       nx <- ncol(du)
       if (nx + length(z) > 12L) return(NULL)

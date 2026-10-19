@@ -119,9 +119,14 @@ random numbers, so the results do not depend on \code{cores}.}
 
 \item{method}{estimation method for a \link[=tsmod-class]{tsmod} model: \code{"twostage"}
 (default) or \code{"joint"}, joint maximum likelihood of the margin and copula
-parameters started at the two-stage estimates (parametric margins only;
-the effective lag of a d-vine copula is held at its two-stage value);
-\code{se = "hessian"} is then available.}
+parameters started at the two-stage estimates, or at the parameters of
+the copula supplied in \code{object} (with the margin refitted) if those have the
+higher likelihood (parametric margins only; the effective lag of a d-vine
+copula is held at its two-stage value, the number of nonlinear lags follows
+the two-stage rule with its 0.01 tolerance). The joint likelihood is never
+lower than at the start; a fit that stops with a large gradient is reported
+with a warning and in \verb{@convergence} (0 converged, 1 iteration limit, 10
+stalled). \code{se = "hessian"} is then available.}
 
 \item{margin_control}{control list passed to the optimiser of the margin.}
 

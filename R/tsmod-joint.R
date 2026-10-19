@@ -2,8 +2,9 @@
 # are estimated together by maximising
 #   sum_t log f(x_t; theta_m) + log c(F(x_t; theta_m); theta_c)
 # on the free scale of both parameter sets. The copula enters only through the
-# internal cop_obj() interface (R/copula-objective.R). The effective lag of a
-# d-vine copula is held fixed at its two-stage value. Margin parameters that put a PIT within 1e-9 of 0 or 1,
+# internal cop_obj() interface (R/copula-objective.R). The effective lag K of a
+# d-vine copula is held fixed at its two-stage value; the number of nonlinear lags L is held fixed during an
+# optimisation and follows the rule of the two-stage fit afterwards (tm_joint_L_rule). Margin parameters that put a PIT within 1e-9 of 0 or 1,
 # or the median PIT outside (0.05, 0.95), are infeasible (the copula likelihood is unbounded when the PITs
 # collapse onto the boundary).
 
@@ -16,6 +17,7 @@ tm_joint_setup <- function(mmodel, cmodel, x) {
   nm <- length(free)
   u0 <- tm_pits(mmodel, x)
   cop <- cop_obj(cmodel, u0)
+  if (!is.null(cop$setL) && is.na(cop$L())) cop$setL(cop$Lat(cop$z0))     # L is held fixed during the optimisation
   zm0 <- if (nm > 0L) mg_to_free(th0[free], types) else numeric(0)
   mpars <- function(zm) {
     th <- th0
@@ -78,11 +80,30 @@ tm_joint_setup <- function(mmodel, cmodel, x) {
        })
 }
 
-# Maximise the joint likelihood from `start` (BFGS, Nelder-Mead fallback).
-tm_joint_optim <- function(jt, x, start = jt$theta0, control = list()) {
+# Best of the points par + s e_k (coordinate steps s = +-1e-4, ..., +-0.1 on the free scale) and `par`.
+tm_joint_probe <- function(jt, x, par, value) {
+  best <- list(par = par, value = value)
+  for (k in seq_along(par)) {
+    for (s in c(-1, 1) * rep(10^(-4:-1), each = 2)) {
+      p <- par; p[k] <- p[k] + s
+      v <- jt$negll(p, x)
+      if (is.finite(v) && v < best$value) best <- list(par = p, value = v)
+    }
+  }
+  best
+}
+
+# Maximise the joint likelihood from `start`. The result never has a lower likelihood than the start. The objective can
+# be rough in the margin parameters (observations cross the fulcrums of an inverse v-transform as the PITs shift), so that
+# BFGS can stall after a tiny step and still report convergence. After BFGS the point is therefore probed with coordinate
+# steps of several sizes; if one of them improves the log-likelihood by `tol` (0.01) or more, BFGS is restarted from there
+# on a coarser parameter scale (at most three times), and Nelder-Mead is the last resort. `convergence` is 0 (converged:
+# no probe improves by `tol`), 1 (iteration limit) or 10 (stalled: the probes still find improvements).
+tm_joint_optim <- function(jt, x, start = jt$theta0, control = list(), tol = 0.01) {
   np <- length(start)
-  if (np == 0L) return(list(theta = start, value = jt$negll(start, x), convergence = 0L, message = ""))
-  if (jt$negll(start, x) >= 1e10) stop("the two-stage estimates are infeasible for the joint likelihood", call. = FALSE)
+  v0 <- jt$negll(start, x)
+  if (np == 0L) return(list(theta = start, value = v0, convergence = 0L, message = ""))
+  if (v0 >= 1e10) stop("the two-stage estimates are infeasible for the joint likelihood", call. = FALSE)
   ctrl <- utils::modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, np)), control)
   gr <- function(theta, x) {
     g <- jt$gradient(theta, x)
@@ -94,14 +115,93 @@ tm_joint_optim <- function(jt, x, start = jt$theta0, control = list()) {
       (jt$negll(tp, x) - jt$negll(tm, x)) / (2 * h)
     }, numeric(1))
   }
-  opt <- stats::optim(start, jt$negll, gr = gr, x = x, method = "BFGS", control = ctrl)
-  if (opt$convergence != 0L || opt$value >= 1e10) {
-    alt <- stats::optim(opt$par, jt$negll, x = x, method = "Nelder-Mead",
-                        control = list(maxit = 5000, reltol = 1e-10, warn.1d.NelderMead = FALSE))
-    if (alt$value < opt$value) opt <- alt
+  best <- list(par = start, value = v0)
+  conv <- 0L
+  msg <- ""
+  run <- function(from, ct, method = "BFGS") {
+    opt <- if (method == "BFGS") {
+      stats::optim(from, jt$negll, gr = gr, x = x, method = "BFGS", control = ct)
+    } else {
+      stats::optim(from, jt$negll, x = x, method = "Nelder-Mead", control = ct)
+    }
+    if (is.finite(opt$value) && opt$value < best$value) best <<- list(par = opt$par, value = opt$value)
+    conv <<- opt$convergence
+    msg <<- if (is.null(opt$message)) "" else opt$message
   }
-  list(theta = opt$par, value = opt$value, convergence = opt$convergence,
-       message = if (is.null(opt$message)) "" else opt$message)
+  c2 <- utils::modifyList(ctrl, list(parscale = rep(0.05, np)))
+  run(start, ctrl)
+  ok <- FALSE
+  for (it in 1:4) {
+    pr <- tm_joint_probe(jt, x, best$par, best$value)
+    if (best$value - pr$value < tol) {
+      ok <- TRUE
+      break
+    }
+    if (it == 4L) break
+    best <- pr
+    run(best$par, c2)
+  }
+  if (!ok || conv != 0L) {
+    run(best$par, list(maxit = 2000, reltol = 1e-10, warn.1d.NelderMead = FALSE), "NM")
+    pr <- tm_joint_probe(jt, x, best$par, best$value)
+    if (best$value - pr$value >= tol) {
+      best <- pr
+      conv <- 10L
+      msg <- "the optimiser stalled: a coordinate step still improves the log-likelihood"
+    }
+  }
+  list(theta = best$par, value = best$value, convergence = as.integer(conv), message = msg)
+}
+
+# The number of nonlinear lags L (nonlinear v-transforms) at the joint optimum follows the rule of the two-stage fit: if
+# the rule gives another number at the optimum, the log-likelihood is compared with the new one at the same parameters; a
+# change below `tol` keeps the new number, otherwise the fit is repeated with it from the optimum and kept only if it has
+# the higher likelihood (at most twice).
+tm_joint_L_rule <- function(jt, x, fit, control = list(), tol = 0.01) {
+  cop <- jt$cop
+  if (is.null(cop$Lat) || is.null(cop$setL) || is.na(cop$L())) return(fit)
+  zc <- function(th) th[jt$nm + seq_along(cop$z0)]
+  for (it in 1:2) {
+    Lold <- cop$L()
+    Lnew <- cop$Lat(zc(fit$theta))
+    if (is.na(Lnew) || Lnew == Lold) break
+    ll_old <- -jt$negll(fit$theta, x)
+    cop$setL(Lnew)
+    ll_new <- -jt$negll(fit$theta, x)
+    if (is.finite(ll_new) && abs(ll_new - ll_old) < tol) {
+      fit$value <- -ll_new
+      break
+    }
+    new <- tryCatch(tm_joint_optim(jt, x, start = fit$theta, control = control), error = function(e) NULL)
+    if (is.null(new) || new$value >= fit$value) {
+      cop$setL(Lold)
+      break
+    }
+    fit <- new
+  }
+  fit
+}
+
+# Full joint fit: the start is the two-stage fit (`cfit_model`, the copula refitted to the PITs of `mmodel`), or the
+# copula model supplied by the user (`cmodel`) with the same margin if that has the higher likelihood (a fitted model is
+# then a start as good as the one it came from, instead of a refit that can end in a worse local optimum);
+# the optimisation, then the rule for L. Returns the setup used and the fit, with `start` naming the start.
+tm_joint_fit <- function(mmodel, cmodel, cfit_model, x, control = list()) {
+  jt <- tm_joint_setup(mmodel, cfit_model, x)
+  start <- "twostage"
+  if (!identical(cmodel, cfit_model)) {
+    alt <- tryCatch(tm_joint_setup(mmodel, cmodel, x), error = function(e) NULL)
+    if (!is.null(alt) && length(alt$theta0) == length(jt$theta0)) {
+      va <- alt$negll(alt$theta0, x)
+      if (is.finite(va) && va < 1e10 && va < jt$negll(jt$theta0, x) - 1e-8) {
+        jt <- alt
+        start <- "supplied"
+      }
+    }
+  }
+  fit <- tm_joint_optim(jt, x, control = control)
+  fit <- tm_joint_L_rule(jt, x, fit, control)
+  c(fit, list(jt = jt, start = start))
 }
 
 # A margfit object for the jointly estimated margin (standard errors are
