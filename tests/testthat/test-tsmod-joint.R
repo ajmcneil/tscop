@@ -118,3 +118,19 @@ test_that("joint fits with the exact gradient agree with fits by differences", {
   expect_equal(unname(coef(f1)), unname(coef(f2)), tolerance = 1e-3)
   expect_equal(as.numeric(logLik(f1)), as.numeric(logLik(f2)), tolerance = 1e-6)
 })
+
+test_that("the joint objective rejects margins that collapse the PITs onto the boundary", {
+  set.seed(21)
+  tru <- tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)),
+               sdvinecop(arfactcop(lambda = 0.9, w = 0.5), tail = pc("ivt", base = "joe"), vt = c(0.5, 0.5), maxlag = 12, tautol = 1e-3))
+  x <- tssim(tru, 500)
+  f2 <- tsfit(x, tsmod("st", sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), maxlag = 12, tautol = 1e-3)))
+  jt <- tm_joint_setup(f2@model@margin, f2@model@copula, x)
+  expect_lt(jt$negll(jt$theta0, x), 1e10)
+  th <- jt$theta0
+  th[match("mu", jt$free)] <- 50                      # location far outside the data: every PIT is ~ 0
+  expect_equal(jt$negll(th, x), 1e10)
+  th <- jt$theta0
+  th[match("mu", jt$free)] <- 8 * stats::sd(x)         # all PITs inside (0, 1) but crowded at the upper end
+  expect_equal(jt$negll(th, x), 1e10)
+})
