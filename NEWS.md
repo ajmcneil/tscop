@@ -1,5 +1,6 @@
 # tscop (development version)
 
+* Joint maximum likelihood (`tsfit(method = "joint")`) treats margin parameters that put a PIT within 1e-9 of 0 or 1 as infeasible: the copula likelihood is unbounded when all the PITs collapse onto the boundary, and the optimiser could escape there (observed with a Johnson SU margin and a nonlinear IVT copula).
 * The Gaussian base of nonlinear (v2p) `sdvinecop` models is compiled like the other bases (closed-form h-functions and density on the normal-score scale): a cold v2p fit with a Gaussian IVT base at n = 1500 takes about 2 s instead of about 58 s. Results agree with the R reference to 1e-8.
 * Faster nonlinear (v2p) `sdvinecop` fits: the optimiser uses relative tolerance `1e-8` (instead of `1e-10`) and parameters scaled to the size of their standard errors (`control$pscale`, default 6 divided by `sqrt(n)`), which roughly halves the number of likelihood evaluations of a cold fit (Joe, n = 1500: about 14 s to 6-8 s) and makes a warm refit (`init` = fitted model) almost free. Estimates change by about 1e-4.
 * `tsfit(se = "hessian")` for `sdvinecop` models uses central differences of the exact gradient instead of the value, which is about four times faster for nonlinear (v2p) models.

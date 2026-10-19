@@ -3,7 +3,8 @@
 #   sum_t log f(x_t; theta_m) + log c(F(x_t; theta_m); theta_c)
 # on the free scale of both parameter sets. The copula enters only through the
 # internal cop_obj() interface (R/copula-objective.R). The effective lag of a
-# d-vine copula is held fixed at its two-stage value.
+# d-vine copula is held fixed at its two-stage value. Margin parameters that put a PIT within 1e-9 of 0 or 1
+# are infeasible (the copula likelihood is unbounded when the PITs collapse onto the boundary).
 
 # Joint objective for the fitted margin `mmodel` and copula `cmodel`.
 tm_joint_setup <- function(mmodel, cmodel, x) {
@@ -27,6 +28,9 @@ tm_joint_setup <- function(mmodel, cmodel, x) {
     if (!is.finite(vm) || vm >= 1e10) return(1e10)
     u <- mg_cdf(fam, mpars(zm), x)
     if (anyNA(u)) return(1e10)
+    # a margin that pushes observations to the ends of (0, 1) makes the copula likelihood unbounded
+    # (all the PITs coincide at the clamp): such parameter values are infeasible
+    if (any(u < 1e-9 | u > 1 - 1e-9)) return(1e10)
     u <- pmin(pmax(u, 1e-12), 1 - 1e-12)
     vc <- tryCatch(cop$negll(zc, u), error = function(e) 1e10)
     if (!is.finite(vc) || vc >= 1e10) return(1e10)
