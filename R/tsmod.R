@@ -180,8 +180,9 @@ tm_resid <- function(model, data, scale, nodes, type) {
 setClass("tsmodfit", slots = c(
   model = "tsmod", data = "numeric", margfit = "ANY", copfit = "ANY", estimate = "numeric",
   se = "numeric", vcov = "matrix", se_method = "character", boot = "matrix", loglik = "numeric",
-  nobs = "integer", npar = "integer", method = "character", template = "ANY", selection = "ANY"
-))
+  nobs = "integer", npar = "integer", method = "character", template = "ANY", selection = "ANY",
+  convergence = "integer", message = "character"
+), prototype = prototype(convergence = 0L, message = ""))
 
 #' @describeIn tsfit Estimation of a [tsmod-class] model from the data `U` on its
 #'   original scale (a numeric vector or time series without missing values).
@@ -204,9 +205,14 @@ setClass("tsmodfit", slots = c(
 #'   generated first, so the results do not depend on `cores`.
 #' @param method estimation method for a [tsmod-class] model: `"twostage"`
 #'   (default) or `"joint"`, joint maximum likelihood of the margin and copula
-#'   parameters started at the two-stage estimates (parametric margins only;
-#'   the effective lag of a d-vine copula is held at its two-stage value);
-#'   `se = "hessian"` is then available.
+#'   parameters started at the two-stage estimates, or at the parameters of
+#'   the copula supplied in `object` (with the margin refitted) if those have the
+#'   higher likelihood (parametric margins only; the effective lag of a d-vine
+#'   copula is held at its two-stage value, the number of nonlinear lags follows
+#'   the two-stage rule with its 0.01 tolerance). The joint likelihood is never
+#'   lower than at the start; a fit that stops with a large gradient is reported
+#'   with a warning and in `@convergence` (0 converged, 1 iteration limit, 10
+#'   stalled). `se = "hessian"` is then available.
 #' @param joint_control control list passed to [stats::optim()] for
 #'   `method = "joint"`.
 #' @param margin_control control list passed to the optimiser of the margin.
@@ -257,9 +263,11 @@ setMethod("tsfit", signature(U = "ANY", object = "tsmod"),
     npar <- length(est)
     ll <- as.numeric(logLik(cfit)) + if (is(mfit, "margfit")) as.numeric(logLik(mfit)) else 0
     jt <- jfit <- NULL
+    conv <- 0L
+    cmsg <- ""
     if (joint) {
-      jt <- tm_joint_setup(mmodel, cfit@model, x)
-      jfit <- tm_joint_optim(jt, x, control = joint_control)
+      jfit <- tm_joint_fit(mmodel, object@copula, cfit@model, x, control = joint_control)
+      jt <- jfit$jt
       jm <- jt$build(jfit$theta)
       mfit <- tm_joint_margfit(jt, jm$margin, x, mmodel, jfit$convergence, jfit$message)
       cfit <- jm$copula
@@ -267,7 +275,9 @@ setMethod("tsfit", signature(U = "ANY", object = "tsmod"),
       model <- new("tsmod", margin = mmodel, copula = jm$copula)
       est <- jt$coefmap(jfit$theta)
       ll <- -jfit$value
-      if (jfit$convergence != 0L) warning("the joint optimisation did not converge (code ", jfit$convergence, ")")
+      conv <- jfit$convergence
+      cmsg <- jfit$message
+      if (conv != 0L) warning("the joint optimisation did not converge (code ", conv, if (nzchar(cmsg)) paste0(": ", cmsg), ")")
     }
     V <- matrix(NA_real_, npar, npar, dimnames = list(names(est), names(est)))
     boot <- matrix(NA_real_, 0L, npar, dimnames = list(NULL, names(est)))
@@ -326,7 +336,7 @@ setMethod("tsfit", signature(U = "ANY", object = "tsmod"),
       model = model, data = x, margfit = mfit, copfit = cfit, estimate = est,
       se = se_vec, vcov = V, se_method = se_method, boot = boot,
       loglik = ll, nobs = length(x), npar = as.integer(npar), method = method, template = template,
-      selection = selection
+      selection = selection, convergence = as.integer(conv), message = cmsg
     )
   }
 )
@@ -377,6 +387,10 @@ setMethod("show", "tsmodfit", function(object) {
   }
   cat("loglik: ", format(object@loglik, digits = 7), "  npar: ", object@npar, "  nobs: ", object@nobs,
       if (is(object@margfit, "emarg")) "  (copula pseudo-likelihood)", "\n", sep = "")
+  if (.hasSlot(object, "convergence") && object@convergence != 0L) {
+    cat("warning: the joint optimisation did not converge (code ", object@convergence,
+        if (nzchar(object@message)) paste0(": ", object@message), ")\n", sep = "")
+  }
   invisible(object)
 })
 

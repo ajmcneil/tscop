@@ -134,3 +134,72 @@ test_that("the joint objective rejects margins that collapse the PITs onto the b
   th[match("mu", jt$free)] <- 8 * stats::sd(x)         # all PITs inside (0, 1) but crowded at the upper end
   expect_equal(jt$negll(th, x), 1e10)
 })
+
+test_that("the joint optimiser escapes a rough objective where plain BFGS stalls, and never ends below its start", {
+  # a stiff smooth objective with a sawtooth of period 1e-5 in the first parameter: BFGS reports convergence at a
+  # value of about 2000 after a tiny step, although a coordinate step of 1e-3 reaches about 0.02
+  f <- function(th, x) 1e5 * (th[1] - 0.3)^2 / 2 + sum((th[-1] - 1)^2) / 2 + 1e3 * (th[2] - th[3])^2 +
+    abs(((th[1] / 1e-5) %% 1) - 0.5)
+  g <- function(th, x) c(1e5 * (th[1] - 0.3) - sign(((th[1] / 1e-5) %% 1) - 0.5) / 1e-5, th[-1] - 1 + c(1, -1) * 2e3 * (th[2] - th[3]))
+  jt <- list(negll = f, gradient = g, theta0 = c(0.5, 0, 3), nm = 1L)
+  plain <- stats::optim(jt$theta0, f, g, x = NULL, method = "BFGS", control = list(maxit = 500, reltol = 1e-10))
+  expect_equal(plain$convergence, 0L)
+  expect_gt(plain$value, 100)
+  o <- tm_joint_optim(jt, NULL)
+  expect_lt(o$value, 0.1)
+  expect_lte(o$value, f(jt$theta0, NULL))
+  expect_equal(o$convergence, 0L)
+  # an objective that cannot be improved returns the start itself
+  flat <- list(negll = function(th, x) sum(th^2), gradient = function(th, x) 2 * th, theta0 = c(0, 0), nm = 1L)
+  o2 <- tm_joint_optim(flat, NULL)
+  expect_equal(o2$value, 0)
+  expect_equal(o2$convergence, 0L)
+})
+
+test_that("the number of nonlinear lags in the joint fit follows the 0.01 tolerance rule of the two-stage fit", {
+  # a mock objective whose L is held fixed during the optimisation: the rule gives L = 3 at the optimum, the
+  # log-likelihood with L = 3 is 5 higher (so a refit is accepted); with a difference of 0.001 the new L is kept
+  # without a refit; a refit that does not improve is reverted
+  mk <- function(shift3, refit_gain) {
+    L <- 2L
+    cop <- list(z0 = 0, L = function() L, Lat = function(z) 3L, setL = function(l) L <<- l)
+    jt <- list(nm = 0L, cop = cop, gradient = function(th, x) NULL)
+    jt$negll <- function(th, x) (th - 1)^2 + if (L == 3L) -shift3 else 0
+    list(jt = jt, L = function() L)
+  }
+  fit <- list(theta = 1, value = 0, convergence = 0L, message = "")
+  m <- mk(5, 0)
+  r <- tm_joint_L_rule(m$jt, NULL, fit, control = list())
+  expect_equal(m$L(), 3L)
+  expect_equal(r$value, -5)
+  m <- mk(0.001, 0)
+  r <- tm_joint_L_rule(m$jt, NULL, fit)
+  expect_equal(m$L(), 3L)
+  expect_equal(r$value, -0.001)
+  # worse with the new L: reverted
+  m <- mk(-5, 0)
+  r <- tm_joint_L_rule(m$jt, NULL, fit)
+  expect_equal(m$L(), 2L)
+  expect_equal(r$value, 0)
+})
+
+test_that("tsfit(method = 'joint') starts from the supplied fitted copula when that is better than the refit", {
+  skip_on_cran()
+  set.seed(31)
+  tru <- tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)),
+               sdvinecop(arfactcop(lambda = 0.9, w = 0.5), tail = pc("ivt", base = "joe"), vt = c(0.5, 0.5), maxlag = 12, tautol = 1e-3))
+  x <- tssim(tru, 500)
+  f2 <- tsfit(x, tsmod("st", sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = "joe"), maxlag = 12, tautol = 1e-3)))
+  mm <- f2@model@margin
+  cm <- f2@model@copula
+  # a deliberately poor "refit": the supplied model must be the start
+  bad <- cm
+  bad@kpacf <- arfactcop(lambda = 0.5, w = 0.2)
+  r <- tm_joint_fit(mm, cm, bad, x)
+  expect_equal(r$start, "supplied")
+  expect_lte(r$value, r$jt$negll(r$jt$theta0, x) + 1e-8)
+  # the fitted object reports the convergence status
+  fj <- tsfit(x, tsmod(mm, cm), method = "joint")
+  expect_equal(fj@convergence, 0L)
+  expect_gte(as.numeric(logLik(fj)), as.numeric(logLik(f2)) - 1e-6)
+})
