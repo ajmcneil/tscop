@@ -436,6 +436,17 @@ dv_tail_label <- function(tail) {
          if (!(tail@family %in% .pc_radial)) sprintf(" (positive: %g, negative: %g)", tail@pos, tail@neg))
 }
 
+# The line giving the number of nonlinear lags L and what determined it (v2p models only).
+dv_show_L <- function(object) {
+  if (object@vttype != "v2p" || is.na(object@L)) return(invisible())
+  basis <- switch(object@Llimit,
+    rule = sprintf("nltau = %g", object@nltau),
+    given = "given by nl",
+    cap = "nl capped at K",
+    "")
+  cat("nonlinear lags L = ", object@L, " (", basis, ")\n", sep = "")
+}
+
 #' @rdname tscop-methods
 #' @export
 setMethod("show", "sdvinecop", function(object) {
@@ -455,6 +466,7 @@ setMethod("show", "sdvinecop", function(object) {
       cap = "internal limit reached (kpacf still above tautol)",
       none = "")
     cat("effective lag K = ", object@K, " (", basis, ")\n", sep = "")
+    dv_show_L(object)
   }
   if (length(object@vt) > 0L) {
     cat("v-transform deltas: ", paste(format(object@vt, digits = 4), collapse = ", "),
@@ -463,7 +475,7 @@ setMethod("show", "sdvinecop", function(object) {
       cat("v-transform shapes (v2p): ", paste(format(object@vtshape, digits = 4), collapse = ", "),
           if (all(c("kappa1", "kappa2") %in% object@vtfix)) " (fixed)" else if (length(intersect(object@vtfix, c("kappa1", "kappa2"))) > 0L)
             paste0(" (", paste(intersect(object@vtfix, c("kappa1", "kappa2")), collapse = ", "), " fixed)"),
-          "; nonlinear lags 1-", object@L, "\n", sep = "")
+          "\n", sep = "")
     }
   }
   cf <- coef(object)

@@ -713,6 +713,7 @@ setMethod("show", "sdvinecopfit", function(object) {
   cat("effective lag K = ", m@K, " (tautol = ", m@tautol, ")",
       if (object@nrefit > 0L) paste0("; started at ", object@Kstart, ", ", object@nrefit, " refit(s)"),
       "\n", sep = "")
+  dv_show_L(m)
   cat("estimates:\n")
   if (object@se_method == "none") {
     print(object@estimate)
