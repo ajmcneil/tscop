@@ -1,5 +1,6 @@
 # tscop (development version)
 
+* Faster nonlinear (v2p) `sdvinecop` fits: the optimiser uses relative tolerance `1e-8` (instead of `1e-10`) and parameters scaled to the size of their standard errors (`control$pscale`, default 6 divided by `sqrt(n)`), which roughly halves the number of likelihood evaluations of a cold fit (Joe, n = 1500: about 14 s to 6-8 s) and makes a warm refit (`init` = fitted model) almost free. Estimates change by about 1e-4.
 * `tsfit(se = "hessian")` for `sdvinecop` models uses central differences of the exact gradient instead of the value, which is about four times faster for nonlinear (v2p) models.
 * The fitting rule for the number of nonlinear lags `L` (v2p) refits only if the log-likelihood at the optimum changes by 0.01 or more with the new `L`, like the rule for `K`.
 * `show` for `sdvinecop` models and fits with `vttype = "v2p"` gives the number of nonlinear lags `L` and what determined it (`nltau`, `nl`) on its own line under the effective lag.

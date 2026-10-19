@@ -188,6 +188,13 @@ optimisation and recomputed at its optimum like \code{K}: the model is refitted
 with the new \code{L} only if the log-likelihood at the optimum changes by 0.01
 or more, otherwise the new \code{L} is kept without refitting.
 
+The optimisation uses BFGS with relative tolerance \code{control$reltol}
+(default \code{1e-10}; \code{1e-8} for \code{vttype = "v2p"}, whose evaluations are
+expensive and whose likelihood is rough below that level). For \code{v2p} the
+free parameters are scaled by \code{control$pscale / sqrt(n)} (default \code{pscale = 6},
+about twice the scale of their standard errors), which avoids
+most of the backtracking in the line searches.
+
 Free-mode models cannot be fitted. The data must be complete.
 \code{se = "bootstrap"} is recommended: the Hessian standard errors are
 unreliable where a rotated copula switches rotation (Kendall's tau near

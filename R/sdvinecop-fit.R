@@ -504,6 +504,8 @@ dv_fit_all <- function(u, object, init, control) {
 dv_fit_core <- function(u, object, init, control) {
   stageK <- control$stageK
   control$stageK <- NULL
+  pscale <- control$pscale
+  control$pscale <- NULL
   st <- dv_start(object, init, u, control)
   lay <- st$lay
   z0 <- st$z0
@@ -513,13 +515,18 @@ dv_fit_core <- function(u, object, init, control) {
   if (dv_negll(z0, lay, K_start, u) >= 1e10) {
     stop("the starting values are infeasible for these data (a BB1 copula needs |tau| >= 1 - 1/delta at its lag)")
   }
-  ctrl <- modifyList(list(maxit = 500, reltol = 1e-10), control)
+  # The v2p fits are expensive and their likelihood is only smooth to about 1e-6: a looser tolerance and parameters
+  # scaled to the size of their standard errors (about 1 / sqrt(n)) save about half of the evaluations.
+  v2p <- lay$vttype == "v2p"
+  if (is.null(pscale) && v2p) pscale <- 6
+  ctrl <- modifyList(list(maxit = 500, reltol = if (v2p) 1e-8 else 1e-10), control)
   fit_fixed <- function(K, z, reltol = ctrl$reltol) {
     npar <- length(z)
     # the number of nonlinear lags is held fixed during an optimisation, like K
     if (lay$vttype == "v2p") lay$Lenv$L <- dv_L_at(z, lay, K)
     if (npar == 0L) return(list(z = z, value = dv_negll(z, lay, K, u), convergence = 0L, message = ""))
     c1 <- modifyList(ctrl, list(ndeps = rep(1e-6, npar), reltol = reltol))
+    if (!is.null(pscale)) c1$parscale <- rep(pscale / sqrt(length(u)), npar)
     opt <- stats::optim(z, dv_negll, gr = dv_negll_gr, lay = lay, K = K, u = u, method = "BFGS", control = c1)
     if (opt$convergence != 0L || opt$value >= 1e10) {
       alt <- stats::optim(opt$par, dv_negll, lay = lay, K = K, u = u, method = "Nelder-Mead",
@@ -593,6 +600,13 @@ dv_fit_core <- function(u, object, init, control) {
 #'   with the new `L` only if the log-likelihood at the optimum changes by 0.01
 #'   or more, otherwise the new `L` is kept without refitting.
 #'
+#'   The optimisation uses BFGS with relative tolerance `control$reltol`
+#'   (default `1e-10`; `1e-8` for `vttype = "v2p"`, whose evaluations are
+#'   expensive and whose likelihood is rough below that level). For `v2p` the
+#'   free parameters are scaled by `control$pscale / sqrt(n)` (default `pscale = 6`,
+#'   about twice the scale of their standard errors), which avoids
+#'   most of the backtracking in the line searches.
+#'
 #'   Free-mode models cannot be fitted. The data must be complete.
 #'   `se = "bootstrap"` is recommended: the Hessian standard errors are
 #'   unreliable where a rotated copula switches rotation (Kendall's tau near
@@ -649,7 +663,7 @@ setMethod("tsfit", signature(U = "ANY", object = "sdvinecop"),
       Ub <- dv_simulate(pairs_hat, matrix(stats::runif(n * B), n, B))
       if (pseudo) Ub <- apply(Ub, 2L, function(v) rank(v, ties.method = "random") / (n + 1))
       boot <- matrix(NA_real_, B, npar, dimnames = list(NULL, cn))
-      ctrl <- modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, length(z))), control)
+      ctrl <- modifyList(list(maxit = 500, reltol = 1e-10, ndeps = rep(1e-6, length(z))), control[setdiff(names(control), c("pscale", "stageK"))])
       Hinv <- if (bootstart == "fitted") boot_prepare(function(zz) dv_negll_gr(zz, lay, K, u), z) else NULL
       refit <- function(b) {
         ub <- Ub[, b]
