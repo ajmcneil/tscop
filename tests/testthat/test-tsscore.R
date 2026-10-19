@@ -66,3 +66,12 @@ test_that("the plot method runs", {
   pdf(NULL); on.exit(dev.off())
   expect_no_error(plot(s)); expect_no_error(plot(s, relative = TRUE))
 })
+
+test_that("forecasts are labelled by their names or argument names", {
+  y <- c(0.1, -0.2, 0.3, 0); lev <- c(0.25, 0.75)
+  Q1 <- matrix(c(-0.5, 0.5), 4, 2, byrow = TRUE); Q2 <- Q1 * 2
+  s <- tsscore(Q1, wide = Q2, Q2, observed = y, levels = lev)
+  expect_equal(s$summary$forecast, c("Q1", "wide", "Q2"))
+  s2 <- tsscore(Q1 * 1, Q2 * 1, observed = y, levels = lev)
+  expect_equal(s2$summary$forecast, c("forecast1", "forecast2"))
+})

@@ -90,7 +90,7 @@ ts_pinball <- function(y, Q, lev) {
 #' @param x a [tsforecast-class] object, or a matrix of predictive quantiles with one row per observation and
 #'   one column per level.
 #' @param ... further forecasts of the same observations (each a [tsforecast-class] object or quantile matrix),
-#'   named for the output.
+#'   named for the output (an unnamed argument that is a plain object name is labelled with it).
 #' @param observed the observations, for forecasts given as matrices.
 #' @param levels the probability levels of the columns, for forecasts given as matrices. The scoring uses the
 #'   levels of the first forecast, which all must share.
@@ -118,9 +118,12 @@ ts_pinball <- function(y, Q, lev) {
 #' }
 tsscore <- function(x, ..., observed = NULL, levels = NULL, p = NULL, weights = "uniform", lag = NULL) {
   fcs <- c(list(x), list(...))
+  # names: those given, else the argument when it is a plain name, else forecast1, forecast2, ...
+  exprs <- c(list(substitute(x)), as.list(substitute(list(...)))[-1L])
   nm <- names(fcs)
   if (is.null(nm)) nm <- rep("", length(fcs))
-  nm[nm == ""] <- paste0("forecast", seq_along(fcs))[nm == ""]
+  if (is.null(names(fcs)) || nm[1L] == "") nm[1L] <- if (is.name(exprs[[1L]])) as.character(exprs[[1L]]) else ""
+  for (k in which(nm == "")) nm[k] <- if (is.name(exprs[[k]])) as.character(exprs[[k]]) else paste0("forecast", k)
   if (is.null(p)) p <- if (is(x, "tsforecast")) x@p else numeric(0)
   u <- lapply(fcs, ts_unpack_fc, observed = observed, levels = levels, p = p)
   y <- u[[1L]]$y; lev <- u[[1L]]$lev; n <- length(y)
