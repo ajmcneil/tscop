@@ -338,6 +338,23 @@ dv_K_at <- function(z, lay, tautol, maxlag) {
 
 # ---- effective-lag rule ----------------------------------------------------
 
+# The feasible box of the free vector (the region where dv_negll is below 1e10).
+dv_bounds <- function(lay, npar) {
+  b <- rep(Inf, npar)
+  na <- lay$nk
+  b[seq_len(na)] <- lay$ops$zbound
+  b[na + seq_along(lay$aux_lags)] <- 12
+  if (lay$nvt > 0L) b[dv_vt_index(lay)] <- 6
+  list(lower = -b, upper = b)
+}
+
+# TRUE if the exact gradient of the negative log-likelihood at z is clearly not zero (a coordinate step of 0.1 on the
+# free scale could gain 0.01): a converged fit has gradients of order 1e-3, a stalled one of order 10.
+dv_stalled <- function(z, lay, K, u, tol = 0.1) {
+  g <- tryCatch(dv_negll_grad(z, lay, K, u), error = function(e) NULL)
+  !is.null(g) && all(is.finite(g)) && max(abs(g)) > tol
+}
+
 # Wrap a fixed-K optimisation in the rule of the spec: fit with K held fixed;
 # at the optimum recompute K and the change in log-likelihood; accept if the
 # change is below 'tol' (storing the new K, or keeping the old one when the new
@@ -533,8 +550,34 @@ dv_fit_core <- function(u, object, init, control) {
                           control = list(maxit = 5000, reltol = 1e-10))
       if (alt$value < opt$value) opt <- alt
     }
-    list(z = opt$par, value = opt$value, convergence = opt$convergence,
-         message = if (is.null(opt$message)) "" else opt$message)
+    out <- list(z = opt$par, value = opt$value, convergence = opt$convergence,
+                message = if (is.null(opt$message)) "" else opt$message)
+    # BFGS can stall and still report convergence: a free-scale parameter sitting on the edge of the feasible box (a
+    # kpacf parameter the linear stage left at its bound, say) makes every step along the negative gradient infeasible,
+    # however short, while the shape parameters just released from the linear fit have a gradient far from zero. If the
+    # exact gradient at the result is not close to zero, the fit is continued with L-BFGS-B inside the box, and if that
+    # is not enough with the joint-ML remedy (coordinate probes, restarts on a coarser scale, Nelder-Mead; convergence
+    # 10 if it is still stalled).
+    if (v2p && is.finite(opt$value) && opt$value < 1e10 && dv_stalled(opt$par, lay, K, u)) {
+      better <- function(par, value, convergence, message) {
+        if (is.finite(value) && value < out$value) out <<- list(z = par, value = value, convergence = as.integer(convergence), message = message)
+      }
+      bx <- dv_bounds(lay, npar)
+      alt <- tryCatch(stats::optim(out$z, dv_negll, gr = dv_negll_gr, lay = lay, K = K, u = u, method = "L-BFGS-B",
+                                   lower = bx$lower, upper = bx$upper, control = c1[c("maxit", "ndeps", "parscale")]),
+                      error = function(e) NULL)
+      if (!is.null(alt)) better(alt$par, alt$value, alt$convergence, if (is.null(alt$message)) "" else alt$message)
+      if (dv_stalled(out$z, lay, K, u)) {
+        jt <- list(negll = function(z, x) dv_negll(z, lay, K, x), gradient = function(z, x) dv_negll_gr(z, lay, K, x))
+        alt <- tryCatch(tm_joint_optim(jt, u, start = out$z, control = c1[intersect(names(c1), c("maxit", "reltol", "parscale"))]),
+                        error = function(e) NULL)
+        if (!is.null(alt)) better(alt$theta, alt$value, alt$convergence, alt$message)
+      } else {
+        out$convergence <- 0L
+        out$message <- ""
+      }
+    }
+    out
   }
   K_of <- function(z) dv_K_at(z, lay, tautol, maxlag)$K
   ll_of <- function(z, K) -dv_negll(z, lay, K, u)

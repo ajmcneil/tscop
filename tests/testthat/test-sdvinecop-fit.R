@@ -273,3 +273,19 @@ test_that("the staged fit and the direct fit reach the same optimum", {
   expect_equal(fs@loglik, fd@loglik, tolerance = 1e-4)
   expect_equal(unname(coef(fs)), unname(coef(fd)), tolerance = 1e-2)
 })
+
+test_that("a v2p fit does not stall at the linear fit when the kpacf parameter sits on its bound", {
+  skip_on_cran()
+  # the staged fit starts the shape parameters at the linear optimum, where lambda1 is on the edge of its feasible
+  # range: every step along the negative gradient is then infeasible and plain BFGS stops there (kappa = 1, 1 exactly,
+  # with a gradient of about 20) while reporting convergence
+  truth <- sdvinecop(arfactcop(lambda = c(0.9997, 0.9085), w = c(0.0452, 0.1666)), tail = pc("ivt", base = "ast"),
+                     vt = c(0.4337, 0.6538), vttype = "v2p", vtshape = c(0.6684, 1.4304), maxlag = 40, tautol = 1e-3)
+  spec <- sdvinecop(arfactcop(order = 2), tail = pc("ivt", base = "ast"), vttype = "v2p", maxlag = 40, tautol = 1e-3)
+  set.seed(21)
+  x <- tssim(truth, 1500)
+  f <- tsfit(x, spec, pseudo = TRUE)
+  expect_equal(f@convergence, 0L)
+  expect_gt(logLik(f), f@loglik_linear + 5)
+  expect_true(all(abs(coef(f)[c("kappa1", "kappa2")] - 1) > 0.1))
+})
