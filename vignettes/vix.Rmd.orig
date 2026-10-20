@@ -51,12 +51,12 @@ rtr <- r[1:ntr]
 
 ## Why a copula model for VIX returns?
 
-Daily VIX returns are heavy tailed and show the familiar volatility clustering: large moves of either sign are followed by large moves. The serial dependence is therefore of "cross" form, not monotone: the autocorrelations of the returns themselves are small and unreliable, while those of absolute returns are strong and slowly decaying. The ranks of the returns show a small but consistent first-order dependence, which is what the copula models below describe.
+Daily VIX returns are heavy tailed and show the familiar volatility clustering: large moves of either sign are followed by large moves. The serial dependence is therefore of "cross" form, not monotone. The autocorrelations of the returns themselves are negligible, while those of the absolute returns are strong and slowly decaying. The same holds on the copula scale, where the dependence between the *magnitudes* of the moves can be read from $|U_t - 1/2|$ with $U_t$ the rank-based pseudo-observation: these are the dependence structures that the models below describe.
 
-```{r acf, fig.width = 7, fig.height = 3.6, fig.cap = "Autocorrelation of the absolute returns (left) and of the ranks of the returns (right) over the estimation period."}
-op <- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+```{r acf, fig.width = 7, fig.height = 3.8, fig.cap = "Autocorrelation of the absolute returns (left) and of the magnitudes of the rank-based pseudo-observations (right) over the estimation period."}
+op <- par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
 acf(abs(rtr), lag.max = 40, main = "absolute returns")
-acf(rank(rtr), lag.max = 40, main = "ranks of returns")
+acf(abs(rank(rtr) / (ntr + 1) - 0.5), lag.max = 40, main = "magnitudes of the pseudo-observations")
 par(op)
 ```
 
@@ -156,4 +156,207 @@ plot(kh$lag, kh$tau_data, xlab = "lag", ylab = "tau", ylim = range(c(kh$tau_data
 lines(kh$lag, kh$tau_model, col = 2, lwd = 2)
 ```
 
-TODO: IFM, joint, GARCH, out of sample.
+## Margin first: the IFM approach
+
+In the inference-functions-for-margins (IFM) approach a parametric margin is fitted first and the copula is fitted to its probability integral transforms. The function `automarg` fits all the available families and ranks them.
+
+```{r ifm-margin}
+am <- automarg(rtr, criterion = "AICc")
+head(am@table[, c("family", "npar", "loglik", "AICc", "delta")], 5)
+mg <- am@best
+mg
+```
+
+The normal inverse Gaussian family fits best, with the Johnson SU and generalised hyperbolic families close behind; the Gaussian margin is far worse (not shown). The probability integral transforms of the fitted margin should be uniform:
+
+```{r ifm-pit, fig.width = 6.5, fig.height = 3.6, fig.cap = "Probability integral transform of the fitted margin: histogram (left) and QQ plot of the normal scores (right)."}
+u_ifm <- mdf(mg, rtr)
+op <- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+hist(u_ifm, breaks = 20, freq = FALSE, main = "PIT", xlab = "u"); abline(h = 1, lty = 2)
+qqnorm(qnorm(u_ifm), main = "normal scores"); abline(0, 1, lty = 2)
+par(op)
+```
+
+The copula models are fitted to these transforms, with the same specifications as before.
+
+```{r ifm-fit, cache = TRUE}
+fit_ifm <- function(sp, init = NULL) tsfit(u_ifm, sp, pseudo = FALSE, init = init)
+i_ast1_lin <- fit_ifm(spec("ast", 1)); i_ast1_nl <- fit_ifm(spec("ast", 1, "v2p"))
+fits_ifm <- list(
+  "ast (2), linear" = fit_ifm(spec("ast", 2), start2(i_ast1_lin)),
+  "ast (2), v2p" = fit_ifm(spec("ast", 2, "v2p"), start2(i_ast1_nl)),
+  "clayton180 (1), linear" = fit_ifm(spec("clayton180", 1)),
+  "clayton180 (1), v2p" = fit_ifm(spec("clayton180", 1, "v2p")),
+  "joe (1), linear" = fit_ifm(spec("joe", 1)),
+  "joe (1), v2p" = fit_ifm(spec("joe", 1, "v2p")))
+vtfit_ifm <- fit_ifm(vtscop(sdvinecop(arfactcop(order = 1), tail = pc("ast"), maxlag = 40, tautol = 1e-3), udp::v2p(0.5, 1)))
+aicc_table(fits_ifm, vtfit_ifm)
+```
+
+The picture is the same as for the semiparametric fits: the nonlinear transforms help for every base, and `ast` and Clayton are close. The estimates of the best model barely change with the margin:
+
+```{r ifm-compare}
+round(rbind(semiparametric = coef(fit_nl), IFM = coef(fits_ifm[["ast (2), v2p"]])), 3)
+```
+
+## The full model: joint maximum likelihood
+
+Finally, the margin and the copula process can be estimated together by maximising the joint likelihood of the series. The two-stage estimates are the starting values.
+
+```{r joint, cache = TRUE}
+full <- tsfit(rtr, tsmod(mg@model, fits_ifm[["ast (2), v2p"]]@model), method = "joint", se = "hessian")
+full
+two_stage <- as.numeric(logLik(mg)) + as.numeric(logLik(fits_ifm[["ast (2), v2p"]]))
+c(two_stage = two_stage, joint = as.numeric(logLik(full)))
+```
+
+The joint estimation improves the log-likelihood only slightly, and the estimates are similar to those of the two-stage approach: the data are informative about the margin, so there is little to gain from estimating the two parts together.
+
+## Comparison with GARCH in sample
+
+As a benchmark we fit GARCH(1,1) and GJR-GARCH(1,1) models with six innovation distributions, using the `rugarch` package, and select by AICc. The helper functions are listed in the appendix.
+
+```{r garch-helpers, include = FALSE}
+library(rugarch)
+garch_spec <- function(model, dist)
+  ugarchspec(variance.model = list(model = model, garchOrder = c(1, 1)), mean.model = list(armaOrder = c(0, 0), include.mean = TRUE),
+             distribution.model = dist)
+garch_fit <- function(x, model, dist) {
+  f <- tryCatch(ugarchfit(garch_spec(model, dist), x, solver = "hybrid"), error = function(e) NULL)
+  if (is.null(f) || f@fit$convergence != 0) NULL else f
+}
+# predictive quantiles (one row per observation, one column per level) of the observations in `x`, from the
+# coefficients of a fit, with the filter run over the whole series `x`
+garch_quantiles <- function(cf, x, model, dist, levels) {
+  sp <- garch_spec(model, dist)
+  setfixed(sp) <- as.list(cf)
+  fl <- ugarchfilter(sp, x)
+  s <- as.numeric(sigma(fl))
+  mu <- x - as.numeric(residuals(fl))
+  skew <- if ("skew" %in% names(cf)) cf[["skew"]] else 1
+  shape <- if ("shape" %in% names(cf)) cf[["shape"]] else 5
+  mu + outer(s, qdist(dist, levels, skew = skew, shape = shape))
+}
+# rolling re-estimation: refit every H observations on the window and forecast the next block
+garch_roll <- function(x, model, dist, start, H = 20, levels = (1:99) / 100, cf0 = NULL) {
+  n <- length(x)
+  Q <- matrix(NA_real_, n - start + 1, length(levels))
+  cf <- cf0
+  for (b0 in seq(start, n, by = H)) {
+    idx <- b0:min(b0 + H - 1, n)
+    if (!is.null(cf0) && b0 > start || is.null(cf)) {
+      f <- garch_fit(x[1:(b0 - 1)], model, dist)
+      if (!is.null(f)) cf <- coef(f)
+    }
+    Q[idx - start + 1, ] <- garch_quantiles(cf, x[1:max(idx)], model, dist, levels)[idx, ]
+  }
+  Q
+}
+```
+
+```{r garch-fit, cache = TRUE}
+garch_grid <- expand.grid(model = c("sGARCH", "gjrGARCH"), dist = c("norm", "std", "sstd", "ged", "jsu", "nig"), stringsAsFactors = FALSE)
+gfits <- lapply(seq_len(nrow(garch_grid)), function(i) garch_fit(rtr, garch_grid$model[i], garch_grid$dist[i]))
+garch_tab <- data.frame(garch_grid, loglik = sapply(gfits, likelihood), npar = sapply(gfits, function(f) length(coef(f))))
+garch_tab$AICc <- -2 * garch_tab$loglik + 2 * garch_tab$npar + 2 * garch_tab$npar * (garch_tab$npar + 1) / (ntr - garch_tab$npar - 1)
+garch_tab <- garch_tab[order(garch_tab$AICc), ]
+head(garch_tab, 5)
+best_g <- garch_tab[1, ]
+gbest <- gfits[[which(garch_grid$model == best_g$model & garch_grid$dist == best_g$dist)]]
+```
+
+The best GARCH model is a GJR-GARCH model, whose asymmetry parameter captures the leverage-type effect. For the copula models the corresponding feature is the difference between the two fulcrums of the v-transforms. To compare the fits we add the margin and the copula parts of the copula models (the copula part alone is not comparable with the GARCH likelihood).
+
+```{r insample-table}
+ic <- function(ll, k) c(loglik = ll, npar = k, AICc = -2 * ll + 2 * k + 2 * k * (k + 1) / (ntr - k - 1))
+mll <- as.numeric(logLik(mg)); mk <- attr(logLik(mg), "df")
+insample <- rbind(
+  "GJR-GARCH (best)" = ic(best_g$loglik, best_g$npar),
+  "IFM, linear" = ic(mll + as.numeric(logLik(fits_ifm[["ast (2), linear"]])), mk + attr(logLik(fits_ifm[["ast (2), linear"]]), "df")),
+  "IFM, v2p" = ic(mll + as.numeric(logLik(fits_ifm[["ast (2), v2p"]])), mk + attr(logLik(fits_ifm[["ast (2), v2p"]]), "df")),
+  "joint, v2p" = ic(as.numeric(logLik(full)), attr(logLik(full), "df")))
+round(cbind(insample, dAICc = insample[, "AICc"] - insample["GJR-GARCH (best)", "AICc"]), 2)
+```
+
+In sample the nonlinear copula model fits much better than the best GJR-GARCH model, and even the linear copula model has a lower AICc. This in-sample advantage is not the same as forecasting accuracy, so we now compare out-of-sample forecasts.
+
+## Out-of-sample comparison with fixed parameters
+
+For each of the 500 holdout days we compute the one-step-ahead predictive distribution given all the data to the previous day, with the parameters fixed at their estimates from the estimation period. `tsroll` returns the predictive quantiles, the log predictive density and the lower-tail value-at-risk and expected shortfall; `tsscore` scores them. We use the average quantile score (AQS, the pinball loss averaged over 99 equally spaced levels: smaller is better), value-at-risk backtests, and Diebold-Mariano tests with Newey-West standard errors. The GARCH forecasts are supplied as a matrix of predictive quantiles, which `tsscore` also accepts.
+
+```{r oos, cache = TRUE}
+lev <- (1:99) / 100
+start <- ntr + 1
+em <- emarg(rtr, qtype = 8)
+fc <- list(
+  semiparametric_lin = tsroll(tsmod(em, fit_lin@model), r, start = start),
+  semiparametric_nl = tsroll(tsmod(em, fit_nl@model), r, start = start),
+  IFM_lin = tsroll(tsmod(mg@model, fits_ifm[["ast (2), linear"]]@model), r, start = start),
+  IFM_nl = tsroll(tsmod(mg@model, fits_ifm[["ast (2), v2p"]]@model), r, start = start),
+  joint_nl = tsroll(full, r, start = start))
+garch <- garch_quantiles(coef(gbest), r, best_g$model, best_g$dist, lev)[start:length(r), ]
+y <- r[start:length(r)]
+sc <- do.call(tsscore, c(list(x = garch), fc, list(observed = y, levels = lev, p = c(0.01, 0.05))))
+```
+
+```{r oos-table}
+tab <- sc$summary[, c("forecast", "aqs")]
+tab$forecast[1] <- "GJR-GARCH"
+tab$aqs_x1000 <- 1000 * tab$aqs
+tab$vs_garch_pct <- 100 * (tab$aqs / tab$aqs[1] - 1)
+v1 <- sc$var[["0.01"]]; v5 <- sc$var[["0.05"]]
+tab$breaches_1pct <- v1$breaches; tab$kupiec_p_1pct <- v1$kupiec.p
+tab$breaches_5pct <- v5$breaches; tab$kupiec_p_5pct <- v5$kupiec.p
+dm <- sc$dm[sc$dm$loss == "aqs", c("forecast", "statistic", "p.value")]
+tab$DM_stat <- c(NA, dm$statistic); tab$DM_p <- c(NA, dm$p.value)
+tab$aqs <- NULL
+print(tab, digits = 3, row.names = FALSE)
+```
+
+The Diebold-Mariano statistic is the mean difference in AQS between GARCH and the copula model, so positive values favour the copula model. Expected numbers of breaches are 5 at the 1% level and 25 at the 5% level over the 500 days.
+
+```{r oos-profile, fig.width = 6.5, fig.height = 4, fig.cap = "Average quantile score by level relative to GJR-GARCH; negative values favour the copula model."}
+plot(sc, relative = TRUE, main = "quantile score relative to GJR-GARCH")
+```
+
+Compared with the other copula models the log predictive density is also available, since the copula forecasts include the margin:
+
+```{r oos-copulas}
+sc2 <- tsscore(semiparametric_lin = fc$semiparametric_lin, semiparametric_nl = fc$semiparametric_nl, IFM_lin = fc$IFM_lin, IFM_nl = fc$IFM_nl,
+               joint_nl = fc$joint_nl)
+sc2$summary[, c("forecast", "aqs", "neglogscore")]
+```
+
+## Rolling re-estimation
+
+The comparison so far used parameters fixed at the estimation-period values. To see whether stale parameters matter, we re-estimate every 20 days on an expanding window, starting each fit from the previous estimates; the model structure is kept. We do this for the semiparametric models, whose refits are quickest, and for GJR-GARCH.
+
+```{r rolling, cache = TRUE}
+roll <- list(
+  semiparametric_lin = tsroll(tsmod(em, fit_lin@model), r, start = start, refit = 20),
+  semiparametric_nl = tsroll(tsmod(em, fit_nl@model), r, start = start, refit = 20))
+garch_r <- garch_roll(r, best_g$model, best_g$dist, start = start, H = 20, cf0 = coef(gbest))
+scr <- do.call(tsscore, c(list(x = garch_r), roll, list(observed = y, levels = lev, p = c(0.01, 0.05))))
+```
+
+```{r rolling-table}
+tabr <- scr$summary[, c("forecast", "aqs")]
+tabr$forecast[1] <- "GJR-GARCH"
+fixed_aqs <- c(sc$summary$aqs[sc$summary$forecast == "forecast1"], sc$summary$aqs[sc$summary$forecast %in% c("semiparametric_lin", "semiparametric_nl")])
+tabr$aqs_fixed_x1000 <- 1000 * fixed_aqs[c(1, 2, 3)]
+tabr$aqs_rolling_x1000 <- 1000 * tabr$aqs
+tabr$vs_garch_pct <- 100 * (tabr$aqs / tabr$aqs[1] - 1)
+dmr <- scr$dm[scr$dm$loss == "aqs", c("forecast", "statistic", "p.value")]
+tabr$DM_stat <- c(NA, dmr$statistic); tabr$DM_p <- c(NA, dmr$p.value)
+tabr$aqs <- NULL
+print(tabr, digits = 3, row.names = FALSE)
+```
+
+## Summary
+
+TODO: summary and caveats.
+
+## Appendix: the GARCH helper functions
+
+```{r garch-helpers-show, ref.label = "garch-helpers", echo = TRUE, eval = FALSE}
+```
