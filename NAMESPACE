@@ -49,6 +49,7 @@ exportMethods(logLik)
 exportMethods(mdens)
 exportMethods(mdf)
 exportMethods(mqf)
+exportMethods(plot)
 exportMethods(predict)
 exportMethods(rep)
 exportMethods(resid)
@@ -59,6 +60,10 @@ exportMethods(tssim)
 exportMethods(vcov)
 import(methods)
 importFrom(Rcpp,sourceCpp)
+importFrom(grDevices,
+  adjustcolor,
+  hcl.colors
+)
 importFrom(parallel,mclapply)
 importFrom(rvinecopulib,
   bicop_dist,

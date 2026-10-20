@@ -28,6 +28,8 @@ License: GPL-3
 Depends:
     R (>= 3.5.0)
 Imports:
+    graphics,
+    grDevices,
     methods,
     parallel,
     Rcpp,
@@ -85,3 +87,4 @@ Collate:
     'ktauhat.R'
     'tscop-package.R'
     'RcppExports.R'
+    'plot-pairs.R'

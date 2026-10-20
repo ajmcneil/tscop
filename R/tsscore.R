@@ -218,6 +218,7 @@ print.tsscore <- function(x, digits = 4, ...) {
 
 #' @param relative for the `plot` method: show the difference from the first forecast.
 #' @rdname tsscore
+#' @method plot tsscore
 #' @export
 plot.tsscore <- function(x, relative = FALSE, ...) {
   P <- x$profile

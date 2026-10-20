@@ -35,7 +35,10 @@ log-likelihood only.}
 
 \item{\code{npar}}{number of estimated parameters (both stages).}
 
-\item{\code{method}}{estimation method (\code{"twostage"}).}
+\item{\code{method}}{estimation method (\code{"twostage"} or \code{"joint"}).}
+
+\item{\code{convergence,message}}{convergence code of the optimiser of a joint fit (0 = converged) and its message (0 and
+\code{""} for the two-stage methods).}
 
 \item{\code{selection}}{the \link[=automarg-class]{automarg} object if the margin was chosen
 automatically, otherwise \code{NULL}.}

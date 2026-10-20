@@ -170,7 +170,9 @@ tm_resid <- function(model, data, scale, nodes, type) {
 #'   log-likelihood only.
 #' @slot nobs number of observations.
 #' @slot npar number of estimated parameters (both stages).
-#' @slot method estimation method (`"twostage"`).
+#' @slot method estimation method (`"twostage"` or `"joint"`).
+#' @slot convergence,message convergence code of the optimiser of a joint fit (0 = converged) and its message (0 and
+#'   `""` for the two-stage methods).
 #' @slot selection the [automarg-class] object if the margin was chosen
 #'   automatically, otherwise `NULL`.
 #' @slot template the original input if it was a `ts`, `zoo` or `xts` object,
