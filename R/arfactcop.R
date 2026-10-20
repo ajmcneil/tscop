@@ -231,7 +231,7 @@ afc_par_to_free <- function(lambda, w, noise) {
 setMethod("gc_is_specified", "arfactcop", function(G) !anyNA(c(G@lambda, G@w)))
 
 setMethod("gc_describe", "arfactcop", function(G) {
-  paste0(G@m, "-factor AR(1) model", if (!G@noise) " without noise" else "")
+  paste0("ARFACT(", G@m, ")", if (!G@noise) " without noise" else "")
 })
 
 setMethod("gc_pacf", "arfactcop", function(G, K) {

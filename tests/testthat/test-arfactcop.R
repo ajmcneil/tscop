@@ -192,7 +192,7 @@ test_that("sdvinecop accepts an arfactcop and resolves pair copulas from its kpa
   m <- sdvinecop(g, pairs = list(pc("ast"), pc("gumbel")), tail = "ast")
   expect_equal(m@mode, "tied")
   expect_gt(m@K, 5L)
-  expect_output(show(m), "kpacf: 2-factor AR\\(1\\) model")
+  expect_output(show(m), "kpacf: ARFACT\\(2\\)")
   tau <- dv_kpacf_tau(g, m@K)
   pr <- dv_resolve(m)
   for (j in seq_len(m@K)) expect_lt(abs(dv_pair_ktau(pr[[j]]) - tau[j]), 1e-6)
