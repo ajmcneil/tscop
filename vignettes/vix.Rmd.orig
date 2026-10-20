@@ -12,6 +12,7 @@ vignette: >
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.path = "figure/vix-", fig.width = 6.5, fig.height = 4.5, dpi = 110)
 options(digits = 4)
+knitr::opts_chunk$set(cache.path = "cache/vix-")
 library(tscop)
 set.seed(2026)
 ```
@@ -41,4 +42,118 @@ dates <- vix$date[-1]
 c(n = length(r), first = format(dates[1]), last = format(dates[length(r)]))
 ```
 
-TODO: remaining sections.
+The first 1500 returns (to `r format(dates[1500])`) are used for estimation and the last 500 are a holdout for the forecasting comparison. We work with the raw returns throughout: there is no mean model or prefilter, because the dependence of interest is in the volatility and the copula models do not need a zero-mean series.
+
+```{r split}
+ntr <- 1500
+rtr <- r[1:ntr]
+```
+
+## Why a copula model for VIX returns?
+
+Daily VIX returns are heavy tailed and show the familiar volatility clustering: large moves of either sign are followed by large moves. The serial dependence is therefore of "cross" form, not monotone: the autocorrelations of the returns themselves are small and unreliable, while those of absolute returns are strong and slowly decaying. The ranks of the returns show a small but consistent first-order dependence, which is what the copula models below describe.
+
+```{r acf, fig.width = 7, fig.height = 3.6, fig.cap = "Autocorrelation of the absolute returns (left) and of the ranks of the returns (right) over the estimation period."}
+op <- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+acf(abs(rtr), lag.max = 40, main = "absolute returns")
+acf(rank(rtr), lag.max = 40, main = "ranks of returns")
+par(op)
+```
+
+## The model
+
+A stationary time series with continuous margins can be described by its marginal distribution $F$ and a copula process for the probability integral transforms $U_t = F(X_t)$. We model the copula process as a *D-vine* with pair copulas $c_k$ for the dependence between $U_t$ and $U_{t+k}$ given the values in between, truncated at an effective lag $K$. Two ingredients make the model suitable for volatile series:
+
+* The pair copulas are *inverse-v-transformed* (IVT) copulas. A base copula $C^*$ with positive dependence and upper tail dependence (here the absolute spherical t copula, `ast`, in the base-copula role) is evaluated at v-transformed arguments, $c_k(u, v) = c^*(V_1(u), V_2(v))$, where $V_1$ and $V_2$ are v-shaped transformations with *fulcrums* $\delta_1$ and $\delta_2$. This produces dependence between the *magnitudes* of moves relative to the fulcrums, with different fulcrums for the earlier and the later variable.
+* The strength of the dependence at lag $k$ is tied to the Kendall partial autocorrelation function of an AR-factor process, `arfactcop`. In this vignette we use the second-order version `arfactcop(order = 2)` for the `ast` base.
+
+The v-transforms are either linear (the default), or two-parameter *nonlinear* transforms (`vttype = "v2p"`) with shape parameters $\kappa_1$, $\kappa_2$ for the first $L$ lags, where $L$ is determined from the Kendall partial autocorrelations; $\kappa = 1$ is the linear transform.
+
+```{r specs}
+spec <- function(base = "ast", order = 2, vttype = "linear") {
+  sdvinecop(arfactcop(order = order), tail = pc("ivt", base = base), vttype = vttype, maxlag = 40, tautol = 1e-3)
+}
+spec("ast", 2, "v2p")
+```
+
+## Semiparametric estimation
+
+In the semiparametric approach the margin is estimated by the empirical distribution function and the copula is fitted to the rank-based pseudo-observations. We compare linear and nonlinear (`v2p`) v-transforms for three base copulas: `ast` (second-order AR-factor), and Clayton and Joe copulas (first order). As a point of reference, we also fit the process-level alternative `vtscop`, in which a single v-transform is applied to a d-vine process of the base copula; it appears in the information-criterion table only.
+
+```{r semipar, cache = TRUE}
+pobs <- rank(rtr) / (ntr + 1)
+fit_semi <- function(sp, init = NULL) tsfit(pobs, sp, pseudo = TRUE, init = init)
+# a second-order fit is started from the first-order estimates of the same model (lambda1, lambda2, w1, w2 are the
+# decay rates and weights of the two factors)
+start2 <- function(f1) {
+  c1 <- coef(f1)
+  c(c1["lambda1"], 0.5 * c1["lambda1"], c1["w1"], 0.3 * c1["w1"], c1[-(1:2)])
+}
+f_ast1_lin <- fit_semi(spec("ast", 1)); f_ast1_nl <- fit_semi(spec("ast", 1, "v2p"))
+fits <- list(
+  "ast (2), linear" = fit_semi(spec("ast", 2), start2(f_ast1_lin)),
+  "ast (2), v2p" = fit_semi(spec("ast", 2, "v2p"), start2(f_ast1_nl)),
+  "clayton180 (1), linear" = fit_semi(spec("clayton180", 1)),
+  "clayton180 (1), v2p" = fit_semi(spec("clayton180", 1, "v2p")),
+  "joe (1), linear" = fit_semi(spec("joe", 1)),
+  "joe (1), v2p" = fit_semi(spec("joe", 1, "v2p")))
+vtfit <- fit_semi(vtscop(sdvinecop(arfactcop(order = 1), tail = pc("ast"), maxlag = 40, tautol = 1e-3), udp::v2p(0.5, 1)))
+```
+
+```{r semipar-table}
+aicc_table <- function(fits, vt = NULL) {
+  tab <- data.frame(model = names(fits), loglik = sapply(fits, logLik), npar = sapply(fits, function(f) attr(logLik(f), "df")),
+                    AICc = sapply(fits, AICc), K = sapply(fits, function(f) f@model@K),
+                    L = sapply(fits, function(f) f@model@L), row.names = NULL)
+  if (!is.null(vt)) tab <- rbind(tab, data.frame(model = "vtscop, ast (1)", loglik = as.numeric(logLik(vt)), npar = attr(logLik(vt), "df"),
+                                                 AICc = AICc(vt), K = vt@model@base@K, L = NA))
+  tab$dAICc <- tab$AICc - min(tab$AICc)
+  tab[order(tab$AICc), ]
+}
+aicc_table(fits, vtfit)
+```
+
+The nonlinear v-transforms improve the fit for every base copula, with the `ast` base giving the lowest AICc, closely followed by Clayton. The `vtscop` alternative, which uses one transform for the whole process, fits substantially worse.
+
+The best linear and nonlinear fits and their estimates, with standard errors from the Hessian, are shown next. The linear model is the special case $\kappa_1 = \kappa_2 = 1$ of the nonlinear one, so we can test linearity with a likelihood ratio test (two extra parameters; the effective lag $K$ and the number of nonlinear lags $L$ are chosen from the data, so the p-value is indicative).
+
+```{r semipar-se, cache = TRUE}
+fit_nl <- tsfit(pobs, spec("ast", 2, "v2p"), pseudo = TRUE, init = coef(fits[["ast (2), v2p"]]), se = "hessian")
+fit_lin <- fits[["ast (2), linear"]]
+fit_nl
+lr <- 2 * (as.numeric(logLik(fit_nl)) - as.numeric(logLik(fit_lin)))
+c(LR = lr, p.value = pchisq(lr, df = 2, lower.tail = FALSE))
+```
+
+The Hessian standard errors do not account for the data-driven choice of $K$ and $L$, and the likelihood is not smooth where an observation crosses a fulcrum, so we also compute a parametric bootstrap with 100 replicates. Each replicate simulates a series from the fitted model, re-ranks it and refits the model, starting from the fitted values.
+
+```{r semipar-boot, cache = TRUE}
+fit_boot <- tsfit(pobs, spec("ast", 2, "v2p"), pseudo = TRUE, init = coef(fit_nl), se = "bootstrap", B = 100,
+                  cores = max(1, parallel::detectCores() - 1))
+ci <- apply(fit_boot@boot, 2, quantile, c(0.025, 0.975), na.rm = TRUE)
+round(rbind(estimate = coef(fit_boot), se = fit_boot@se, ci), 3)
+```
+
+### What the fitted dependence looks like
+
+The `plot` method draws the pair copulas at the first lags as contours of the density. Each is the copula of $(U_t, U_{t+k})$ given the observations in between (the *partial* copula). The densities are cross shaped: values close to the fulcrums of the two v-transforms are positively dependent, and so are two large moves, of either sign. The dependence is not symmetric, because the fulcrums are different.
+
+```{r pairs, fig.width = 6.5, fig.height = 6.5, fig.cap = "Pair copula densities at lags 1 to 4 of the nonlinear model; the contour levels are common to the panels."}
+plot(fit_nl, lags = 1:4)
+```
+
+The next figure compares the linear and nonlinear models at lag 1, with the pairs of consecutive observations (as probability-integral transforms) and the two v-transforms in the strips: $V_1$ above and $V_2$ to the right, with the fulcrums marked in the panels. With linear transforms the fit puts the fulcrums at about (0.26, 0.78); the nonlinear transforms curve, and their fulcrums move to about (0.43, 0.65). The fulcrums therefore do not mean the same thing in the two models, and should not be compared directly.
+
+```{r pairs-compare, fig.width = 8.5, fig.height = 4.6, fig.cap = "Lag-1 pair copula of the linear (left) and nonlinear (right) models with the data and the v-transforms."}
+plot(fit_lin, fit_nl, lags = 1, data = TRUE, strips = TRUE, fill = FALSE, labels = c("linear", "v2p"))
+```
+
+The fitted Kendall partial autocorrelations can be compared with their estimates from the data through the residuals-based "generalised lag" diagnostic `ktauhat`.
+
+```{r ktauhat, fig.width = 6.5, fig.height = 4, fig.cap = "Kendall partial autocorrelations of the base copula pairs: model (line) and data (points)."}
+kh <- ktauhat(fit_nl, lagmax = 20)
+plot(kh$lag, kh$tau_data, xlab = "lag", ylab = "tau", ylim = range(c(kh$tau_data, kh$tau_model)))
+lines(kh$lag, kh$tau_model, col = 2, lwd = 2)
+```
+
+TODO: IFM, joint, GARCH, out of sample.
