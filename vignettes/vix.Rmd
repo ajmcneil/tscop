@@ -58,7 +58,7 @@ acf(abs(rtr), lag.max = 40, main = "absolute returns")
 acf(abs(rank(rtr) / (ntr + 1) - 0.5), lag.max = 40, main = "magnitudes of the pseudo-observations")
 ```
 
-![Autocorrelation of the absolute returns (left) and of the magnitudes of the rank-based pseudo-observations (right) over the estimation period.](figure/vix-acf-1.png)
+![Autocorrelation of the absolute returns (left) and of the magnitudes of the rank-based pseudo-observations (right) over the estimation period.](vix-figs/vix-acf-1.png)
 
 ``` r
 par(op)
@@ -193,7 +193,7 @@ The `plot` method draws the pair copulas at the first lags as contours of the de
 plot(fit_nl, lags = 1:4)
 ```
 
-![Pair copula densities at lags 1 to 4 of the nonlinear model; the contour levels are common to the panels.](figure/vix-pairs-1.png)
+![Pair copula densities at lags 1 to 4 of the nonlinear model; the contour levels are common to the panels.](vix-figs/vix-pairs-1.png)
 
 The next figure compares the linear and nonlinear models at lag 1, with the pairs of consecutive observations (as probability-integral transforms) and the two v-transforms in the strips: $V_1$ above and $V_2$ to the right, with the fulcrums marked in the panels. With linear transforms the fit puts the fulcrums at about (0.26, 0.78); the nonlinear transforms curve, and their fulcrums move to about (0.43, 0.65). The fulcrums therefore do not mean the same thing in the two models, and should not be compared directly.
 
@@ -202,7 +202,7 @@ The next figure compares the linear and nonlinear models at lag 1, with the pair
 plot(fit_lin, fit_nl, lags = 1, data = TRUE, strips = TRUE, fill = FALSE, labels = c("linear", "v2p"))
 ```
 
-![Lag-1 pair copula of the linear (left) and nonlinear (right) models with the data and the v-transforms.](figure/vix-pairs-compare-1.png)
+![Lag-1 pair copula of the linear (left) and nonlinear (right) models with the data and the v-transforms.](vix-figs/vix-pairs-compare-1.png)
 
 The fitted Kendall partial autocorrelations can be compared with their estimates from the data through the residuals-based "generalised lag" diagnostic `ktauhat`.
 
@@ -213,7 +213,7 @@ plot(kh$lag, kh$tau_data, xlab = "lag", ylab = "tau", ylim = range(c(kh$tau_data
 lines(kh$lag, kh$tau_model, col = 2, lwd = 2)
 ```
 
-![Kendall partial autocorrelations of the base copula pairs: model (line) and data (points).](figure/vix-ktauhat-1.png)
+![Kendall partial autocorrelations of the base copula pairs: model (line) and data (points).](vix-figs/vix-ktauhat-1.png)
 
 ## Margin first: the IFM approach
 
@@ -249,7 +249,7 @@ hist(u_ifm, breaks = 20, freq = FALSE, main = "PIT", xlab = "u"); abline(h = 1, 
 qqnorm(qnorm(u_ifm), main = "normal scores"); abline(0, 1, lty = 2)
 ```
 
-![Probability integral transform of the fitted margin: histogram (left) and QQ plot of the normal scores (right).](figure/vix-ifm-pit-1.png)
+![Probability integral transform of the fitted margin: histogram (left) and QQ plot of the normal scores (right).](vix-figs/vix-ifm-pit-1.png)
 
 ``` r
 par(op)
@@ -442,7 +442,7 @@ colnames(sc$profile)[1] <- "GJR-GARCH"
 plot(sc, relative = TRUE, main = "quantile score relative to GJR-GARCH")
 ```
 
-![Average quantile score by level relative to GJR-GARCH; negative values favour the copula model.](figure/vix-oos-profile-1.png)
+![Average quantile score by level relative to GJR-GARCH; negative values favour the copula model.](vix-figs/vix-oos-profile-1.png)
 
 Among the copula models themselves the log predictive density is also available, since their forecasts include the margin. Here `neglogscore` is the negative log predictive density (smaller is better). The log scores are only comparable between models with the same margin, because the semiparametric forecasts use a kernel density estimate for the margin: we compare the linear and nonlinear semiparametric models, and then the three versions of the parametric-margin models. The Diebold-Mariano statistics compare each model with the first in its group; positive values favour the other model.
 
