@@ -1,0 +1,45 @@
+---
+title: "Modelling VIX returns: semiparametric, IFM and full models against GARCH"
+author: "Alexander J. McNeil"
+date: "20 October 2026"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Modelling VIX returns}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+## Data
+
+We study the daily log-returns of the VIX index. The prices are downloaded from Yahoo Finance with `quantmod` over a fixed date range, so that the analysis is reproducible, and cached locally; the data are not distributed with the package. Yahoo reports VIX values on a couple of days on which the S&P 500 was closed, which we drop so that the VIX series follows the S&P 500 trading calendar.
+
+
+``` r
+get_prices <- function(symbol, from, to, cache_dir = "cache") {
+  file <- file.path(cache_dir, paste0(gsub("[^A-Za-z0-9]", "", symbol), ".csv"))
+  if (!file.exists(file)) {
+    dir.create(cache_dir, showWarnings = FALSE)
+    x <- quantmod::Cl(quantmod::getSymbols(symbol, src = "yahoo", from = from, to = to, auto.assign = FALSE, warnings = FALSE))
+    d <- data.frame(date = zoo::index(x), price = as.numeric(x))
+    write.csv(d[is.finite(d$price) & d$price > 0, ], file, row.names = FALSE)
+  }
+  d <- read.csv(file)
+  d$date <- as.Date(d$date)
+  d
+}
+vix <- get_prices("^VIX", from = "2018-10-25", to = "2026-10-14")
+#> Registered S3 method overwritten by 'quantmod':
+#>   method            from
+#>   as.zoo.data.frame zoo
+spx <- get_prices("^GSPC", from = "2018-10-25", to = "2026-10-14")
+vix <- vix[vix$date %in% spx$date, ]
+r <- diff(log(vix$price))
+dates <- vix$date[-1]
+c(n = length(r), first = format(dates[1]), last = format(dates[length(r)]))
+#>            n        first         last 
+#>       "2000" "2018-10-26" "2026-10-13"
+```
+
+TODO: remaining sections.
