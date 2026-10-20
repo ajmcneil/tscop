@@ -4,7 +4,7 @@ author: "Alexander J. McNeil"
 date: "`r format(Sys.Date(), '%d %B %Y')`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Modelling VIX returns}
+  %\VignetteIndexEntry{Modelling VIX returns: semiparametric, IFM and full models against GARCH}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -210,7 +210,7 @@ two_stage <- as.numeric(logLik(mg)) + as.numeric(logLik(fits_ifm[["ast (2), v2p"
 c(two_stage = two_stage, joint = as.numeric(logLik(full)))
 ```
 
-The joint estimation improves the log-likelihood only slightly, and the estimates are similar to those of the two-stage approach: the data are informative about the margin, so there is little to gain from estimating the two parts together.
+The joint estimation improves the log-likelihood only slightly, and the estimates are similar to those of the two-stage approach: the data are informative about the margin, so there is little to gain from estimating the two parts together. The standard error of `lambda1`, which is estimated at almost exactly 1 (a very persistent first factor), is not reliable: the parameter is at the edge of its range, and the bootstrap interval above is the better guide.
 
 ## Comparison with GARCH in sample
 
@@ -297,11 +297,11 @@ fc <- list(
 garch <- garch_quantiles(coef(gbest), r, best_g$model, best_g$dist, lev)[start:length(r), ]
 y <- r[start:length(r)]
 sc <- do.call(tsscore, c(list(x = garch), fc, list(observed = y, levels = lev, p = c(0.01, 0.05))))
+sc$summary$forecast[1] <- "GJR-GARCH"
 ```
 
 ```{r oos-table}
 tab <- sc$summary[, c("forecast", "aqs")]
-tab$forecast[1] <- "GJR-GARCH"
 tab$aqs_x1000 <- 1000 * tab$aqs
 tab$vs_garch_pct <- 100 * (tab$aqs / tab$aqs[1] - 1)
 v1 <- sc$var[["0.01"]]; v5 <- sc$var[["0.05"]]
@@ -316,16 +316,23 @@ print(tab, digits = 3, row.names = FALSE)
 The Diebold-Mariano statistic is the mean difference in AQS between GARCH and the copula model, so positive values favour the copula model. Expected numbers of breaches are 5 at the 1% level and 25 at the 5% level over the 500 days.
 
 ```{r oos-profile, fig.width = 6.5, fig.height = 4, fig.cap = "Average quantile score by level relative to GJR-GARCH; negative values favour the copula model."}
+colnames(sc$profile)[1] <- "GJR-GARCH"
 plot(sc, relative = TRUE, main = "quantile score relative to GJR-GARCH")
 ```
 
-Compared with the other copula models the log predictive density is also available, since the copula forecasts include the margin:
+Among the copula models themselves the log predictive density is also available, since their forecasts include the margin. Here `neglogscore` is the negative log predictive density (smaller is better). The log scores are only comparable between models with the same margin, because the semiparametric forecasts use a kernel density estimate for the margin: we compare the linear and nonlinear semiparametric models, and then the three versions of the parametric-margin models. The Diebold-Mariano statistics compare each model with the first in its group; positive values favour the other model.
 
 ```{r oos-copulas}
-sc2 <- tsscore(semiparametric_lin = fc$semiparametric_lin, semiparametric_nl = fc$semiparametric_nl, IFM_lin = fc$IFM_lin, IFM_nl = fc$IFM_nl,
-               joint_nl = fc$joint_nl)
-sc2$summary[, c("forecast", "aqs", "neglogscore")]
+semiparametric_lin <- fc$semiparametric_lin; semiparametric_nl <- fc$semiparametric_nl
+IFM_lin <- fc$IFM_lin; IFM_nl <- fc$IFM_nl; joint_nl <- fc$joint_nl
+sc_semi <- tsscore(semiparametric_lin, semiparametric_nl)
+sc_par <- tsscore(IFM_lin, IFM_nl, joint_nl)
+rbind(sc_semi$summary[, c("forecast", "aqs", "neglogscore")], sc_par$summary[, c("forecast", "aqs", "neglogscore")])
+rbind(sc_semi$dm[sc_semi$dm$loss == "neglogscore", c("forecast", "diff", "statistic", "p.value")],
+      sc_par$dm[sc_par$dm$loss == "neglogscore", c("forecast", "diff", "statistic", "p.value")])
 ```
+
+The nonlinear semiparametric model is clearly better than the linear one on the log score ($p \approx 0.001$), and the same holds for the parametric-margin models, where the joint fit is no better than two-stage.
 
 ## Rolling re-estimation
 
@@ -340,10 +347,9 @@ scr <- do.call(tsscore, c(list(x = garch_r), roll, list(observed = y, levels = l
 ```
 
 ```{r rolling-table}
+scr$summary$forecast[1] <- "GJR-GARCH"
 tabr <- scr$summary[, c("forecast", "aqs")]
-tabr$forecast[1] <- "GJR-GARCH"
-fixed_aqs <- c(sc$summary$aqs[sc$summary$forecast == "forecast1"], sc$summary$aqs[sc$summary$forecast %in% c("semiparametric_lin", "semiparametric_nl")])
-tabr$aqs_fixed_x1000 <- 1000 * fixed_aqs[c(1, 2, 3)]
+tabr$aqs_fixed_x1000 <- 1000 * sc$summary$aqs[match(tabr$forecast, sc$summary$forecast)]
 tabr$aqs_rolling_x1000 <- 1000 * tabr$aqs
 tabr$vs_garch_pct <- 100 * (tabr$aqs / tabr$aqs[1] - 1)
 dmr <- scr$dm[scr$dm$loss == "aqs", c("forecast", "statistic", "p.value")]
@@ -354,7 +360,12 @@ print(tabr, digits = 3, row.names = FALSE)
 
 ## Summary
 
-TODO: summary and caveats.
+* On this series the copula models, and in particular the nonlinear model, describe the data much better than GARCH in sample (AICc lower by 38 for the linear and 62 for the nonlinear model), and the nonlinear transforms are clearly supported: the likelihood ratio test of linearity gives $p \approx 10^{-5}$ and the bootstrap intervals for $\kappa_1$ and $\kappa_2$ exclude 1.
+* Out of sample the advantage is smaller but still present: the average quantile score of the nonlinear models is about 2% lower than that of the best GJR-GARCH model, significant for the semiparametric version and borderline for the IFM and joint versions. The GARCH model underestimates the 1% value-at-risk (11 breaches against 5 expected, rejected by the Kupiec test), while the copula models are not rejected at either level.
+* Re-estimating every 20 days changes the scores very little, and the comparison with GARCH is unchanged.
+* The estimation approaches (semiparametric, IFM, joint) give very similar results here.
+
+These results are for one series and a single holdout period of 500 days, the effective lag is at its upper limit $K = 40$, and VIX was chosen as the example because it illustrates the nonlinear features well. In a wider study of eight daily return series (three stocks, two equity indices, two cryptocurrencies and VIX), which we do not show here, the copula models were statistically indistinguishable out of sample from a well-chosen GJR-GARCH model on every series except VIX. For VIX the nonlinear copula models showed a modest advantage (about 2% in average quantile score), which is only moderately significant once we allow for having selected the best of eight series. VIX is shown here because it illustrates the nonlinear features of the models, not as general evidence that they outperform GARCH.
 
 ## Appendix: the GARCH helper functions
 
