@@ -65,38 +65,31 @@ par(op)
 A stationary time series with continuous margins can be described by its marginal distribution $F$ and a copula process for the probability integral transforms $U_t = F(X_t)$. We model the copula process as a *D-vine* with pair copulas $c_k$ for the dependence between $U_t$ and $U_{t+k}$ given the values in between, truncated at an effective lag $K$. Two ingredients make the model suitable for volatile series:
 
 * The pair copulas are *inverse-v-transformed* (IVT) copulas. A base copula $C^*$ with positive dependence and upper tail dependence (here the absolute spherical t copula, `ast`, in the base-copula role) is evaluated at v-transformed arguments, $c_k(u, v) = c^*(V_1(u), V_2(v))$, where $V_1$ and $V_2$ are v-shaped transformations with *fulcrums* $\delta_1$ and $\delta_2$. This produces dependence between the *magnitudes* of moves relative to the fulcrums, with different fulcrums for the earlier and the later variable.
-* The strength of the dependence at lag $k$ is tied to the Kendall partial autocorrelation function of an AR-factor process, `arfactcop`. In this vignette we use the second-order version `arfactcop(order = 2)` for the `ast` base.
+* The strength of the dependence at lag $k$ is tied to the Kendall partial autocorrelation function (kpacf) of a Gaussian *AR-factor* process, `arfactcop`. With one factor, `ARFACT(1)`, this is the sum of a stationary AR(1) process with parameter $\lambda_1$ and white noise, a special case of an ARMA(1,1) process, with weight $w_1$ on the factor; its Kendall partial autocorrelations are positive and decay geometrically. Higher-order versions with $m$ factors, `ARFACT(m)`, mix several decay rates. The pair-copula parameters of the d-vine are calibrated so that the Kendall's tau of the base copula at lag $k$ equals the kpacf at lag $k$.
 
 The v-transforms are either linear (the default), or two-parameter *nonlinear* transforms (`vttype = "v2p"`) with shape parameters $\kappa_1$, $\kappa_2$ for the first $L$ lags, where $L$ is determined from the Kendall partial autocorrelations; $\kappa = 1$ is the linear transform.
 
 ```{r specs}
-spec <- function(base = "ast", order = 2, vttype = "linear") {
-  sdvinecop(arfactcop(order = order), tail = pc("ivt", base = base), vttype = vttype, maxlag = 40, tautol = 1e-3)
+spec <- function(base = "ast", vttype = "linear") {
+  sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = base), vttype = vttype, maxlag = 40, tautol = 1e-3)
 }
-spec("ast", 2, "v2p")
+spec("ast", "v2p")
 ```
 
 ## Semiparametric estimation
 
-In the semiparametric approach the margin is estimated by the empirical distribution function and the copula is fitted to the rank-based pseudo-observations. We compare linear and nonlinear (`v2p`) v-transforms for three base copulas: `ast` (second-order AR-factor), and Clayton and Joe copulas (first order). As a point of reference, we also fit the process-level alternative `vtscop`, in which a single v-transform is applied to a d-vine process of the base copula; it appears in the information-criterion table only.
+In the semiparametric approach the margin is estimated by the empirical distribution function and the copula is fitted to the rank-based pseudo-observations. We compare linear and nonlinear (`v2p`) v-transforms for three base copulas: `ast`, Clayton (rotated by 180 degrees, so that it has upper tail dependence) and Joe. As a point of reference, we also fit the process-level alternative `vtscop`, in which a single v-transform is applied to a d-vine process of the base copula; it appears in the information-criterion table only.
 
 ```{r semipar, cache = TRUE}
 pobs <- rank(rtr) / (ntr + 1)
-fit_semi <- function(sp, init = NULL) tsfit(pobs, sp, pseudo = TRUE, init = init)
-# a second-order fit is started from the first-order estimates of the same model (lambda1, lambda2, w1, w2 are the
-# decay rates and weights of the two factors)
-start2 <- function(f1) {
-  c1 <- coef(f1)
-  c(c1["lambda1"], 0.5 * c1["lambda1"], c1["w1"], 0.3 * c1["w1"], c1[-(1:2)])
-}
-f_ast1_lin <- fit_semi(spec("ast", 1)); f_ast1_nl <- fit_semi(spec("ast", 1, "v2p"))
+fit_semi <- function(sp) tsfit(pobs, sp, pseudo = TRUE)
 fits <- list(
-  "ast (2), linear" = fit_semi(spec("ast", 2), start2(f_ast1_lin)),
-  "ast (2), v2p" = fit_semi(spec("ast", 2, "v2p"), start2(f_ast1_nl)),
-  "clayton180 (1), linear" = fit_semi(spec("clayton180", 1)),
-  "clayton180 (1), v2p" = fit_semi(spec("clayton180", 1, "v2p")),
-  "joe (1), linear" = fit_semi(spec("joe", 1)),
-  "joe (1), v2p" = fit_semi(spec("joe", 1, "v2p")))
+  "ast, linear" = fit_semi(spec("ast")),
+  "ast, v2p" = fit_semi(spec("ast", vttype = "v2p")),
+  "clayton180, linear" = fit_semi(spec("clayton180")),
+  "clayton180, v2p" = fit_semi(spec("clayton180", vttype = "v2p")),
+  "joe, linear" = fit_semi(spec("joe")),
+  "joe, v2p" = fit_semi(spec("joe", vttype = "v2p")))
 vtfit <- fit_semi(vtscop(sdvinecop(arfactcop(order = 1), tail = pc("ast"), maxlag = 40, tautol = 1e-3), udp::v2p(0.5, 1)))
 ```
 
@@ -105,7 +98,7 @@ aicc_table <- function(fits, vt = NULL) {
   tab <- data.frame(model = names(fits), loglik = sapply(fits, logLik), npar = sapply(fits, function(f) attr(logLik(f), "df")),
                     AICc = sapply(fits, AICc), K = sapply(fits, function(f) f@model@K),
                     L = sapply(fits, function(f) f@model@L), row.names = NULL)
-  if (!is.null(vt)) tab <- rbind(tab, data.frame(model = "vtscop, ast (1)", loglik = as.numeric(logLik(vt)), npar = attr(logLik(vt), "df"),
+  if (!is.null(vt)) tab <- rbind(tab, data.frame(model = "vtscop, ast", loglik = as.numeric(logLik(vt)), npar = attr(logLik(vt), "df"),
                                                  AICc = AICc(vt), K = vt@model@base@K, L = NA))
   tab$dAICc <- tab$AICc - min(tab$AICc)
   tab[order(tab$AICc), ]
@@ -118,8 +111,8 @@ The nonlinear v-transforms improve the fit for every base copula, with the `ast`
 The best linear and nonlinear fits and their estimates, with standard errors from the Hessian, are shown next. The linear model is the special case $\kappa_1 = \kappa_2 = 1$ of the nonlinear one, so we can test linearity with a likelihood ratio test (two extra parameters; the effective lag $K$ and the number of nonlinear lags $L$ are chosen from the data, so the p-value is indicative).
 
 ```{r semipar-se, cache = TRUE}
-fit_nl <- tsfit(pobs, spec("ast", 2, "v2p"), pseudo = TRUE, init = coef(fits[["ast (2), v2p"]]), se = "hessian")
-fit_lin <- fits[["ast (2), linear"]]
+fit_nl <- tsfit(pobs, spec("ast", vttype = "v2p"), pseudo = TRUE, init = coef(fits[["ast, v2p"]]), se = "hessian")
+fit_lin <- fits[["ast, linear"]]
 fit_nl
 lr <- 2 * (as.numeric(logLik(fit_nl)) - as.numeric(logLik(fit_lin)))
 c(LR = lr, p.value = pchisq(lr, df = 2, lower.tail = FALSE))
@@ -128,7 +121,7 @@ c(LR = lr, p.value = pchisq(lr, df = 2, lower.tail = FALSE))
 The Hessian standard errors do not account for the data-driven choice of $K$ and $L$, and the likelihood is not smooth where an observation crosses a fulcrum, so we also compute a parametric bootstrap with 100 replicates. Each replicate simulates a series from the fitted model, re-ranks it and refits the model, starting from the fitted values.
 
 ```{r semipar-boot, cache = TRUE}
-fit_boot <- tsfit(pobs, spec("ast", 2, "v2p"), pseudo = TRUE, init = coef(fit_nl), se = "bootstrap", B = 100,
+fit_boot <- tsfit(pobs, spec("ast", vttype = "v2p"), pseudo = TRUE, init = coef(fit_nl), se = "bootstrap", B = 100,
                   cores = max(1, parallel::detectCores() - 1))
 ci <- apply(fit_boot@boot, 2, quantile, c(0.025, 0.975), na.rm = TRUE)
 round(rbind(estimate = coef(fit_boot), se = fit_boot@se, ci), 3)
@@ -180,15 +173,14 @@ par(op)
 The copula models are fitted to these transforms, with the same specifications as before.
 
 ```{r ifm-fit, cache = TRUE}
-fit_ifm <- function(sp, init = NULL) tsfit(u_ifm, sp, pseudo = FALSE, init = init)
-i_ast1_lin <- fit_ifm(spec("ast", 1)); i_ast1_nl <- fit_ifm(spec("ast", 1, "v2p"))
+fit_ifm <- function(sp) tsfit(u_ifm, sp, pseudo = FALSE)
 fits_ifm <- list(
-  "ast (2), linear" = fit_ifm(spec("ast", 2), start2(i_ast1_lin)),
-  "ast (2), v2p" = fit_ifm(spec("ast", 2, "v2p"), start2(i_ast1_nl)),
-  "clayton180 (1), linear" = fit_ifm(spec("clayton180", 1)),
-  "clayton180 (1), v2p" = fit_ifm(spec("clayton180", 1, "v2p")),
-  "joe (1), linear" = fit_ifm(spec("joe", 1)),
-  "joe (1), v2p" = fit_ifm(spec("joe", 1, "v2p")))
+  "ast, linear" = fit_ifm(spec("ast")),
+  "ast, v2p" = fit_ifm(spec("ast", vttype = "v2p")),
+  "clayton180, linear" = fit_ifm(spec("clayton180")),
+  "clayton180, v2p" = fit_ifm(spec("clayton180", vttype = "v2p")),
+  "joe, linear" = fit_ifm(spec("joe")),
+  "joe, v2p" = fit_ifm(spec("joe", vttype = "v2p")))
 vtfit_ifm <- fit_ifm(vtscop(sdvinecop(arfactcop(order = 1), tail = pc("ast"), maxlag = 40, tautol = 1e-3), udp::v2p(0.5, 1)))
 aicc_table(fits_ifm, vtfit_ifm)
 ```
@@ -196,7 +188,7 @@ aicc_table(fits_ifm, vtfit_ifm)
 The picture is the same as for the semiparametric fits: the nonlinear transforms help for every base, and `ast` and Clayton are close. The estimates of the best model barely change with the margin:
 
 ```{r ifm-compare}
-round(rbind(semiparametric = coef(fit_nl), IFM = coef(fits_ifm[["ast (2), v2p"]])), 3)
+round(rbind(semiparametric = coef(fit_nl), IFM = coef(fits_ifm[["ast, v2p"]])), 3)
 ```
 
 ## The full model: joint maximum likelihood
@@ -204,9 +196,9 @@ round(rbind(semiparametric = coef(fit_nl), IFM = coef(fits_ifm[["ast (2), v2p"]]
 Finally, the margin and the copula process can be estimated together by maximising the joint likelihood of the series. The two-stage estimates are the starting values.
 
 ```{r joint, cache = TRUE}
-full <- tsfit(rtr, tsmod(mg@model, fits_ifm[["ast (2), v2p"]]@model), method = "joint", se = "hessian")
+full <- tsfit(rtr, tsmod(mg@model, fits_ifm[["ast, v2p"]]@model), method = "joint", se = "hessian")
 full
-two_stage <- as.numeric(logLik(mg)) + as.numeric(logLik(fits_ifm[["ast (2), v2p"]]))
+two_stage <- as.numeric(logLik(mg)) + as.numeric(logLik(fits_ifm[["ast, v2p"]]))
 c(two_stage = two_stage, joint = as.numeric(logLik(full)))
 ```
 
@@ -272,8 +264,8 @@ ic <- function(ll, k) c(loglik = ll, npar = k, AICc = -2 * ll + 2 * k + 2 * k * 
 mll <- as.numeric(logLik(mg)); mk <- attr(logLik(mg), "df")
 insample <- rbind(
   "GJR-GARCH (best)" = ic(best_g$loglik, best_g$npar),
-  "IFM, linear" = ic(mll + as.numeric(logLik(fits_ifm[["ast (2), linear"]])), mk + attr(logLik(fits_ifm[["ast (2), linear"]]), "df")),
-  "IFM, v2p" = ic(mll + as.numeric(logLik(fits_ifm[["ast (2), v2p"]])), mk + attr(logLik(fits_ifm[["ast (2), v2p"]]), "df")),
+  "IFM, linear" = ic(mll + as.numeric(logLik(fits_ifm[["ast, linear"]])), mk + attr(logLik(fits_ifm[["ast, linear"]]), "df")),
+  "IFM, v2p" = ic(mll + as.numeric(logLik(fits_ifm[["ast, v2p"]])), mk + attr(logLik(fits_ifm[["ast, v2p"]]), "df")),
   "joint, v2p" = ic(as.numeric(logLik(full)), attr(logLik(full), "df")))
 round(cbind(insample, dAICc = insample[, "AICc"] - insample["GJR-GARCH (best)", "AICc"]), 2)
 ```
@@ -291,8 +283,8 @@ em <- emarg(rtr, qtype = 8)
 fc <- list(
   semiparametric_lin = tsroll(tsmod(em, fit_lin@model), r, start = start),
   semiparametric_nl = tsroll(tsmod(em, fit_nl@model), r, start = start),
-  IFM_lin = tsroll(tsmod(mg@model, fits_ifm[["ast (2), linear"]]@model), r, start = start),
-  IFM_nl = tsroll(tsmod(mg@model, fits_ifm[["ast (2), v2p"]]@model), r, start = start),
+  IFM_lin = tsroll(tsmod(mg@model, fits_ifm[["ast, linear"]]@model), r, start = start),
+  IFM_nl = tsroll(tsmod(mg@model, fits_ifm[["ast, v2p"]]@model), r, start = start),
   joint_nl = tsroll(full, r, start = start))
 garch <- garch_quantiles(coef(gbest), r, best_g$model, best_g$dist, lev)[start:length(r), ]
 y <- r[start:length(r)]
