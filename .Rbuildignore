@@ -8,5 +8,6 @@
 ^literature$
 ^\.Rhistory$
 ^private$
+^inst/extdata$
 ^LICENSE$
 ^Rplots\.pdf$
