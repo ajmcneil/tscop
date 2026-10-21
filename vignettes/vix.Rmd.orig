@@ -53,12 +53,13 @@ rtr <- r[1:ntr]
 
 ## Why a copula model for VIX returns?
 
-Daily VIX returns are heavy tailed and show the familiar volatility clustering: large moves of either sign are followed by large moves. The serial dependence is therefore of "cross" form, not monotone. The autocorrelations of the returns themselves are negligible, while those of the absolute returns are strong and slowly decaying. The same holds on the copula scale, where the dependence between the *magnitudes* of the moves can be read from $|U_t - 1/2|$ with $U_t$ the rank-based pseudo-observation: these are the dependence structures that the models below describe.
+Daily VIX returns are heavy tailed and show the familiar volatility clustering: large moves of either sign are followed by large moves. The serial dependence is therefore of "cross" form, not monotone. The returns themselves have a small negative first-order autocorrelation (about $-0.10$) and essentially none beyond lag 1, while the absolute returns are positively autocorrelated, with autocorrelations of about 0.2 at the first few lags that decay over roughly ten lags. The same holds on the copula scale, where the dependence between the *magnitudes* of the moves can be read from $|U_t - 1/2|$, with $U_t$ the rank-based pseudo-observation. The small negative lag-1 dependence is also present in the ranks (the Spearman correlation is about $-0.06$); the models below capture it through different fulcrums for the earlier and the later variable of a pair. These are the dependence structures that the models below describe.
 
-```{r acf, fig.width = 7, fig.height = 3.8, fig.cap = "Autocorrelation of the absolute returns (left) and of the magnitudes of the rank-based pseudo-observations (right) over the estimation period."}
+```{r acf, fig.width = 7, fig.height = 3.8, fig.cap = "Autocorrelation of the absolute returns (left) and of the magnitudes $|U_t - 1/2|$ of the rank-based pseudo-observations (right) over the estimation period."}
 op <- par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
-acf(abs(rtr), lag.max = 40, main = "absolute returns")
-acf(abs(rank(rtr) / (ntr + 1) - 0.5), lag.max = 40, main = "magnitudes of the pseudo-observations")
+acf(abs(rtr), lag.max = 40, main = "|returns|")
+acf(abs(rank(rtr) / (ntr + 1) - 0.5), lag.max = 40,
+    main = expression(group("|", U[t] - 1/2, "|")))
 par(op)
 ```
 
