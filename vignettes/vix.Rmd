@@ -58,7 +58,7 @@ Daily VIX returns are heavy tailed and show the familiar volatility clustering: 
 op <- par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
 acf(abs(rtr), lag.max = 40, main = "|returns|")
 acf(abs(rank(rtr) / (ntr + 1) - 0.5), lag.max = 40,
-    main = expression(group("|", U[t] - 1/2, "|")))
+    main = expression(bold("|" * U[t] - 1/2 * "|")))
 ```
 
 ![Autocorrelation of the absolute returns (left) and of the magnitudes $|U_t - 1/2|$ of the rank-based pseudo-observations (right) over the estimation period.](vix-figs/vix-acf-1.png)
