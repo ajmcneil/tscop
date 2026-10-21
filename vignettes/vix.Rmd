@@ -51,6 +51,21 @@ ntr <- 1500
 rtr <- r[1:ntr]
 ```
 
+
+``` r
+op <- par(mar = c(4, 4, 1, 1))
+plot(dates, r, type = "l", xlab = "", ylab = "log-return")
+abline(v = dates[ntr + 1], lty = 3)
+```
+
+![Daily log-returns of the VIX index. The dotted line marks the start of the holdout period.](vix-figs/vix-returns-1.png)
+
+``` r
+par(op)
+```
+
+VIX is a trademark of Cboe. The values are downloaded from Yahoo Finance and are not distributed with the package.
+
 ## Why a copula model for VIX returns?
 
 Daily VIX returns are heavy tailed and show the familiar volatility clustering: large moves of either sign are followed by large moves. The serial dependence is therefore of "cross" form, not monotone. The returns themselves have a small negative first-order autocorrelation (about $-0.10$) and essentially none beyond lag 1, while the absolute returns are positively autocorrelated, with autocorrelations of about 0.2 at the first few lags that decay over roughly ten lags. The same holds on the copula scale, where the dependence between the *magnitudes* of the moves can be read from $|U_t - 1/2|$, with $U_t$ the rank-based pseudo-observation. The small negative lag-1 dependence is also present in the ranks (the Spearman correlation is about $-0.06$); the models below capture it through different fulcrums for the earlier and the later variable of a pair. These are the dependence structures that the models below describe.
