@@ -202,7 +202,7 @@ two_stage <- as.numeric(logLik(mg)) + as.numeric(logLik(fits_ifm[["ast, v2p"]]))
 c(two_stage = two_stage, joint = as.numeric(logLik(full)))
 ```
 
-The joint estimation improves the log-likelihood only slightly, and the estimates are similar to those of the two-stage approach: the data are informative about the margin, so there is little to gain from estimating the two parts together. The standard error of `lambda1`, which is estimated at almost exactly 1 (a very persistent first factor), is not reliable: the parameter is at the edge of its range, and the bootstrap interval above is the better guide.
+The joint estimation improves the log-likelihood only slightly, and the estimates are similar to those of the two-stage approach: the data are informative about the margin, so there is little to gain from estimating the two parts together.
 
 ## Comparison with GARCH in sample
 
@@ -324,7 +324,7 @@ rbind(sc_semi$dm[sc_semi$dm$loss == "neglogscore", c("forecast", "diff", "statis
       sc_par$dm[sc_par$dm$loss == "neglogscore", c("forecast", "diff", "statistic", "p.value")])
 ```
 
-The nonlinear semiparametric model is clearly better than the linear one on the log score ($p \approx 0.001$), and the same holds for the parametric-margin models, where the joint fit is no better than two-stage.
+The nonlinear semiparametric model is clearly better than the linear one on the log score ($p \approx 0.006$), and the same holds for the parametric-margin models, where the joint fit is no better than two-stage.
 
 ## Rolling re-estimation
 
@@ -352,12 +352,12 @@ print(tabr, digits = 3, row.names = FALSE)
 
 ## Summary
 
-* On this series the copula models, and in particular the nonlinear model, describe the data much better than GARCH in sample (AICc lower by 38 for the linear and 62 for the nonlinear model), and the nonlinear transforms are clearly supported: the likelihood ratio test of linearity gives $p \approx 10^{-5}$ and the bootstrap intervals for $\kappa_1$ and $\kappa_2$ exclude 1.
+* On this series the copula models, and in particular the nonlinear model, describe the data much better than GARCH in sample (AICc lower by 37 for the linear and 62 for the nonlinear model), and the nonlinear transforms are clearly supported: the likelihood ratio test of linearity gives $p \approx 10^{-5}$ and the bootstrap intervals for $\kappa_1$ and $\kappa_2$ exclude 1.
 * Out of sample the advantage is smaller but still present: the average quantile score of the nonlinear models is about 2% lower than that of the best GJR-GARCH model, significant for the semiparametric version and borderline for the IFM and joint versions. The GARCH model underestimates the 1% value-at-risk (11 breaches against 5 expected, rejected by the Kupiec test), while the copula models are not rejected at either level.
 * Re-estimating every 20 days changes the scores very little, and the comparison with GARCH is unchanged.
 * The estimation approaches (semiparametric, IFM, joint) give very similar results here.
 
-These results are for one series and a single holdout period of 500 days, the effective lag is at its upper limit $K = 40$, and VIX was chosen as the example because it illustrates the nonlinear features well. In a wider study of eight daily return series (three stocks, two equity indices, two cryptocurrencies and VIX), which we do not show here, the copula models were statistically indistinguishable out of sample from a well-chosen GJR-GARCH model on every series except VIX. For VIX the nonlinear copula models showed a modest advantage (about 2% in average quantile score), which is only moderately significant once we allow for having selected the best of eight series. VIX is shown here because it illustrates the nonlinear features of the models, not as general evidence that they outperform GARCH.
+These results are for one series and a single holdout period of 500 days, the effective lag $K \approx 26$ is below the cap of 40 that we imposed, and VIX was chosen as the example because it illustrates the nonlinear features well. In a wider study of eight daily return series (three stocks, two equity indices, two cryptocurrencies and VIX), which we do not show here, the copula models were statistically indistinguishable out of sample from a well-chosen GJR-GARCH model on every series except VIX. For VIX the nonlinear copula models showed a modest advantage (about 2% in average quantile score), which is only moderately significant once we allow for having selected the best of eight series. VIX is shown here because it illustrates the nonlinear features of the models, not as general evidence that they outperform GARCH.
 
 ## Appendix: the GARCH helper functions
 
