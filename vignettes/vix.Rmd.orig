@@ -26,9 +26,11 @@ get_prices <- function(symbol, from, to, cache_dir = "cache") {
   file <- file.path(cache_dir, paste0(gsub("[^A-Za-z0-9]", "", symbol), ".csv"))
   if (!file.exists(file)) {
     dir.create(cache_dir, showWarnings = FALSE)
-    x <- quantmod::Cl(quantmod::getSymbols(symbol, src = "yahoo", from = from, to = to, auto.assign = FALSE, warnings = FALSE))
-    d <- data.frame(date = zoo::index(x), price = as.numeric(x))
-    write.csv(d[is.finite(d$price) & d$price > 0, ], file, row.names = FALSE)
+    x <- quantmod::getSymbols(symbol, from = from, to = to,
+                              auto.assign = FALSE, warnings = FALSE)
+    d <- data.frame(date = zoo::index(x), price = as.numeric(quantmod::Cl(x)))
+    d <- d[is.finite(d$price) & d$price > 0, ]
+    write.csv(d, file, row.names = FALSE)
   }
   d <- read.csv(file)
   d$date <- as.Date(d$date)
@@ -71,7 +73,9 @@ The v-transforms are either linear (the default), or two-parameter *nonlinear* t
 
 ```{r specs}
 spec <- function(base = "ast", vttype = "linear") {
-  sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = base), vttype = vttype, maxlag = 40, tautol = 1e-3)
+  # lags are cut off where the base-copula tau falls below 0.001, at lag 40 at most
+  sdvinecop(arfactcop(order = 1), tail = pc("ivt", base = base), vttype = vttype,
+            maxlag = 40, tautol = 1e-3)
 }
 spec("ast", "v2p")
 ```
@@ -82,24 +86,31 @@ In the semiparametric approach the margin is estimated by the empirical distribu
 
 ```{r semipar, cache = TRUE}
 pobs <- rank(rtr) / (ntr + 1)
-fit_semi <- function(sp) tsfit(pobs, sp, pseudo = TRUE)
+fit_semi <- function(sp) tsfit(pobs, sp)
 fits <- list(
   "ast, linear" = fit_semi(spec("ast")),
-  "ast, v2p" = fit_semi(spec("ast", vttype = "v2p")),
+  "ast, v2p" = fit_semi(spec("ast", "v2p")),
   "clayton180, linear" = fit_semi(spec("clayton180")),
-  "clayton180, v2p" = fit_semi(spec("clayton180", vttype = "v2p")),
+  "clayton180, v2p" = fit_semi(spec("clayton180", "v2p")),
   "joe, linear" = fit_semi(spec("joe")),
-  "joe, v2p" = fit_semi(spec("joe", vttype = "v2p")))
-vtfit <- fit_semi(vtscop(sdvinecop(arfactcop(order = 1), tail = pc("ast"), maxlag = 40, tautol = 1e-3), udp::v2p(0.5, 1)))
+  "joe, v2p" = fit_semi(spec("joe", "v2p")))
+vtscop_ast <- vtscop(sdvinecop(arfactcop(order = 1), tail = pc("ast"),
+                               maxlag = 40, tautol = 1e-3), udp::v2p(0.5, 1))
+vtfit <- fit_semi(vtscop_ast)
 ```
 
 ```{r semipar-table}
 aic_table <- function(fits, vt = NULL) {
-  tab <- data.frame(model = names(fits), loglik = sapply(fits, logLik), npar = sapply(fits, function(f) attr(logLik(f), "df")),
-                    AIC = sapply(fits, AIC), K = sapply(fits, function(f) f@model@K),
-                    L = sapply(fits, function(f) f@model@L), row.names = NULL)
-  if (!is.null(vt)) tab <- rbind(tab, data.frame(model = "vtscop, ast", loglik = as.numeric(logLik(vt)), npar = attr(logLik(vt), "df"),
-                                                 AIC = AIC(vt), K = vt@model@base@K, L = NA))
+  npar <- function(f) attr(logLik(f), "df")
+  tab <- data.frame(model = names(fits), loglik = sapply(fits, logLik),
+                    npar = sapply(fits, npar), AIC = sapply(fits, AIC),
+                    K = sapply(fits, function(f) f@model@K),
+                    L = sapply(fits, function(f) f@model@L))
+  if (!is.null(vt)) {
+    tab <- rbind(tab, data.frame(model = "vtscop, ast", loglik = logLik(vt)[1],
+                                 npar = npar(vt), AIC = AIC(vt),
+                                 K = vt@model@base@K, L = NA))
+  }
   tab$dAIC <- tab$AIC - min(tab$AIC)
   tab[order(tab$AIC), ]
 }
@@ -113,18 +124,18 @@ We rank models by the Akaike information criterion (AIC), which targets predicti
 The best linear and nonlinear fits and their estimates, with standard errors from the Hessian, are shown next. The linear model is the special case $\kappa_1 = \kappa_2 = 1$ of the nonlinear one, so we can test linearity with a likelihood ratio test (two extra parameters; the effective lag $K$ and the number of nonlinear lags $L$ are chosen from the data, so the p-value is indicative).
 
 ```{r semipar-se, cache = TRUE}
-fit_nl <- tsfit(pobs, spec("ast", vttype = "v2p"), pseudo = TRUE, init = coef(fits[["ast, v2p"]]), se = "hessian")
+fit_nl <- tsfit(pobs, spec("ast", "v2p"), se = "hessian")
 fit_lin <- fits[["ast, linear"]]
 fit_nl
-lr <- 2 * (as.numeric(logLik(fit_nl)) - as.numeric(logLik(fit_lin)))
+lr <- 2 * (logLik(fit_nl)[1] - logLik(fit_lin)[1])
 c(LR = lr, p.value = pchisq(lr, df = 2, lower.tail = FALSE))
 ```
 
 The Hessian standard errors do not account for the data-driven choice of $K$ and $L$, and the likelihood is not smooth where an observation crosses a fulcrum, so we also compute a parametric bootstrap with 100 replicates. Each replicate simulates a series from the fitted model, re-ranks it and refits the model, starting from the fitted values.
 
 ```{r semipar-boot, cache = TRUE}
-fit_boot <- tsfit(pobs, spec("ast", vttype = "v2p"), pseudo = TRUE, init = coef(fit_nl), se = "bootstrap", B = 100,
-                  cores = max(1, parallel::detectCores() - 1))
+cores <- max(1, parallel::detectCores() - 1)
+fit_boot <- tsfit(pobs, spec("ast", "v2p"), se = "bootstrap", B = 100, cores = cores)
 ci <- apply(fit_boot@boot, 2, quantile, c(0.025, 0.975), na.rm = TRUE)
 round(rbind(estimate = coef(fit_boot), se = fit_boot@se, ci), 3)
 ```
@@ -134,7 +145,7 @@ round(rbind(estimate = coef(fit_boot), se = fit_boot@se, ci), 3)
 The `plot` method draws the pair copulas at the first lags as contours of the density. Each is the copula of $(U_t, U_{t+k})$ given the observations in between (the *partial* copula). The densities are cross shaped: values close to the fulcrums of the two v-transforms are positively dependent, and so are two large moves, of either sign. The dependence is not symmetric, because the fulcrums are different.
 
 ```{r pairs, fig.width = 6.5, fig.height = 6.5, fig.cap = "Pair copula densities at lags 1 to 4 of the nonlinear model; the contour levels are common to the panels."}
-plot(fit_nl, lags = 1:4)
+plot(fit_nl)
 ```
 
 The next figure compares the linear and nonlinear models at lag 1, with the pairs of consecutive observations (as probability-integral transforms) and the two v-transforms in the strips: $V_1$ above and $V_2$ to the right, with the fulcrums marked in the panels. With linear transforms the fit puts the fulcrums at about (0.26, 0.78); the nonlinear transforms curve, and their fulcrums move to about (0.43, 0.65). The fulcrums therefore do not mean the same thing in the two models, and should not be compared directly.
@@ -146,8 +157,9 @@ plot(fit_lin, fit_nl, lags = 1, data = TRUE, strips = TRUE, fill = FALSE, labels
 The fitted Kendall partial autocorrelations can be compared with their estimates from the data through the residuals-based "generalised lag" diagnostic `ktauhat`.
 
 ```{r ktauhat, fig.width = 6.5, fig.height = 4, fig.cap = "Kendall partial autocorrelations of the base copula pairs: model (line) and data (points)."}
-kh <- ktauhat(fit_nl, lagmax = 20)
-plot(kh$lag, kh$tau_data, xlab = "lag", ylab = "tau", ylim = range(c(kh$tau_data, kh$tau_model)))
+kh <- ktauhat(fit_nl)
+plot(kh$lag, kh$tau_data, xlab = "lag", ylab = "tau",
+     ylim = range(c(kh$tau_data, kh$tau_model)))
 lines(kh$lag, kh$tau_model, col = 2, lwd = 2)
 ```
 
@@ -156,7 +168,7 @@ lines(kh$lag, kh$tau_model, col = 2, lwd = 2)
 In the inference-functions-for-margins (IFM) approach a parametric margin is fitted first and the copula is fitted to its probability integral transforms. The function `automarg` fits all the available families and ranks them.
 
 ```{r ifm-margin}
-am <- automarg(rtr, criterion = "AIC")
+am <- automarg(rtr)
 head(am@table[, c("family", "npar", "loglik", "AIC", "delta")], 5)
 mg <- am@best
 mg
@@ -178,19 +190,21 @@ The copula models are fitted to these transforms, with the same specifications a
 fit_ifm <- function(sp) tsfit(u_ifm, sp, pseudo = FALSE)
 fits_ifm <- list(
   "ast, linear" = fit_ifm(spec("ast")),
-  "ast, v2p" = fit_ifm(spec("ast", vttype = "v2p")),
+  "ast, v2p" = fit_ifm(spec("ast", "v2p")),
   "clayton180, linear" = fit_ifm(spec("clayton180")),
-  "clayton180, v2p" = fit_ifm(spec("clayton180", vttype = "v2p")),
+  "clayton180, v2p" = fit_ifm(spec("clayton180", "v2p")),
   "joe, linear" = fit_ifm(spec("joe")),
-  "joe, v2p" = fit_ifm(spec("joe", vttype = "v2p")))
-vtfit_ifm <- fit_ifm(vtscop(sdvinecop(arfactcop(order = 1), tail = pc("ast"), maxlag = 40, tautol = 1e-3), udp::v2p(0.5, 1)))
+  "joe, v2p" = fit_ifm(spec("joe", "v2p")))
+vtfit_ifm <- fit_ifm(vtscop_ast)
 aic_table(fits_ifm, vtfit_ifm)
+ifm_lin <- fits_ifm[["ast, linear"]]
+ifm_nl <- fits_ifm[["ast, v2p"]]
 ```
 
 The picture is the same as for the semiparametric fits: the nonlinear transforms help for every base, and `ast` and Clayton are close. The estimates of the best model barely change with the margin:
 
 ```{r ifm-compare}
-round(rbind(semiparametric = coef(fit_nl), IFM = coef(fits_ifm[["ast, v2p"]])), 3)
+round(rbind(semiparametric = coef(fit_nl), IFM = coef(ifm_nl)), 3)
 ```
 
 ## The full model: joint maximum likelihood
@@ -198,10 +212,10 @@ round(rbind(semiparametric = coef(fit_nl), IFM = coef(fits_ifm[["ast, v2p"]])), 
 Finally, the margin and the copula process can be estimated together by maximising the joint likelihood of the series. The two-stage estimates are the starting values.
 
 ```{r joint, cache = TRUE}
-full <- tsfit(rtr, tsmod(mg@model, fits_ifm[["ast, v2p"]]@model), method = "joint", se = "hessian")
+full <- tsfit(rtr, tsmod(mg@model, ifm_nl@model), method = "joint", se = "hessian")
 full
-two_stage <- as.numeric(logLik(mg)) + as.numeric(logLik(fits_ifm[["ast, v2p"]]))
-c(two_stage = two_stage, joint = as.numeric(logLik(full)))
+two_stage <- logLik(mg)[1] + logLik(ifm_nl)[1]
+c(two_stage = two_stage, joint = logLik(full)[1])
 ```
 
 The joint estimation improves the log-likelihood only slightly, and the estimates are similar to those of the two-stage approach: the data are informative about the margin, so there is little to gain from estimating the two parts together.
@@ -212,15 +226,18 @@ As a benchmark we fit GARCH(1,1) and GJR-GARCH(1,1) models with six innovation d
 
 ```{r garch-helpers, include = FALSE}
 library(rugarch)
-garch_spec <- function(model, dist)
-  ugarchspec(variance.model = list(model = model, garchOrder = c(1, 1)), mean.model = list(armaOrder = c(0, 0), include.mean = TRUE),
-             distribution.model = dist)
+garch_spec <- function(model, dist) {
+  ugarchspec(variance.model = list(model = model),
+             mean.model = list(armaOrder = c(0, 0)), distribution.model = dist)
+}
 garch_fit <- function(x, model, dist) {
-  f <- tryCatch(ugarchfit(garch_spec(model, dist), x, solver = "hybrid"), error = function(e) NULL)
+  f <- tryCatch(ugarchfit(garch_spec(model, dist), x, solver = "hybrid"),
+                error = function(e) NULL)
   if (is.null(f) || f@fit$convergence != 0) NULL else f
 }
-# predictive quantiles (one row per observation, one column per level) of the observations in `x`, from the
-# coefficients of a fit, with the filter run over the whole series `x`
+# predictive quantiles (one row per observation, one column per level) of the
+# observations in `x`, from the coefficients `cf` of a fit; the filter is run over
+# the whole series `x`
 garch_quantiles <- function(cf, x, model, dist, levels) {
   sp <- garch_spec(model, dist)
   setfixed(sp) <- as.list(cf)
@@ -231,8 +248,9 @@ garch_quantiles <- function(cf, x, model, dist, levels) {
   shape <- if ("shape" %in% names(cf)) cf[["shape"]] else 5
   mu + outer(s, qdist(dist, levels, skew = skew, shape = shape))
 }
-# rolling re-estimation: refit every H observations on the window and forecast the next block
-garch_roll <- function(x, model, dist, start, H = 20, levels = (1:99) / 100, cf0 = NULL) {
+# rolling re-estimation: refit every H observations and forecast the next block
+garch_roll <- function(x, model, dist, start, H = 20, levels = (1:99) / 100,
+                       cf0 = NULL) {
   n <- length(x)
   Q <- matrix(NA_real_, n - start + 1, length(levels))
   cf <- cf0
@@ -242,34 +260,41 @@ garch_roll <- function(x, model, dist, start, H = 20, levels = (1:99) / 100, cf0
       f <- garch_fit(x[1:(b0 - 1)], model, dist)
       if (!is.null(f)) cf <- coef(f)
     }
-    Q[idx - start + 1, ] <- garch_quantiles(cf, x[1:max(idx)], model, dist, levels)[idx, ]
+    q <- garch_quantiles(cf, x[1:max(idx)], model, dist, levels)
+    Q[idx - start + 1, ] <- q[idx, ]
   }
   Q
 }
 ```
 
 ```{r garch-fit, cache = TRUE}
-garch_grid <- expand.grid(model = c("sGARCH", "gjrGARCH"), dist = c("norm", "std", "sstd", "ged", "jsu", "nig"), stringsAsFactors = FALSE)
-gfits <- lapply(seq_len(nrow(garch_grid)), function(i) garch_fit(rtr, garch_grid$model[i], garch_grid$dist[i]))
-garch_tab <- data.frame(garch_grid, loglik = sapply(gfits, likelihood), npar = sapply(gfits, function(f) length(coef(f))))
-garch_tab$AIC <- sapply(gfits, function(f) infocriteria(f)["Akaike", 1]) * ntr   # rugarch reports AIC per observation
-garch_tab <- garch_tab[order(garch_tab$AIC), ]
-head(garch_tab, 5)
-best_g <- garch_tab[1, ]
-gbest <- gfits[[which(garch_grid$model == best_g$model & garch_grid$dist == best_g$dist)]]
+garch_grid <- expand.grid(model = c("sGARCH", "gjrGARCH"),
+                          dist = c("norm", "std", "sstd", "ged", "jsu", "nig"),
+                          stringsAsFactors = FALSE)
+gfits <- lapply(seq_len(nrow(garch_grid)), function(i)
+  garch_fit(rtr, garch_grid$model[i], garch_grid$dist[i]))
+garch_tab <- data.frame(garch_grid, loglik = sapply(gfits, likelihood),
+                        npar = sapply(gfits, function(f) length(coef(f))))
+# rugarch reports the AIC per observation
+garch_tab$AIC <- sapply(gfits, function(f) infocriteria(f)["Akaike", 1]) * ntr
+head(garch_tab[order(garch_tab$AIC), ], 5)
+best <- which.min(garch_tab$AIC)
+best_g <- garch_tab[best, ]
+gbest <- gfits[[best]]
 ```
 
 The best GARCH model is a GJR-GARCH model, whose asymmetry parameter captures the leverage-type effect. For the copula models the corresponding feature is the difference between the two fulcrums of the v-transforms. To compare the fits we add the margin and the copula parts of the copula models (the copula part alone is not comparable with the GARCH likelihood).
 
 ```{r insample-table}
+n_par <- function(f) attr(logLik(f), "df")
 ic <- function(ll, k) c(loglik = ll, npar = k, AIC = -2 * ll + 2 * k)
-mll <- as.numeric(logLik(mg)); mk <- attr(logLik(mg), "df")
+ifm <- function(f) ic(logLik(mg)[1] + logLik(f)[1], n_par(mg) + n_par(f))
 insample <- rbind(
   "GJR-GARCH (best)" = ic(best_g$loglik, best_g$npar),
-  "IFM, linear" = ic(mll + as.numeric(logLik(fits_ifm[["ast, linear"]])), mk + attr(logLik(fits_ifm[["ast, linear"]]), "df")),
-  "IFM, v2p" = ic(mll + as.numeric(logLik(fits_ifm[["ast, v2p"]])), mk + attr(logLik(fits_ifm[["ast, v2p"]]), "df")),
-  "joint, v2p" = ic(as.numeric(logLik(full)), attr(logLik(full), "df")))
-round(cbind(insample, dAIC = insample[, "AIC"] - insample["GJR-GARCH (best)", "AIC"]), 2)
+  "IFM, linear" = ifm(ifm_lin),
+  "IFM, v2p" = ifm(ifm_nl),
+  "joint, v2p" = ic(logLik(full)[1], n_par(full)))
+round(cbind(insample, dAIC = insample[, "AIC"] - insample[1, "AIC"]), 2)
 ```
 
 In sample the nonlinear copula model fits much better than the best GJR-GARCH model, and even the linear copula model has a lower AIC. This in-sample advantage is not the same as forecasting accuracy, so we now compare out-of-sample forecasts.
@@ -281,16 +306,18 @@ For each of the 500 holdout days we compute the one-step-ahead predictive distri
 ```{r oos, cache = TRUE}
 lev <- (1:99) / 100
 start <- ntr + 1
-em <- emarg(rtr, qtype = 8)
+em <- emarg(rtr)
 fc <- list(
   semiparametric_lin = tsroll(tsmod(em, fit_lin@model), r, start = start),
   semiparametric_nl = tsroll(tsmod(em, fit_nl@model), r, start = start),
-  IFM_lin = tsroll(tsmod(mg@model, fits_ifm[["ast, linear"]]@model), r, start = start),
-  IFM_nl = tsroll(tsmod(mg@model, fits_ifm[["ast, v2p"]]@model), r, start = start),
+  IFM_lin = tsroll(tsmod(mg@model, ifm_lin@model), r, start = start),
+  IFM_nl = tsroll(tsmod(mg@model, ifm_nl@model), r, start = start),
   joint_nl = tsroll(full, r, start = start))
-garch <- garch_quantiles(coef(gbest), r, best_g$model, best_g$dist, lev)[start:length(r), ]
+garch <- garch_quantiles(coef(gbest), r, best_g$model, best_g$dist, lev)
+garch <- garch[start:length(r), ]
 y <- r[start:length(r)]
-sc <- do.call(tsscore, c(list(x = garch), fc, list(observed = y, levels = lev, p = c(0.01, 0.05))))
+sc <- do.call(tsscore, c(list(x = garch), fc,
+                         list(observed = y, levels = lev, p = c(0.01, 0.05))))
 sc$summary$forecast[1] <- "GJR-GARCH"
 ```
 
@@ -317,13 +344,16 @@ plot(sc, relative = TRUE, main = "quantile score relative to GJR-GARCH")
 Among the copula models themselves the log predictive density is also available, since their forecasts include the margin. Here `neglogscore` is the negative log predictive density (smaller is better). The log scores are only comparable between models with the same margin, because the semiparametric forecasts use a kernel density estimate for the margin: we compare the linear and nonlinear semiparametric models, and then the three versions of the parametric-margin models. The Diebold-Mariano statistics compare each model with the first in its group; positive values favour the other model.
 
 ```{r oos-copulas}
-semiparametric_lin <- fc$semiparametric_lin; semiparametric_nl <- fc$semiparametric_nl
+semiparametric_lin <- fc$semiparametric_lin
+semiparametric_nl <- fc$semiparametric_nl
 IFM_lin <- fc$IFM_lin; IFM_nl <- fc$IFM_nl; joint_nl <- fc$joint_nl
 sc_semi <- tsscore(semiparametric_lin, semiparametric_nl)
 sc_par <- tsscore(IFM_lin, IFM_nl, joint_nl)
-rbind(sc_semi$summary[, c("forecast", "aqs", "neglogscore")], sc_par$summary[, c("forecast", "aqs", "neglogscore")])
-rbind(sc_semi$dm[sc_semi$dm$loss == "neglogscore", c("forecast", "diff", "statistic", "p.value")],
-      sc_par$dm[sc_par$dm$loss == "neglogscore", c("forecast", "diff", "statistic", "p.value")])
+cols <- c("forecast", "aqs", "neglogscore")
+rbind(sc_semi$summary[, cols], sc_par$summary[, cols])
+cols <- c("forecast", "diff", "statistic", "p.value")
+rbind(sc_semi$dm[sc_semi$dm$loss == "neglogscore", cols],
+      sc_par$dm[sc_par$dm$loss == "neglogscore", cols])
 ```
 
 The nonlinear semiparametric model is clearly better than the linear one on the log score ($p \approx 0.006$), and the same holds for the parametric-margin models, where the joint fit is no better than two-stage.
@@ -336,8 +366,9 @@ The comparison so far used parameters fixed at the estimation-period values. To 
 roll <- list(
   semiparametric_lin = tsroll(tsmod(em, fit_lin@model), r, start = start, refit = 20),
   semiparametric_nl = tsroll(tsmod(em, fit_nl@model), r, start = start, refit = 20))
-garch_r <- garch_roll(r, best_g$model, best_g$dist, start = start, H = 20, cf0 = coef(gbest))
-scr <- do.call(tsscore, c(list(x = garch_r), roll, list(observed = y, levels = lev, p = c(0.01, 0.05))))
+garch_r <- garch_roll(r, best_g$model, best_g$dist, start, cf0 = coef(gbest))
+scr <- do.call(tsscore, c(list(x = garch_r), roll,
+                          list(observed = y, levels = lev, p = c(0.01, 0.05))))
 ```
 
 ```{r rolling-table}
