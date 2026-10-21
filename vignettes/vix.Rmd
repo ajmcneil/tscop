@@ -351,7 +351,7 @@ The joint estimation improves the log-likelihood only slightly, and the estimate
 
 ## Comparison with GARCH in sample
 
-As a benchmark we fit GARCH(1,1) and GJR-GARCH(1,1) models with six innovation distributions, using the `rugarch` package, and select by AIC. The helper functions are listed in the appendix.
+As a benchmark we fit GARCH(1,1) and GJR-GARCH(1,1) models with six innovation distributions and three conditional mean models: a constant, an AR(1) and an ARMA(1,1). The mean models matter here because of the negative first-order autocorrelation of the returns noted above. We use the `rugarch` package and select by AIC; the helper functions are listed in the appendix.
 
 
 
@@ -359,26 +359,36 @@ As a benchmark we fit GARCH(1,1) and GJR-GARCH(1,1) models with six innovation d
 ``` r
 garch_grid <- expand.grid(model = c("sGARCH", "gjrGARCH"),
                           dist = c("norm", "std", "sstd", "ged", "jsu", "nig"),
-                          stringsAsFactors = FALSE)
+                          p = 0:1, q = 0:1, stringsAsFactors = FALSE)
+garch_grid <- garch_grid[garch_grid$p >= garch_grid$q, ]  # ARMA(0,0), (1,0), (1,1)
 gfits <- lapply(seq_len(nrow(garch_grid)), function(i)
-  garch_fit(rtr, garch_grid$model[i], garch_grid$dist[i]))
+  garch_fit(rtr, garch_grid[i, ]))
 garch_tab <- data.frame(garch_grid, loglik = sapply(gfits, likelihood),
                         npar = sapply(gfits, function(f) length(coef(f))))
 # rugarch reports the AIC per observation
 garch_tab$AIC <- sapply(gfits, function(f) infocriteria(f)["Akaike", 1]) * ntr
 head(garch_tab[order(garch_tab$AIC), ], 5)
-#>       model dist loglik npar   AIC
-#> 10 gjrGARCH  jsu   1990    7 -3967
-#> 12 gjrGARCH  nig   1989    7 -3964
-#> 6  gjrGARCH sstd   1987    7 -3961
-#> 9    sGARCH  jsu   1968    6 -3924
-#> 11   sGARCH  nig   1967    6 -3922
+#>       model dist p q loglik npar   AIC
+#> 46 gjrGARCH  jsu 1 1   2003    9 -3987
+#> 48 gjrGARCH  nig 1 1   2001    9 -3985
+#> 45   sGARCH  jsu 1 1   1999    8 -3982
+#> 42 gjrGARCH sstd 1 1   2000    9 -3981
+#> 47   sGARCH  nig 1 1   1998    8 -3981
 best <- which.min(garch_tab$AIC)
 best_g <- garch_tab[best, ]
 gbest <- gfits[[best]]
+coef(gbest)
+#>         mu        ar1        ma1      omega     alpha1      beta1     gamma1 
+#>  0.0001795  0.7341393 -0.8284436  0.0003874  0.1598442  0.8318184 -0.1437150 
+#>       skew      shape 
+#>  1.2963681  1.7871900
+# the best model with a constant mean, for comparison
+best0 <- which.min(ifelse(garch_tab$p == 0, garch_tab$AIC, Inf))
+best_g0 <- garch_tab[best0, ]
+gbest0 <- gfits[[best0]]
 ```
 
-The best GARCH model is a GJR-GARCH model, whose asymmetry parameter captures the leverage-type effect. For the copula models the corresponding feature is the difference between the two fulcrums of the v-transforms. To compare the fits we add the margin and the copula parts of the copula models (the copula part alone is not comparable with the GARCH likelihood).
+The best model is a GJR-GARCH model with Johnson SU innovations and an ARMA(1,1) conditional mean, which improves the AIC by about 20 over the best constant-mean model. The AR and MA coefficients, $0.73$ and $-0.83$, are close to cancelling, so the mean equation is a small correction: a first-order autocorrelation of about $-0.1$ that decays slowly. (Estimates from longer windows, in the rolling section below, show an even closer cancellation.) The asymmetry parameter of the GJR model captures the leverage-type effect; for the copula models the corresponding feature is the difference between the two fulcrums of the v-transforms, and the copula models have no mean equation. To compare the fits we add the margin and the copula parts of the copula models (the copula part alone is not comparable with the GARCH likelihood).
 
 
 ``` r
@@ -386,19 +396,21 @@ n_par <- function(f) attr(logLik(f), "df")
 ic <- function(ll, k) c(loglik = ll, npar = k, AIC = -2 * ll + 2 * k)
 ifm <- function(f) ic(logLik(mg)[1] + logLik(f)[1], n_par(mg) + n_par(f))
 insample <- rbind(
-  "GJR-GARCH (best)" = ic(best_g$loglik, best_g$npar),
+  "GARCH, best" = ic(best_g$loglik, best_g$npar),
+  "GARCH, best constant mean" = ic(best_g0$loglik, best_g0$npar),
   "IFM, linear" = ifm(ifm_lin),
   "IFM, v2p" = ifm(ifm_nl),
   "joint, v2p" = ic(logLik(full)[1], n_par(full)))
 round(cbind(insample, dAIC = insample[, "AIC"] - insample[1, "AIC"]), 2)
-#>                  loglik npar   AIC   dAIC
-#> GJR-GARCH (best)   1990    7 -3967   0.00
-#> IFM, linear        2010    8 -4004 -37.35
-#> IFM, v2p           2024   10 -4029 -61.93
-#> joint, v2p         2024   10 -4029 -62.12
+#>                           loglik npar   AIC   dAIC
+#> GARCH, best                 2003    9 -3987   0.00
+#> GARCH, best constant mean   1990    7 -3967  20.47
+#> IFM, linear                 2010    8 -4004 -16.89
+#> IFM, v2p                    2024   10 -4029 -41.47
+#> joint, v2p                  2024   10 -4029 -41.66
 ```
 
-In sample the nonlinear copula model fits much better than the best GJR-GARCH model, and even the linear copula model has a lower AIC. This in-sample advantage is not the same as forecasting accuracy, so we now compare out-of-sample forecasts.
+In sample the nonlinear copula model fits much better than the best GARCH model (AIC lower by 41) and the linear copula model also has the lower AIC (by 17), although the margin is smaller than against the constant-mean GARCH model (20 points). This in-sample advantage is not the same as forecasting accuracy, so we now compare out-of-sample forecasts.
 
 ## Out-of-sample comparison with fixed parameters
 
@@ -415,12 +427,12 @@ fc <- list(
   IFM_lin = tsroll(tsmod(mg@model, ifm_lin@model), r, start = start),
   IFM_nl = tsroll(tsmod(mg@model, ifm_nl@model), r, start = start),
   joint_nl = tsroll(full, r, start = start))
-garch <- garch_quantiles(coef(gbest), r, best_g$model, best_g$dist, lev)
-garch <- garch[start:length(r), ]
+garch <- garch_quantiles(coef(gbest), r, best_g, lev)[start:length(r), ]
+garch0 <- garch_quantiles(coef(gbest0), r, best_g0, lev)[start:length(r), ]
 y <- r[start:length(r)]
-sc <- do.call(tsscore, c(list(x = garch), fc,
+sc <- do.call(tsscore, c(list(x = garch, GARCH_const_mean = garch0), fc,
                          list(observed = y, levels = lev, p = c(0.01, 0.05))))
-sc$summary$forecast[1] <- "GJR-GARCH"
+sc$summary$forecast[1] <- "GARCH"
 ```
 
 
@@ -436,30 +448,34 @@ tab$DM_stat <- c(NA, dm$statistic); tab$DM_p <- c(NA, dm$p.value)
 tab$aqs <- NULL
 print(tab, digits = 3, row.names = FALSE)
 #>            forecast aqs_x1000 vs_garch_pct breaches_1pct kupiec_p_1pct
-#>           GJR-GARCH      21.0        0.000            11        0.0199
-#>  semiparametric_lin      20.8       -1.029             9        0.1060
-#>   semiparametric_nl      20.6       -1.914             9        0.1060
-#>             IFM_lin      20.8       -0.966             7        0.3966
-#>              IFM_nl      20.6       -1.891             8        0.2149
-#>            joint_nl      20.6       -1.838             8        0.2149
-#>  breaches_5pct kupiec_p_5pct DM_stat   DM_p
-#>             27         0.685      NA     NA
-#>             23         0.678    1.66 0.0967
-#>             29         0.423    2.39 0.0169
-#>             23         0.678    1.34 0.1795
-#>             28         0.546    1.89 0.0585
-#>             28         0.546    1.90 0.0574
+#>               GARCH      20.8      0.00000            11        0.0199
+#>    GARCH_const_mean      21.0      0.96958            11        0.0199
+#>  semiparametric_lin      20.8     -0.06921             9        0.1060
+#>   semiparametric_nl      20.6     -0.96257             9        0.1060
+#>             IFM_lin      20.8     -0.00612             7        0.3966
+#>              IFM_nl      20.6     -0.93982             8        0.2149
+#>            joint_nl      20.6     -0.88606             8        0.2149
+#>  breaches_5pct kupiec_p_5pct  DM_stat   DM_p
+#>             25         1.000       NA     NA
+#>             27         0.685 -1.68767 0.0915
+#>             23         0.678  0.11371 0.9095
+#>             29         0.423  1.65502 0.0979
+#>             23         0.678  0.00872 0.9930
+#>             28         0.546  1.29305 0.1960
+#>             28         0.546  1.25743 0.2086
 ```
 
-The Diebold-Mariano statistic is the mean difference in AQS between GARCH and the copula model, so positive values favour the copula model. Expected numbers of breaches are 5 at the 1% level and 25 at the 5% level over the 500 days.
+The Diebold-Mariano statistic is the mean difference in AQS between the first forecast (the best GARCH model) and the other one, so positive values favour the other model; the `GARCH_const_mean` row compares the two GARCH models. Expected numbers of breaches are 5 at the 1% level and 25 at the 5% level over the 500 days.
+
+With the ARMA mean the GARCH model is about 1% better in AQS than with a constant mean (DM $p = 0.09$). The nonlinear copula models are about 0.9 to 1.0% better than the best GARCH model, which is not significant at conventional levels (DM $p = 0.10$ for the semiparametric version and about 0.2 for the IFM and joint versions), and the linear copula models are level with GARCH. The value-at-risk backtests are as before: the GARCH models have 11 breaches at the 1% level, which the Kupiec test rejects ($p = 0.02$), while the copula models are not rejected at either level.
 
 
 ``` r
-colnames(sc$profile)[1] <- "GJR-GARCH"
-plot(sc, relative = TRUE, main = "quantile score relative to GJR-GARCH")
+colnames(sc$profile)[1:2] <- c("GARCH", "GARCH, constant mean")
+plot(sc, relative = TRUE, main = "quantile score relative to GARCH")
 ```
 
-![Average quantile score by level relative to GJR-GARCH; negative values favour the copula model.](vix-figs/vix-oos-profile-1.png)
+![Average quantile score by level relative to the best GARCH model; negative values favour the copula model.](vix-figs/vix-oos-profile-1.png)
 
 Among the copula models themselves the log predictive density is also available, since their forecasts include the margin. Here `neglogscore` is the negative log predictive density (smaller is better). The log scores are only comparable between models with the same margin, because the semiparametric forecasts use a kernel density estimate for the margin: we compare the linear and nonlinear semiparametric models, and then the three versions of the parametric-margin models. The Diebold-Mariano statistics compare each model with the first in its group; positive values favour the other model.
 
@@ -491,21 +507,21 @@ The nonlinear semiparametric model is clearly better than the linear one on the 
 
 ## Rolling re-estimation
 
-The comparison so far used parameters fixed at the estimation-period values. To see whether stale parameters matter, we re-estimate every 20 days on an expanding window, starting each fit from the previous estimates; the model structure is kept. We do this for the semiparametric models, whose refits are quickest, and for GJR-GARCH.
+The comparison so far used parameters fixed at the estimation-period values. To see whether stale parameters matter, we re-estimate every 20 days on an expanding window, starting each fit from the previous estimates; the model structure is kept. We do this for the semiparametric models, whose refits are quickest, and for the best GARCH model.
 
 
 ``` r
 roll <- list(
   semiparametric_lin = tsroll(tsmod(em, fit_lin@model), r, start = start, refit = 20),
   semiparametric_nl = tsroll(tsmod(em, fit_nl@model), r, start = start, refit = 20))
-garch_r <- garch_roll(r, best_g$model, best_g$dist, start, cf0 = coef(gbest))
+garch_r <- garch_roll(r, best_g, start, cf0 = coef(gbest))
 scr <- do.call(tsscore, c(list(x = garch_r), roll,
                           list(observed = y, levels = lev, p = c(0.01, 0.05))))
 ```
 
 
 ``` r
-scr$summary$forecast[1] <- "GJR-GARCH"
+scr$summary$forecast[1] <- "GARCH"
 tabr <- scr$summary[, c("forecast", "aqs")]
 tabr$aqs_fixed_x1000 <- 1000 * sc$summary$aqs[match(tabr$forecast, sc$summary$forecast)]
 tabr$aqs_rolling_x1000 <- 1000 * tabr$aqs
@@ -515,64 +531,72 @@ tabr$DM_stat <- c(NA, dmr$statistic); tabr$DM_p <- c(NA, dmr$p.value)
 tabr$aqs <- NULL
 print(tabr, digits = 3, row.names = FALSE)
 #>            forecast aqs_fixed_x1000 aqs_rolling_x1000 vs_garch_pct DM_stat
-#>           GJR-GARCH            21.0              21.0         0.00      NA
-#>  semiparametric_lin            20.8              20.8        -1.23    2.00
-#>   semiparametric_nl            20.6              20.6        -1.91    2.32
-#>    DM_p
-#>      NA
-#>  0.0460
-#>  0.0205
+#>               GARCH            20.8              20.7        0.000      NA
+#>  semiparametric_lin            20.8              20.8        0.440   -0.81
+#>   semiparametric_nl            20.6              20.6       -0.255    0.43
+#>   DM_p
+#>     NA
+#>  0.418
+#>  0.667
 ```
+
+With re-estimation the GARCH model improves further: the advantage of the nonlinear copula model shrinks to 0.3% (DM $p = 0.67$) and the linear copula model is slightly worse than GARCH. The refits show why. The ARMA coefficients estimated from the first 1500 observations ($0.73$ and $-0.83$) differ from those estimated on windows of 1520 or more observations, which are close to $0.92$ and $-0.98$, an even closer cancellation: the fixed-parameter GARCH forecasts therefore use mean parameters that are not representative of the later windows. A mean equation of this kind models a small negative autocorrelation of the returns that decays slowly.
 
 ## Summary
 
-* On this series the copula models, and in particular the nonlinear model, describe the data much better than GARCH in sample (AIC lower by 37 for the linear and 62 for the nonlinear model), and the nonlinear transforms are clearly supported: the likelihood ratio test of linearity gives $p \approx 10^{-5}$ and the bootstrap intervals for $\kappa_1$ and $\kappa_2$ exclude 1.
-* Out of sample the advantage is smaller but still present: the average quantile score of the nonlinear models is about 2% lower than that of the best GJR-GARCH model, significant for the semiparametric version and borderline for the IFM and joint versions. The GARCH model underestimates the 1% value-at-risk (11 breaches against 5 expected, rejected by the Kupiec test), while the copula models are not rejected at either level.
-* Re-estimating every 20 days changes the scores very little, and the comparison with GARCH is unchanged.
+The main attraction of the copula models is not forecasting accuracy, where a well-specified GARCH model is hard to beat, but that they separate the two parts of the dynamics and expose each of them explicitly. The margin is modelled and checked on its own: here a skewed, heavy-tailed normal inverse Gaussian distribution, whose fit is assessed through the probability integral transform. The serial dependence is described by a few interpretable quantities: the Kendall partial autocorrelations, which fall from 0.12 at lag 1 to 0.06 at lag 4 and are governed by the decay rate $\lambda_1 = 0.94$ and the weight $w_1 = 0.20$ of the factor; the fulcrums, 0.44 and 0.64, whose difference expresses the asymmetry between the earlier and the later observation of a pair; and the shape parameters, which show how the dependence between large moves departs from a simple v-shape. The pair-copula plots display this dependence directly, lag by lag. In a GARCH model the same information is folded into the variance recursion and the innovation distribution. The split also lets us estimate, replace or check the margin and the dependence separately, by an empirical distribution, a parametric margin, or both together.
+
+The comparison with GARCH gives the following results.
+
+* In sample the copula models describe the data better than GARCH even with an ARMA(1,1) mean (AIC lower by 17 for the linear and by 41 for the nonlinear model), and the nonlinear transforms are clearly supported: the likelihood ratio test of linearity gives $p \approx 10^{-5}$ and the bootstrap intervals for $\kappa_1$ and $\kappa_2$ exclude 1.
+* Out of sample with fixed parameters the nonlinear copula models are about 1% better in average quantile score than the best GARCH model with a conditional mean, which is not significant ($p$ between 0.10 and 0.21), and the linear copula models are level with GARCH. The GARCH models underestimate the 1% value-at-risk (11 breaches against 5 expected, rejected by the Kupiec test), while the copula models are not rejected at either level.
+* With rolling re-estimation GARCH catches up: the advantage of the nonlinear copula model falls to 0.3% ($p = 0.67$). The advantage with fixed parameters is partly due to mean-equation parameters that were not representative of the later data.
 * The estimation approaches (semiparametric, IFM, joint) give very similar results here.
 
-These results are for one series and a single holdout period of 500 days, the effective lag $K \approx 26$ is below the cap of 40 that we imposed, and VIX was chosen as the example because it illustrates the nonlinear features well. In a wider study of eight daily return series (three stocks, two equity indices, two cryptocurrencies and VIX), which we do not show here, the copula models were statistically indistinguishable out of sample from a well-chosen GJR-GARCH model on every series except VIX. For VIX the nonlinear copula models showed a modest advantage (about 2% in average quantile score), which is only moderately significant once we allow for having selected the best of eight series. VIX is shown here because it illustrates the nonlinear features of the models, not as general evidence that they outperform GARCH.
+These results are for one series and a single holdout period of 500 days, the effective lag $K \approx 26$ is below the cap of 40 that we imposed, and VIX was chosen as the example because it illustrates the nonlinear features well. In a wider study of eight daily return series (three stocks, two equity indices, two cryptocurrencies and VIX), which we do not show here, the copula models were statistically indistinguishable out of sample from a well-chosen GARCH model with a conditional mean on every series. For VIX the nonlinear copula models were about 1% better in average quantile score (with $p$-values between 0.07 and 0.22 for fixed parameters), which is not significant at the 5% level, and the advantage vanishes with rolling re-estimation. VIX is shown here because it illustrates the nonlinear features of the models, not as evidence that they outperform GARCH.
 
 ## Appendix: the GARCH helper functions
 
 
 ``` r
 library(rugarch)
-garch_spec <- function(model, dist) {
-  ugarchspec(variance.model = list(model = model),
-             mean.model = list(armaOrder = c(0, 0)), distribution.model = dist)
+# g describes a GARCH model: the variance model, the innovation distribution and
+# the ARMA orders p, q of the conditional mean
+garch_spec <- function(g) {
+  ugarchspec(variance.model = list(model = g$model),
+             mean.model = list(armaOrder = c(g$p, g$q)),
+             distribution.model = g$dist)
 }
-garch_fit <- function(x, model, dist) {
-  f <- tryCatch(ugarchfit(garch_spec(model, dist), x, solver = "hybrid"),
+garch_fit <- function(x, g) {
+  f <- tryCatch(ugarchfit(garch_spec(g), x, solver = "hybrid"),
                 error = function(e) NULL)
   if (is.null(f) || f@fit$convergence != 0) NULL else f
 }
 # predictive quantiles (one row per observation, one column per level) of the
 # observations in `x`, from the coefficients `cf` of a fit; the filter is run over
 # the whole series `x`
-garch_quantiles <- function(cf, x, model, dist, levels) {
-  sp <- garch_spec(model, dist)
+garch_quantiles <- function(cf, x, g, levels) {
+  sp <- garch_spec(g)
   setfixed(sp) <- as.list(cf)
   fl <- ugarchfilter(sp, x)
   s <- as.numeric(sigma(fl))
   mu <- x - as.numeric(residuals(fl))
   skew <- if ("skew" %in% names(cf)) cf[["skew"]] else 1
   shape <- if ("shape" %in% names(cf)) cf[["shape"]] else 5
-  mu + outer(s, qdist(dist, levels, skew = skew, shape = shape))
+  mu + outer(s, qdist(g$dist, levels, skew = skew, shape = shape))
 }
 # rolling re-estimation: refit every H observations and forecast the next block
-garch_roll <- function(x, model, dist, start, H = 20, levels = (1:99) / 100,
-                       cf0 = NULL) {
+garch_roll <- function(x, g, start, H = 20, levels = (1:99) / 100, cf0 = NULL) {
   n <- length(x)
   Q <- matrix(NA_real_, n - start + 1, length(levels))
   cf <- cf0
   for (b0 in seq(start, n, by = H)) {
     idx <- b0:min(b0 + H - 1, n)
     if (!is.null(cf0) && b0 > start || is.null(cf)) {
-      f <- garch_fit(x[1:(b0 - 1)], model, dist)
+      f <- garch_fit(x[1:(b0 - 1)], g)
       if (!is.null(f)) cf <- coef(f)
     }
-    q <- garch_quantiles(cf, x[1:max(idx)], model, dist, levels)
+    q <- garch_quantiles(cf, x[1:max(idx)], g, levels)
     Q[idx - start + 1, ] <- q[idx, ]
   }
   Q
