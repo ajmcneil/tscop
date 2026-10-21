@@ -18,6 +18,9 @@ library(tscop)
 set.seed(2026)
 ```
 
+```{r helpers, include = FALSE}
+```
+
 ## Data
 
 We study the daily log-returns of the VIX index. The prices are downloaded from Yahoo Finance with `quantmod` over a fixed date range, so that the analysis is reproducible, and cached locally; the data are not distributed with the package. Yahoo reports VIX values on a couple of days on which the S&P 500 was closed, which we drop so that the VIX series follows the S&P 500 trading calendar.
@@ -214,9 +217,6 @@ The joint estimation improves the log-likelihood only slightly, and the estimate
 ## Comparison with GARCH in sample
 
 As a benchmark we fit GARCH(1,1) and GJR-GARCH(1,1) models with six innovation distributions and three conditional mean models: a constant, an AR(1) and an ARMA(1,1). The mean models matter here because of the negative first-order autocorrelation of the returns noted above. We use the `rugarch` package and select by AIC; the helper functions are listed in the appendix.
-
-```{r helpers, include = FALSE}
-```
 
 ```{r garch-fit, cache = TRUE}
 garch_grid <- expand.grid(model = c("sGARCH", "gjrGARCH"),
