@@ -359,8 +359,8 @@ As a benchmark we fit GARCH(1,1) and GJR-GARCH(1,1) models with six innovation d
 ``` r
 garch_grid <- expand.grid(model = c("sGARCH", "gjrGARCH"),
                           dist = c("norm", "std", "sstd", "ged", "jsu", "nig"),
-                          p = 0:1, q = 0:1, stringsAsFactors = FALSE)
-garch_grid <- garch_grid[garch_grid$p >= garch_grid$q, ]  # ARMA(0,0), (1,0), (1,1)
+                          meanmod = c("(0,0)", "(1,0)", "(1,1)"),
+                          stringsAsFactors = FALSE)
 gfits <- lapply(seq_len(nrow(garch_grid)), function(i)
   garch_fit(rtr, garch_grid[i, ]))
 garch_tab <- data.frame(garch_grid, loglik = sapply(gfits, likelihood),
@@ -368,12 +368,12 @@ garch_tab <- data.frame(garch_grid, loglik = sapply(gfits, likelihood),
 # rugarch reports the AIC per observation
 garch_tab$AIC <- sapply(gfits, function(f) infocriteria(f)["Akaike", 1]) * ntr
 head(garch_tab[order(garch_tab$AIC), ], 5)
-#>       model dist p q loglik npar   AIC
-#> 46 gjrGARCH  jsu 1 1   2003    9 -3987
-#> 48 gjrGARCH  nig 1 1   2001    9 -3985
-#> 45   sGARCH  jsu 1 1   1999    8 -3982
-#> 42 gjrGARCH sstd 1 1   2000    9 -3981
-#> 47   sGARCH  nig 1 1   1998    8 -3981
+#>       model dist meanmod loglik npar   AIC
+#> 34 gjrGARCH  jsu   (1,1)   2003    9 -3987
+#> 36 gjrGARCH  nig   (1,1)   2001    9 -3985
+#> 33   sGARCH  jsu   (1,1)   1999    8 -3982
+#> 30 gjrGARCH sstd   (1,1)   2000    9 -3981
+#> 35   sGARCH  nig   (1,1)   1998    8 -3981
 best <- which.min(garch_tab$AIC)
 best_g <- garch_tab[best, ]
 gbest <- gfits[[best]]
@@ -383,7 +383,7 @@ coef(gbest)
 #>       skew      shape 
 #>  1.2963681  1.7871900
 # the best model with a constant mean, for comparison
-best0 <- which.min(ifelse(garch_tab$p == 0, garch_tab$AIC, Inf))
+best0 <- which.min(ifelse(garch_tab$meanmod == "(0,0)", garch_tab$AIC, Inf))
 best_g0 <- garch_tab[best0, ]
 gbest0 <- gfits[[best0]]
 ```
@@ -561,10 +561,11 @@ These results are for one series and a single holdout period of 500 days, the ef
 ``` r
 library(rugarch)
 # g describes a GARCH model: the variance model, the innovation distribution and
-# the ARMA orders p, q of the conditional mean
+# the conditional mean model as a string "(p,q)" for the ARMA orders
 garch_spec <- function(g) {
+  arma <- as.numeric(strsplit(gsub("[()]", "", g$meanmod), ",")[[1]])
   ugarchspec(variance.model = list(model = g$model),
-             mean.model = list(armaOrder = c(g$p, g$q)),
+             mean.model = list(armaOrder = arma),
              distribution.model = g$dist)
 }
 garch_fit <- function(x, g) {
