@@ -11,3 +11,7 @@
 ^inst/extdata$
 ^LICENSE$
 ^Rplots\.pdf$
+^vignettes/.*\.orig$
+^vignettes/cache$
+^vignettes/knit-vignettes\.R$
+^vignettes/helpers\.R$

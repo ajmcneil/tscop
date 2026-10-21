@@ -41,11 +41,16 @@ LinkingTo:
     Rcpp
 Suggests:
     ghyp,
+    knitr,
+    quantmod,
+    rmarkdown,
+    rugarch,
     testthat (>= 3.0.0),
     tscopula,
     zoo
 Remotes:
     ajmcneil/udp
+VignetteBuilder: knitr
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Config/roxygen2/version: 8.1.0

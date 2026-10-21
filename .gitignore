@@ -10,3 +10,5 @@ CLAUDE.md
 inst/extdata/
 private/
 Rplots.pdf
+vignettes/cache/
+vignettes/*.html
