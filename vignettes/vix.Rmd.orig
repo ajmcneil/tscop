@@ -13,6 +13,7 @@ vignette: >
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.path = "figure/vix-", fig.width = 6.5, fig.height = 4.5, dpi = 110)
 options(digits = 4)
 knitr::opts_chunk$set(cache.path = "cache/vix-")
+knitr::read_chunk("helpers.R")
 library(tscop)
 set.seed(2026)
 ```
@@ -101,21 +102,7 @@ vtfit <- fit_semi(vtscop_ast)
 ```
 
 ```{r semipar-table}
-aic_table <- function(fits, vt = NULL) {
-  npar <- function(f) attr(logLik(f), "df")
-  tab <- data.frame(model = names(fits), loglik = sapply(fits, logLik),
-                    npar = sapply(fits, npar), AIC = sapply(fits, AIC),
-                    K = sapply(fits, function(f) f@model@K),
-                    L = sapply(fits, function(f) f@model@L), row.names = NULL)
-  if (!is.null(vt)) {
-    tab <- rbind(tab, data.frame(model = "vtscop, ast", loglik = logLik(vt)[1],
-                                 npar = npar(vt), AIC = AIC(vt),
-                                 K = vt@model@base@K, L = NA))
-  }
-  tab$dAIC <- tab$AIC - min(tab$AIC)
-  tab[order(tab$AIC), ]
-}
-aic_table(fits, vtfit)
+aic_table(c(fits, list("vtscop, ast" = vtfit)))
 ```
 
 The nonlinear v-transforms improve the fit for every base copula, with the `ast` base giving the lowest AIC, closely followed by Clayton. The `vtscop` alternative, which uses one transform for the whole process, fits substantially worse.
@@ -185,10 +172,11 @@ qqnorm(qnorm(u_ifm), main = "normal scores"); abline(0, 1, lty = 2)
 par(op)
 ```
 
-The copula models are fitted to these transforms, with the same specifications as before.
+Fitting a `tsmod` model with a parametric margin first estimates the margin and then fits the copula to its probability integral transforms, so one call of `tsfit` carries out the two stages of the IFM approach. The log-likelihood and the AIC of the fitted model are those of the whole model, margin and copula, which is what we need to compare with GARCH below. We use the same copula specifications as before.
 
 ```{r ifm-fit, cache = TRUE}
-fit_ifm <- function(sp) tsfit(u_ifm, sp, pseudo = FALSE)
+fam <- mg@model@family
+fit_ifm <- function(sp) tsfit(rtr, tsmod(fam, sp))
 fits_ifm <- list(
   "ast, linear" = fit_ifm(spec("ast")),
   "ast, v2p" = fit_ifm(spec("ast", "v2p")),
@@ -202,13 +190,13 @@ ifm_nl <- fits_ifm[["ast, v2p"]]
 ```
 
 ```{r ifm-table}
-aic_table(fits_ifm, vtfit_ifm)
+aic_table(c(fits_ifm, list("vtscop, ast" = vtfit_ifm)))
 ```
 
 The picture is the same as for the semiparametric fits: the nonlinear transforms help for every base, and `ast` and Clayton are close. The estimates of the best model barely change with the margin:
 
 ```{r ifm-compare}
-round(rbind(semiparametric = coef(fit_nl), IFM = coef(ifm_nl)), 3)
+round(rbind(semiparametric = coef(fit_nl), IFM = coef(ifm_nl@copfit)), 3)
 ```
 
 ## The full model: joint maximum likelihood
@@ -216,10 +204,9 @@ round(rbind(semiparametric = coef(fit_nl), IFM = coef(ifm_nl)), 3)
 Finally, the margin and the copula process can be estimated together by maximising the joint likelihood of the series. The two-stage estimates are the starting values.
 
 ```{r joint, cache = TRUE}
-full <- tsfit(rtr, tsmod(mg@model, ifm_nl@model), method = "joint", se = "hessian")
+full <- tsfit(rtr, tsmod(fam, spec("ast", "v2p")), method = "joint", se = "hessian")
 full
-two_stage <- logLik(mg)[1] + logLik(ifm_nl)[1]
-c(two_stage = two_stage, joint = logLik(full)[1])
+c(two_stage = logLik(ifm_nl)[1], joint = logLik(full)[1])
 ```
 
 The joint estimation improves the log-likelihood only slightly, and the estimates are similar to those of the two-stage approach: the data are informative about the margin, so there is little to gain from estimating the two parts together.
@@ -228,50 +215,7 @@ The joint estimation improves the log-likelihood only slightly, and the estimate
 
 As a benchmark we fit GARCH(1,1) and GJR-GARCH(1,1) models with six innovation distributions and three conditional mean models: a constant, an AR(1) and an ARMA(1,1). The mean models matter here because of the negative first-order autocorrelation of the returns noted above. We use the `rugarch` package and select by AIC; the helper functions are listed in the appendix.
 
-```{r garch-helpers, include = FALSE}
-library(rugarch)
-# g describes a GARCH model: the variance model, the innovation distribution and
-# the conditional mean model as a string "(p,q)" for the ARMA orders
-garch_spec <- function(g) {
-  arma <- as.numeric(strsplit(gsub("[()]", "", g$meanmod), ",")[[1]])
-  ugarchspec(variance.model = list(model = g$model),
-             mean.model = list(armaOrder = arma),
-             distribution.model = g$dist)
-}
-garch_fit <- function(x, g) {
-  f <- tryCatch(ugarchfit(garch_spec(g), x, solver = "hybrid"),
-                error = function(e) NULL)
-  if (is.null(f) || f@fit$convergence != 0) NULL else f
-}
-# predictive quantiles (one row per observation, one column per level) of the
-# observations in `x`, from the coefficients `cf` of a fit; the filter is run over
-# the whole series `x`
-garch_quantiles <- function(cf, x, g, levels) {
-  sp <- garch_spec(g)
-  setfixed(sp) <- as.list(cf)
-  fl <- ugarchfilter(sp, x)
-  s <- as.numeric(sigma(fl))
-  mu <- x - as.numeric(residuals(fl))
-  skew <- if ("skew" %in% names(cf)) cf[["skew"]] else 1
-  shape <- if ("shape" %in% names(cf)) cf[["shape"]] else 5
-  mu + outer(s, qdist(g$dist, levels, skew = skew, shape = shape))
-}
-# rolling re-estimation: refit every H observations and forecast the next block
-garch_roll <- function(x, g, start, H = 20, levels = (1:99) / 100, cf0 = NULL) {
-  n <- length(x)
-  Q <- matrix(NA_real_, n - start + 1, length(levels))
-  cf <- cf0
-  for (b0 in seq(start, n, by = H)) {
-    idx <- b0:min(b0 + H - 1, n)
-    if (!is.null(cf0) && b0 > start || is.null(cf)) {
-      f <- garch_fit(x[1:(b0 - 1)], g)
-      if (!is.null(f)) cf <- coef(f)
-    }
-    q <- garch_quantiles(cf, x[1:max(idx)], g, levels)
-    Q[idx - start + 1, ] <- q[idx, ]
-  }
-  Q
-}
+```{r helpers, include = FALSE}
 ```
 
 ```{r garch-fit, cache = TRUE}
@@ -281,10 +225,7 @@ garch_grid <- expand.grid(model = c("sGARCH", "gjrGARCH"),
                           stringsAsFactors = FALSE)
 gfits <- lapply(seq_len(nrow(garch_grid)), function(i)
   garch_fit(rtr, garch_grid[i, ]))
-garch_tab <- data.frame(garch_grid, loglik = sapply(gfits, likelihood),
-                        npar = sapply(gfits, function(f) length(coef(f))))
-# rugarch reports the AIC per observation
-garch_tab$AIC <- sapply(gfits, function(f) infocriteria(f)["Akaike", 1]) * ntr
+garch_tab <- cbind(garch_grid, t(sapply(gfits, ic)))
 head(garch_tab[order(garch_tab$AIC), ], 5)
 best <- which.min(garch_tab$AIC)
 best_g <- garch_tab[best, ]
@@ -296,18 +237,12 @@ best_g0 <- garch_tab[best0, ]
 gbest0 <- gfits[[best0]]
 ```
 
-The best model is a GJR-GARCH model with Johnson SU innovations and an ARMA(1,1) conditional mean, which improves the AIC by about 20 over the best constant-mean model. The AR and MA coefficients, $0.73$ and $-0.83$, are close to cancelling, so the mean equation is a small correction: a first-order autocorrelation of about $-0.1$ that decays slowly. (Estimates from longer windows, in the rolling section below, show an even closer cancellation.) The asymmetry parameter of the GJR model captures the leverage-type effect; for the copula models the corresponding feature is the difference between the two fulcrums of the v-transforms, and the copula models have no mean equation. To compare the fits we add the margin and the copula parts of the copula models (the copula part alone is not comparable with the GARCH likelihood).
+The best model is a GJR-GARCH model with Johnson SU innovations and an ARMA(1,1) conditional mean, which improves the AIC by about 20 over the best constant-mean model. The AR and MA coefficients, $0.73$ and $-0.83$, are close to cancelling, so the mean equation is a small correction: a first-order autocorrelation of about $-0.1$ that decays slowly. (Estimates from longer windows, in the rolling section below, show an even closer cancellation.) The asymmetry parameter of the GJR model captures the leverage-type effect; for the copula models the corresponding feature is the difference between the two fulcrums of the v-transforms, and the copula models have no mean equation. The AIC of a fitted copula model with a parametric margin is that of the whole model, margin and copula, so it is comparable with the AIC of the GARCH models.
 
 ```{r insample-table}
-n_par <- function(f) attr(logLik(f), "df")
-ic <- function(ll, k) c(loglik = ll, npar = k, AIC = -2 * ll + 2 * k)
-ifm <- function(f) ic(logLik(mg)[1] + logLik(f)[1], n_par(mg) + n_par(f))
-insample <- rbind(
-  "GARCH, best" = ic(best_g$loglik, best_g$npar),
-  "GARCH, best constant mean" = ic(best_g0$loglik, best_g0$npar),
-  "IFM, linear" = ifm(ifm_lin),
-  "IFM, v2p" = ifm(ifm_nl),
-  "joint, v2p" = ic(logLik(full)[1], n_par(full)))
+models <- list("GARCH, best" = gbest, "GARCH, best constant mean" = gbest0,
+               "IFM, linear" = ifm_lin, "IFM, v2p" = ifm_nl, "joint, v2p" = full)
+insample <- t(sapply(models, ic))
 round(cbind(insample, dAIC = insample[, "AIC"] - insample[1, "AIC"]), 2)
 ```
 
@@ -324,8 +259,8 @@ em <- emarg(rtr)
 fc <- list(
   semiparametric_lin = tsroll(tsmod(em, fit_lin@model), r, start = start),
   semiparametric_nl = tsroll(tsmod(em, fit_nl@model), r, start = start),
-  IFM_lin = tsroll(tsmod(mg@model, ifm_lin@model), r, start = start),
-  IFM_nl = tsroll(tsmod(mg@model, ifm_nl@model), r, start = start),
+  IFM_lin = tsroll(ifm_lin, r, start = start),
+  IFM_nl = tsroll(ifm_nl, r, start = start),
   joint_nl = tsroll(full, r, start = start))
 garch <- garch_quantiles(coef(gbest), r, best_g, lev)[start:length(r), ]
 garch0 <- garch_quantiles(coef(gbest0), r, best_g0, lev)[start:length(r), ]
@@ -416,5 +351,5 @@ These results are for one series and a single holdout period of 500 days, the ef
 
 ## Appendix: the GARCH helper functions
 
-```{r garch-helpers-show, ref.label = "garch-helpers", echo = TRUE, eval = FALSE}
+```{r helpers-show, ref.label = "helpers", echo = TRUE, eval = FALSE}
 ```
