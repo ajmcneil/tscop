@@ -295,7 +295,7 @@ best_g0 <- garch_tab[best0, ]
 gbest0 <- gfits[[best0]]
 ```
 
-The best GARCH model is a GJR-GARCH model, whose asymmetry parameter captures the leverage-type effect. For the copula models the corresponding feature is the difference between the two fulcrums of the v-transforms. To compare the fits we add the margin and the copula parts of the copula models (the copula part alone is not comparable with the GARCH likelihood).
+The best model is a GJR-GARCH model with Johnson SU innovations and an ARMA(1,1) conditional mean, which improves the AIC by about 20 over the best constant-mean model. The AR and MA coefficients, $0.73$ and $-0.83$, are close to cancelling, so the mean equation is a small correction: a first-order autocorrelation of about $-0.1$ that decays slowly. (Estimates from longer windows, in the rolling section below, show an even closer cancellation.) The asymmetry parameter of the GJR model captures the leverage-type effect; for the copula models the corresponding feature is the difference between the two fulcrums of the v-transforms, and the copula models have no mean equation. To compare the fits we add the margin and the copula parts of the copula models (the copula part alone is not comparable with the GARCH likelihood).
 
 ```{r insample-table}
 n_par <- function(f) attr(logLik(f), "df")
@@ -310,7 +310,7 @@ insample <- rbind(
 round(cbind(insample, dAIC = insample[, "AIC"] - insample[1, "AIC"]), 2)
 ```
 
-In sample the nonlinear copula model fits much better than the best GJR-GARCH model, and even the linear copula model has a lower AIC. This in-sample advantage is not the same as forecasting accuracy, so we now compare out-of-sample forecasts.
+In sample the nonlinear copula model fits much better than the best GARCH model (AIC lower by 41) and the linear copula model also has the lower AIC (by 17), although the margin is smaller than against the constant-mean GARCH model (20 points). This in-sample advantage is not the same as forecasting accuracy, so we now compare out-of-sample forecasts.
 
 ## Out-of-sample comparison with fixed parameters
 
@@ -347,7 +347,9 @@ tab$aqs <- NULL
 print(tab, digits = 3, row.names = FALSE)
 ```
 
-The Diebold-Mariano statistic is the mean difference in AQS between GARCH and the copula model, so positive values favour the copula model. Expected numbers of breaches are 5 at the 1% level and 25 at the 5% level over the 500 days.
+The Diebold-Mariano statistic is the mean difference in AQS between the first forecast (the best GARCH model) and the other one, so positive values favour the other model; the `GARCH_const_mean` row compares the two GARCH models. Expected numbers of breaches are 5 at the 1% level and 25 at the 5% level over the 500 days.
+
+With the ARMA mean the GARCH model is about 1% better in AQS than with a constant mean (DM $p = 0.09$). The nonlinear copula models are about 0.9 to 1.0% better than the best GARCH model, which is not significant at conventional levels (DM $p = 0.10$ for the semiparametric version and about 0.2 for the IFM and joint versions), and the linear copula models are level with GARCH. The value-at-risk backtests are as before: the GARCH models have 11 breaches at the 1% level, which the Kupiec test rejects ($p = 0.02$), while the copula models are not rejected at either level.
 
 ```{r oos-profile, fig.width = 6.5, fig.height = 4, fig.cap = "Average quantile score by level relative to the best GARCH model; negative values favour the copula model."}
 colnames(sc$profile)[1:2] <- c("GARCH", "GARCH, constant mean")
@@ -373,9 +375,9 @@ The nonlinear semiparametric model is clearly better than the linear one on the 
 
 ## Rolling re-estimation
 
-The comparison so far used parameters fixed at the estimation-period values. To see whether stale parameters matter, we re-estimate every 20 days on an expanding window, starting each fit from the previous estimates; the model structure is kept. We do this for the semiparametric models, whose refits are quickest, and for GJR-GARCH.
+The comparison so far used parameters fixed at the estimation-period values. To see whether stale parameters matter, we re-estimate every 20 days on an expanding window, starting each fit from the previous estimates; the model structure is kept. We do this for the semiparametric models, whose refits are quickest, and for the best GARCH model.
 
-```{r rolling, cache = TRUE}
+```{r rolling, cache = TRUE, warning = FALSE}
 roll <- list(
   semiparametric_lin = tsroll(tsmod(em, fit_lin@model), r, start = start, refit = 20),
   semiparametric_nl = tsroll(tsmod(em, fit_nl@model), r, start = start, refit = 20))
@@ -396,14 +398,16 @@ tabr$aqs <- NULL
 print(tabr, digits = 3, row.names = FALSE)
 ```
 
+With re-estimation the GARCH model improves further: the advantage of the nonlinear copula model shrinks to 0.3% (DM $p = 0.67$) and the linear copula model is slightly worse than GARCH. The refits show why. The ARMA coefficients estimated from the first 1500 observations ($0.73$ and $-0.83$) differ from those estimated on windows of 1520 or more observations, which are close to $0.92$ and $-0.98$, an even closer cancellation: the fixed-parameter GARCH forecasts therefore use mean parameters that are not representative of the later windows. A mean equation of this kind models a small negative autocorrelation of the returns that decays slowly.
+
 ## Summary
 
-* On this series the copula models, and in particular the nonlinear model, describe the data much better than GARCH in sample (AIC lower by 37 for the linear and 62 for the nonlinear model), and the nonlinear transforms are clearly supported: the likelihood ratio test of linearity gives $p \approx 10^{-5}$ and the bootstrap intervals for $\kappa_1$ and $\kappa_2$ exclude 1.
-* Out of sample the advantage is smaller but still present: the average quantile score of the nonlinear models is about 2% lower than that of the best GJR-GARCH model, significant for the semiparametric version and borderline for the IFM and joint versions. The GARCH model underestimates the 1% value-at-risk (11 breaches against 5 expected, rejected by the Kupiec test), while the copula models are not rejected at either level.
-* Re-estimating every 20 days changes the scores very little, and the comparison with GARCH is unchanged.
+* In sample the copula models describe the data better than GARCH even with an ARMA(1,1) mean (AIC lower by 17 for the linear and by 41 for the nonlinear model), and the nonlinear transforms are clearly supported: the likelihood ratio test of linearity gives $p \approx 10^{-5}$ and the bootstrap intervals for $\kappa_1$ and $\kappa_2$ exclude 1.
+* Out of sample with fixed parameters the nonlinear copula models are about 1% better in average quantile score than the best GARCH model with a conditional mean, which is not significant ($p$ between 0.10 and 0.21), and the linear copula models are level with GARCH. The GARCH models underestimate the 1% value-at-risk (11 breaches against 5 expected, rejected by the Kupiec test), while the copula models are not rejected at either level.
+* With rolling re-estimation GARCH catches up: the advantage of the nonlinear copula model falls to 0.3% ($p = 0.67$). The advantage with fixed parameters is partly due to mean-equation parameters that were not representative of the later data.
 * The estimation approaches (semiparametric, IFM, joint) give very similar results here.
 
-These results are for one series and a single holdout period of 500 days, the effective lag $K \approx 26$ is below the cap of 40 that we imposed, and VIX was chosen as the example because it illustrates the nonlinear features well. In a wider study of eight daily return series (three stocks, two equity indices, two cryptocurrencies and VIX), which we do not show here, the copula models were statistically indistinguishable out of sample from a well-chosen GJR-GARCH model on every series except VIX. For VIX the nonlinear copula models showed a modest advantage (about 2% in average quantile score), which is only moderately significant once we allow for having selected the best of eight series. VIX is shown here because it illustrates the nonlinear features of the models, not as general evidence that they outperform GARCH.
+These results are for one series and a single holdout period of 500 days, the effective lag $K \approx 26$ is below the cap of 40 that we imposed, and VIX was chosen as the example because it illustrates the nonlinear features well. In a wider study of eight daily return series (three stocks, two equity indices, two cryptocurrencies and VIX), which we do not show here, the copula models were statistically indistinguishable out of sample from a well-chosen GARCH model with a conditional mean on every series. For VIX the nonlinear copula models were about 1% better in average quantile score (with $p$-values between 0.07 and 0.22 for fixed parameters), which is not significant at the 5% level, and the advantage vanishes with rolling re-estimation. VIX is shown here because it illustrates the nonlinear features of the models, not as evidence that they outperform GARCH.
 
 ## Appendix: the GARCH helper functions
 
