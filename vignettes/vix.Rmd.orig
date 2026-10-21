@@ -105,7 +105,7 @@ aic_table <- function(fits, vt = NULL) {
   tab <- data.frame(model = names(fits), loglik = sapply(fits, logLik),
                     npar = sapply(fits, npar), AIC = sapply(fits, AIC),
                     K = sapply(fits, function(f) f@model@K),
-                    L = sapply(fits, function(f) f@model@L))
+                    L = sapply(fits, function(f) f@model@L), row.names = NULL)
   if (!is.null(vt)) {
     tab <- rbind(tab, data.frame(model = "vtscop, ast", loglik = logLik(vt)[1],
                                  npar = npar(vt), AIC = AIC(vt),
@@ -196,9 +196,12 @@ fits_ifm <- list(
   "joe, linear" = fit_ifm(spec("joe")),
   "joe, v2p" = fit_ifm(spec("joe", "v2p")))
 vtfit_ifm <- fit_ifm(vtscop_ast)
-aic_table(fits_ifm, vtfit_ifm)
 ifm_lin <- fits_ifm[["ast, linear"]]
 ifm_nl <- fits_ifm[["ast, v2p"]]
+```
+
+```{r ifm-table}
+aic_table(fits_ifm, vtfit_ifm)
 ```
 
 The picture is the same as for the semiparametric fits: the nonlinear transforms help for every base, and `ast` and Clayton are close. The estimates of the best model barely change with the margin:
