@@ -94,19 +94,21 @@ vtfit <- fit_semi(vtscop(sdvinecop(arfactcop(order = 1), tail = pc("ast"), maxla
 ```
 
 ```{r semipar-table}
-aicc_table <- function(fits, vt = NULL) {
+aic_table <- function(fits, vt = NULL) {
   tab <- data.frame(model = names(fits), loglik = sapply(fits, logLik), npar = sapply(fits, function(f) attr(logLik(f), "df")),
-                    AICc = sapply(fits, AICc), K = sapply(fits, function(f) f@model@K),
+                    AIC = sapply(fits, AIC), K = sapply(fits, function(f) f@model@K),
                     L = sapply(fits, function(f) f@model@L), row.names = NULL)
   if (!is.null(vt)) tab <- rbind(tab, data.frame(model = "vtscop, ast", loglik = as.numeric(logLik(vt)), npar = attr(logLik(vt), "df"),
-                                                 AICc = AICc(vt), K = vt@model@base@K, L = NA))
-  tab$dAICc <- tab$AICc - min(tab$AICc)
-  tab[order(tab$AICc), ]
+                                                 AIC = AIC(vt), K = vt@model@base@K, L = NA))
+  tab$dAIC <- tab$AIC - min(tab$AIC)
+  tab[order(tab$AIC), ]
 }
-aicc_table(fits, vtfit)
+aic_table(fits, vtfit)
 ```
 
-The nonlinear v-transforms improve the fit for every base copula, with the `ast` base giving the lowest AICc, closely followed by Clayton. The `vtscop` alternative, which uses one transform for the whole process, fits substantially worse.
+The nonlinear v-transforms improve the fit for every base copula, with the `ast` base giving the lowest AIC, closely followed by Clayton. The `vtscop` alternative, which uses one transform for the whole process, fits substantially worse.
+
+We rank models by the Akaike information criterion (AIC), which targets predictive accuracy. With 1500 observations and at most a dozen parameters the small-sample correction of AICc changes the values by less than 0.2, and BIC, with its heavier penalty of $\ln 1500 \approx 7.3$ per parameter, gives the same two leading models and the same conclusions below; it differs only in ordering some of the weaker ones (for example Joe with linear transforms ranks above Joe with v2p transforms). The semiparametric fits are maximised pseudo-likelihoods based on ranks, so their AIC values are suitable only for comparing copula models for the same data; the comparison with GARCH below uses the parametric-margin fits.
 
 The best linear and nonlinear fits and their estimates, with standard errors from the Hessian, are shown next. The linear model is the special case $\kappa_1 = \kappa_2 = 1$ of the nonlinear one, so we can test linearity with a likelihood ratio test (two extra parameters; the effective lag $K$ and the number of nonlinear lags $L$ are chosen from the data, so the p-value is indicative).
 
@@ -154,8 +156,8 @@ lines(kh$lag, kh$tau_model, col = 2, lwd = 2)
 In the inference-functions-for-margins (IFM) approach a parametric margin is fitted first and the copula is fitted to its probability integral transforms. The function `automarg` fits all the available families and ranks them.
 
 ```{r ifm-margin}
-am <- automarg(rtr, criterion = "AICc")
-head(am@table[, c("family", "npar", "loglik", "AICc", "delta")], 5)
+am <- automarg(rtr, criterion = "AIC")
+head(am@table[, c("family", "npar", "loglik", "AIC", "delta")], 5)
 mg <- am@best
 mg
 ```
@@ -182,7 +184,7 @@ fits_ifm <- list(
   "joe, linear" = fit_ifm(spec("joe")),
   "joe, v2p" = fit_ifm(spec("joe", vttype = "v2p")))
 vtfit_ifm <- fit_ifm(vtscop(sdvinecop(arfactcop(order = 1), tail = pc("ast"), maxlag = 40, tautol = 1e-3), udp::v2p(0.5, 1)))
-aicc_table(fits_ifm, vtfit_ifm)
+aic_table(fits_ifm, vtfit_ifm)
 ```
 
 The picture is the same as for the semiparametric fits: the nonlinear transforms help for every base, and `ast` and Clayton are close. The estimates of the best model barely change with the margin:
@@ -206,7 +208,7 @@ The joint estimation improves the log-likelihood only slightly, and the estimate
 
 ## Comparison with GARCH in sample
 
-As a benchmark we fit GARCH(1,1) and GJR-GARCH(1,1) models with six innovation distributions, using the `rugarch` package, and select by AICc. The helper functions are listed in the appendix.
+As a benchmark we fit GARCH(1,1) and GJR-GARCH(1,1) models with six innovation distributions, using the `rugarch` package, and select by AIC. The helper functions are listed in the appendix.
 
 ```{r garch-helpers, include = FALSE}
 library(rugarch)
@@ -250,8 +252,8 @@ garch_roll <- function(x, model, dist, start, H = 20, levels = (1:99) / 100, cf0
 garch_grid <- expand.grid(model = c("sGARCH", "gjrGARCH"), dist = c("norm", "std", "sstd", "ged", "jsu", "nig"), stringsAsFactors = FALSE)
 gfits <- lapply(seq_len(nrow(garch_grid)), function(i) garch_fit(rtr, garch_grid$model[i], garch_grid$dist[i]))
 garch_tab <- data.frame(garch_grid, loglik = sapply(gfits, likelihood), npar = sapply(gfits, function(f) length(coef(f))))
-garch_tab$AICc <- -2 * garch_tab$loglik + 2 * garch_tab$npar + 2 * garch_tab$npar * (garch_tab$npar + 1) / (ntr - garch_tab$npar - 1)
-garch_tab <- garch_tab[order(garch_tab$AICc), ]
+garch_tab$AIC <- sapply(gfits, function(f) infocriteria(f)["Akaike", 1]) * ntr   # rugarch reports AIC per observation
+garch_tab <- garch_tab[order(garch_tab$AIC), ]
 head(garch_tab, 5)
 best_g <- garch_tab[1, ]
 gbest <- gfits[[which(garch_grid$model == best_g$model & garch_grid$dist == best_g$dist)]]
@@ -260,17 +262,17 @@ gbest <- gfits[[which(garch_grid$model == best_g$model & garch_grid$dist == best
 The best GARCH model is a GJR-GARCH model, whose asymmetry parameter captures the leverage-type effect. For the copula models the corresponding feature is the difference between the two fulcrums of the v-transforms. To compare the fits we add the margin and the copula parts of the copula models (the copula part alone is not comparable with the GARCH likelihood).
 
 ```{r insample-table}
-ic <- function(ll, k) c(loglik = ll, npar = k, AICc = -2 * ll + 2 * k + 2 * k * (k + 1) / (ntr - k - 1))
+ic <- function(ll, k) c(loglik = ll, npar = k, AIC = -2 * ll + 2 * k)
 mll <- as.numeric(logLik(mg)); mk <- attr(logLik(mg), "df")
 insample <- rbind(
   "GJR-GARCH (best)" = ic(best_g$loglik, best_g$npar),
   "IFM, linear" = ic(mll + as.numeric(logLik(fits_ifm[["ast, linear"]])), mk + attr(logLik(fits_ifm[["ast, linear"]]), "df")),
   "IFM, v2p" = ic(mll + as.numeric(logLik(fits_ifm[["ast, v2p"]])), mk + attr(logLik(fits_ifm[["ast, v2p"]]), "df")),
   "joint, v2p" = ic(as.numeric(logLik(full)), attr(logLik(full), "df")))
-round(cbind(insample, dAICc = insample[, "AICc"] - insample["GJR-GARCH (best)", "AICc"]), 2)
+round(cbind(insample, dAIC = insample[, "AIC"] - insample["GJR-GARCH (best)", "AIC"]), 2)
 ```
 
-In sample the nonlinear copula model fits much better than the best GJR-GARCH model, and even the linear copula model has a lower AICc. This in-sample advantage is not the same as forecasting accuracy, so we now compare out-of-sample forecasts.
+In sample the nonlinear copula model fits much better than the best GJR-GARCH model, and even the linear copula model has a lower AIC. This in-sample advantage is not the same as forecasting accuracy, so we now compare out-of-sample forecasts.
 
 ## Out-of-sample comparison with fixed parameters
 
@@ -352,7 +354,7 @@ print(tabr, digits = 3, row.names = FALSE)
 
 ## Summary
 
-* On this series the copula models, and in particular the nonlinear model, describe the data much better than GARCH in sample (AICc lower by 37 for the linear and 62 for the nonlinear model), and the nonlinear transforms are clearly supported: the likelihood ratio test of linearity gives $p \approx 10^{-5}$ and the bootstrap intervals for $\kappa_1$ and $\kappa_2$ exclude 1.
+* On this series the copula models, and in particular the nonlinear model, describe the data much better than GARCH in sample (AIC lower by 37 for the linear and 62 for the nonlinear model), and the nonlinear transforms are clearly supported: the likelihood ratio test of linearity gives $p \approx 10^{-5}$ and the bootstrap intervals for $\kappa_1$ and $\kappa_2$ exclude 1.
 * Out of sample the advantage is smaller but still present: the average quantile score of the nonlinear models is about 2% lower than that of the best GJR-GARCH model, significant for the semiparametric version and borderline for the IFM and joint versions. The GARCH model underestimates the 1% value-at-risk (11 breaches against 5 expected, rejected by the Kupiec test), while the copula models are not rejected at either level.
 * Re-estimating every 20 days changes the scores very little, and the comparison with GARCH is unchanged.
 * The estimation approaches (semiparametric, IFM, joint) give very similar results here.
