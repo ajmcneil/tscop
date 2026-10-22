@@ -26,6 +26,8 @@ Fissler-Ziegel loss such as \code{"fz0_0.05"}.}
 decimals.}
 
 \item{digits}{number of significant digits when printing.}
+
+\item{...}{not used.}
 }
 \value{
 An object of class \code{tstable}, a data frame with the column \code{forecast} and, for each set-up, the columns

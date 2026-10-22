@@ -123,6 +123,7 @@ tstable <- function(x, loss = "aqs", relative = c("auto", "percent", "difference
 }
 
 #' @param digits number of significant digits when printing.
+#' @param ... not used.
 #' @rdname tstable
 #' @method print tstable
 #' @export
