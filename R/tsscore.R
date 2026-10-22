@@ -40,7 +40,14 @@ ts_var_tests <- function(I, p) {
 # Per-time scores of one forecast: pinball losses by level, AQS, FZ0, etc.
 ts_unpack_fc <- function(f, observed, levels, p) {
   if (is(f, "tsforecast")) {
-    list(y = f@observed, Q = f@quantile, lev = f@levels, logdens = f@logdens, p = f@p, var = f@var, es = f@es)
+    # value-at-risk and expected shortfall at the requested probabilities p (a subset of those of the forecast)
+    var <- f@var; es <- f@es; pp <- f@p
+    if (length(p) > 0L) {
+      j <- vapply(p, function(a) { k <- which(abs(f@p - a) < 1e-9); if (length(k) == 1L) k else NA_integer_ }, 1L)
+      if (anyNA(j)) stop("the forecasts contain the value-at-risk and expected shortfall only at p = ", paste(f@p, collapse = ", "), call. = FALSE)
+      var <- var[, j, drop = FALSE]; es <- es[, j, drop = FALSE]; pp <- p
+    }
+    list(y = f@observed, Q = f@quantile, lev = f@levels, logdens = f@logdens, p = pp, var = var, es = es)
   } else {
     Q <- as.matrix(f)
     if (is.null(observed)) stop("'observed' is needed for forecasts given as quantile matrices", call. = FALSE)
