@@ -1,7 +1,7 @@
 Package: tscop
 Type: Package
 Title: Time Series Copula Models
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: c(
     person(
       "Alexander J.", "McNeil",

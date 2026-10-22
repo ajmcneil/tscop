@@ -4,18 +4,27 @@ A ground-up rebuild of the `tscopula` package for time series copula models, bui
 
 ## What is in the package
 
-- **Copula processes**: `armacop` and `arfactcop` (Gaussian), `sdvinecop` (stationary d-vine processes with an ARMA-type Kendall partial autocorrelation function, including inverse-v-transformed pair copulas for stochastic volatility), and `vtscop` (process-level v-transforms).
+- **Copula processes**: `armacop` and `arfactcop` (Gaussian), `sdvinecop` (stationary d-vine processes with an ARMA-type Kendall partial autocorrelation function, including non-Gaussian pair copulas chosen automatically by `autodvinecop`, and inverse-v-transformed pair copulas, with linear or nonlinear v-transforms, for stochastic volatility), and `vtscop` (process-level v-transforms).
 - **Margins**: `marg` (Gaussian, Laplace, Student t, skew t, Johnson SU, sinh-arcsinh, NIG, hyperbolic, generalised hyperbolic), `automarg`, and `emarg` for the semiparametric approach.
-- **Models and inference**: `tsmod` combines a margin and a copula process; `tsfit` fits by two-stage or joint maximum likelihood with bootstrap standard errors; `AIC`, `BIC` and `AICc` compare models; `tssim`, `ktauhat` and `tsrisk` simulate, diagnose and forecast.
+- **Models and inference**: `tsmod` combines a margin and a copula process; `tsfit` fits by two-stage or joint maximum likelihood with Hessian or bootstrap standard errors; `AIC`, `BIC` and `AICc` compare models; `tssim`, `ktauhat`, `tsrisk` and the `plot` method for pair copulas simulate, diagnose and display the dependence structure.
+- **Forecasting**: `tsroll` computes one-step-ahead predictive distributions over a holdout, with fixed or re-estimated parameters; `tsscore` evaluates them (quantile score, log score, risk-measure backtests, Diebold-Mariano tests) and `tstable` tabulates the results.
 - **Speed**: compiled likelihood, exact gradient, simulation and prediction kernels (Rcpp) for all d-vine pair copula families.
+- **Data**: `indpro`, monthly US industrial production (Federal Reserve Board).
 
-Worked examples are in `demo()`: `demo("armacop", package = "tscop")`, and likewise `arfactcop`, `sdvinecop`, `ivt`, `vtscop`, `marg`, `tsmod` and `speed`. See `NEWS.md` for the contents and known limitations of this version.
+## Getting started
+
+Two vignettes show the main workflow from data to forecast evaluation:
+
+- `vignette("ip", package = "tscop")`: non-Gaussian ARMA dependence for industrial production growth, with `sdvinecop` models with a Gaussian tail, `autodvinecop`, `tsroll`, `tsscore` and `tstable`.
+- `vignette("vix", package = "tscop")`: nonlinear inverse-v-transformed d-vine models for VIX returns, with semiparametric, IFM and joint estimation, compared with GARCH models.
+
+Shorter worked examples are in `demo()`: `demo("armacop", package = "tscop")`, and likewise `arfactcop`, `sdvinecop`, `ivt`, `vtscop`, `marg`, `tsmod`, `speed`, `forecast` and `ivt-nonlinear`. See `NEWS.md` for the changes in each version.
 
 ## Installation
 
 ```r
 # install.packages("remotes")
-remotes::install_github("ajmcneil/tscop")
+remotes::install_github("ajmcneil/tscop", build_vignettes = TRUE)
 ```
 
 The [udp](https://github.com/ajmcneil/udp) package, which is installed from GitHub, is pulled in automatically through the `Remotes` field of `DESCRIPTION`.

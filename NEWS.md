@@ -1,4 +1,6 @@
-# tscop (development version)
+# tscop 0.2.0
+
+This version adds nonlinear (v2p) inverse-v-transformed d-vine models, out-of-sample forecasting and forecast evaluation (`tsroll()`, `tsscore()`, `tstable()`), plots of the pair copulas of d-vine processes, a robust joint maximum likelihood, the dataset `indpro` and two vignettes (`vignette("ip")` and `vignette("vix")`).
 
 * New `tstable()` arranges one loss of the results of `tsscore()` (the average quantile score, the negative log score or a Fissler-Ziegel loss) in a table: the score of each forecast, its change relative to the first forecast (as a percentage or a difference) and the p-value of the Diebold-Mariano test; the results of several comparisons with the same forecasts, for example with parameters held fixed and re-estimated, can be put side by side. `as.data.frame()` for the result of `tsscore()` gives the scores and tests as a tidy data frame with one row for each forecast and loss.
 * `tsroll(p = NULL)` skips the value-at-risk and expected shortfall (the forecasts then have no risk measures, and `tsscore()` scores only the forecasts and does not backtest risk measures); this is faster, by about 1.4 to 1.7 times for forecasts of IVT d-vine models. `tsscore()` stops with a clear message if risk measures are requested that the forecasts do not contain. The IP vignette uses these functions.
