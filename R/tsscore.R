@@ -206,7 +206,7 @@ print.tsscore <- function(x, digits = 4, ...) {
   num <- vapply(s, is.numeric, TRUE)
   s[num] <- lapply(s[num], function(v) signif(v, digits))
   print(s, row.names = FALSE)
-  cat("(all scores are losses: smaller is better; neglogscore = minus the mean log predictive density)\n")
+  cat("(all scores are losses: smaller is better;\n neglogscore = minus the mean log predictive density)\n")
   for (key in names(x$var)) {
     cat("\nVaR backtests, p = ", key, "\n", sep = "")
     v <- x$var[[key]]; nn <- vapply(v, is.numeric, TRUE); v[nn] <- lapply(v[nn], function(z) signif(z, digits))
@@ -219,7 +219,7 @@ print.tsscore <- function(x, digits = 4, ...) {
     }
   }
   if (!is.null(x$dm)) {
-    cat("\nDiebold-Mariano tests against '", x$summary$forecast[1L], "' (positive: the other forecast is better)\n", sep = "")
+    cat("\nDiebold-Mariano tests against '", x$summary$forecast[1L], "'\n(positive: the other forecast is better)\n", sep = "")
     d <- x$dm; nn <- vapply(d, is.numeric, TRUE); d[nn] <- lapply(d[nn], function(z) signif(z, digits))
     print(d, row.names = FALSE)
   }

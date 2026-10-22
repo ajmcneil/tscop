@@ -52,6 +52,7 @@ test_that("tstable arranges one loss for one or several set-ups", {
   expect_true(is.na(t1$p.value[1]))
   expect_output(print(t1), "Loss: aqs \\(scores multiplied by 1000\\)")
   expect_output(print(t1), "percentage change relative to 'bad'")
+  expect_output(print(t1), "p.value: Diebold-Mariano test against 'bad'")
   # the difference for the log score
   t2 <- tstable(sc, loss = "neglogscore")
   expect_equal(attr(t2, "relative"), "difference")

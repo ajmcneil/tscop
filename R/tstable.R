@@ -130,8 +130,8 @@ tstable <- function(x, loss = "aqs", relative = c("auto", "percent", "difference
 print.tstable <- function(x, digits = 4, ...) {
   scale <- attr(x, "scale")
   cat("Loss: ", attr(x, "loss"), if (scale != 1) paste0(" (scores multiplied by ", format(scale), ")"), "; smaller is better\n", sep = "")
-  cat("change: ", if (attr(x, "relative") == "percent") "percentage change" else "difference", " relative to '", attr(x, "reference"),
-      "'; p.value: Diebold-Mariano test against '", attr(x, "reference"), "'\n", sep = "")
+  cat("change: ", if (attr(x, "relative") == "percent") "percentage change" else "difference", " relative to '", attr(x, "reference"), "'\n", sep = "")
+  cat("p.value: Diebold-Mariano test against '", attr(x, "reference"), "'\n", sep = "")
   d <- as.data.frame(unclass(x), stringsAsFactors = FALSE)
   attributes(d)[c("loss", "reference", "relative", "scale")] <- NULL
   num <- vapply(d, is.numeric, TRUE)
