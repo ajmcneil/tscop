@@ -75,3 +75,16 @@ test_that("forecasts are labelled by their names or argument names", {
   s2 <- tsscore(Q1 * 1, Q2 * 1, observed = y, levels = lev)
   expect_equal(s2$summary$forecast, c("forecast1", "forecast2"))
 })
+
+test_that("a subset of the forecast probabilities p selects the matching value-at-risk columns", {
+  set.seed(31)
+  m <- tsmod(marg("st", c(mu = 0, sigma = 1, df = 6)), armacop(ar = 0.5))
+  x <- tssim(m, 300)
+  fc <- tsroll(m, x, start = 201)                          # p = c(0.01, 0.05)
+  both <- tsscore(fc)
+  only5 <- tsscore(fc, p = 0.05)
+  expect_equal(only5$var[["0.05"]]$breaches, both$var[["0.05"]]$breaches)
+  expect_equal(only5$var[["0.05"]]$breaches, sum(fc@observed < fc@var[, 2]))
+  expect_equal(only5$es[["0.05"]]$fz0, both$es[["0.05"]]$fz0)
+  expect_error(tsscore(fc, p = 0.1), "only at p")
+})
