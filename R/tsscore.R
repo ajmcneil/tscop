@@ -15,7 +15,7 @@ ts_lrv <- function(d, lag = NULL) {
 ts_mean_test <- function(d, lag = NULL) {
   n <- length(d)
   v <- ts_lrv(d, lag)
-  z <- if (v > 0) mean(d) / sqrt(v / n) else NA_real_
+  z <- if (is.finite(v) && v > 0) mean(d) / sqrt(v / n) else NA_real_   # NA for non-finite differences (for example an infinite log score)
   c(mean = mean(d), stat = z, p.value = 2 * stats::pnorm(-abs(z)))
 }
 

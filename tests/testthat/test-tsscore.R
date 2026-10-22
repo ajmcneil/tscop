@@ -88,3 +88,11 @@ test_that("a subset of the forecast probabilities p selects the matching value-a
   expect_equal(only5$es[["0.05"]]$fz0, both$es[["0.05"]]$fz0)
   expect_error(tsscore(fc, p = 0.1), "only at p")
 })
+
+test_that("tests with non-finite loss differences give NA instead of an error", {
+  d <- c(0.1, -0.2, Inf, 0.3, NaN, 0.05)
+  r <- tscop:::ts_mean_test(d)
+  expect_true(is.na(r[["stat"]]))
+  expect_true(is.na(r[["p.value"]]))
+  expect_false(is.na(tscop:::ts_mean_test(c(0.1, -0.2, 0.3, 0.05))[["stat"]]))
+})
