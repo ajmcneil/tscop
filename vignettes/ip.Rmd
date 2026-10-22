@@ -36,7 +36,7 @@ c(n = length(growth), training = ntr, test = nte - ntr, pandemic = length(growth
 
 ```{r series, fig.width = 7, fig.height = 3.2, fig.cap = "Monthly growth of US industrial production (percent). The dotted lines mark the end of the estimation period and the start of the pandemic."}
 op <- par(mar = c(4, 4, 1, 1))
-plot(dates, growth, type = "l", xlab = "", ylab = "growth (%)")
+plot(dates, growth, type = "h", xlab = "", ylab = "growth (%)")
 abline(v = dates[c(ntr, nte)], lty = 3)
 par(op)
 ```
@@ -56,23 +56,36 @@ The AIC prefers a larger model but the value for ARMA(1,1) is only about one uni
 
 ## Gaussian ARMA copula models
 
-The model object `armacop(order = c(1, 1))` is a Gaussian ARMA copula process, and `sdvinecop` represents the same process as a D-vine. With `tail = pc("gauss")` all the pair copulas are Gaussian, and the kpacf is that of the ARMA model.
+The model object `armacop(order = c(1, 1))` is a Gaussian ARMA copula process, which in the *semiparametric* approach is fitted to the rank-based pseudo-observations $U_t = R_t / (n + 1)$ of the estimation sample, the margin being estimated by the empirical distribution function.
+
+```{r sp-arma}
+n <- length(xtr)
+u <- rank(xtr) / (n + 1)
+sp_arma <- tsfit(u, armacop(order = c(1, 1)))
+sp_arma
+```
+
+The same process can be represented as a D-vine copula process with the function `sdvinecop`. With `tail = pc("gauss")` all the pair copulas are Gaussian, and the Kendall partial autocorrelation function (the Kendall's taus of the pair copulas) is that of the ARMA model. A D-vine has a pair copula for every lag, so it is truncated at an effective lag $K$: the pair copulas beyond the last lag at which the absolute Kendall's tau exceeds the tolerance `tautol` are ignored.
 
 ```{r gaussian}
 spec <- sdvinecop(armacop(order = c(1, 1)), tail = pc("gauss"), tautol = 1e-3)
 spec
-```
-
-The argument `tautol` sets the effective lag $K$ of the model: pair copulas beyond the last lag at which the absolute Kendall's tau exceeds `tautol` are ignored. In the *semiparametric* approach the margin is estimated by the empirical distribution function, so the copula model is fitted to the rank-based pseudo-observations $U_t = R_t / (n + 1)$.
-
-```{r sp-gauss}
-n <- length(xtr)
-u <- rank(xtr) / (n + 1)
 sp_g <- tsfit(u, spec)
 sp_g
 ```
 
-This is the fit of the Gaussian ARMA(1,1) copula, which `tsfit` of the `armacop` object would also give.
+The truncation has a negligible effect. The table shows the fitted coefficients and the log-likelihood of the truncated D-vine for a range of tolerances, together with the exact ARMA copula fit above.
+
+```{r truncation}
+tol <- c(1e-2, 1e-3, 1e-4, 1e-5)
+trunc <- t(sapply(tol, function(tt) {
+  f <- tsfit(u, sdvinecop(armacop(order = c(1, 1)), tail = pc("gauss"), tautol = tt))
+  c(tautol = tt, K = f@model@K, coef(f), loglik = logLik(f)[1])
+}))
+rbind(trunc, c(tautol = NA, K = Inf, coef(sp_arma), loglik = logLik(sp_arma)[1]))
+```
+
+The last row is the exact ARMA copula, which corresponds to an infinite effective lag. At the tolerance of 0.001 that we use the truncated model has $K = 10$ and its coefficients and log-likelihood are very close to those of the exact model.
 
 ## Replacing Gaussian pair copulas: `autodvinecop`
 
@@ -88,7 +101,7 @@ sp_ng@path[, c("lag", "choice", "tau", "criterion", "improvement", "accepted")]
 The result is again a fitted `sdvinecop` model. Its AIC and BIC can be compared with those of the Gaussian model.
 
 ```{r sp-compare}
-c(AIC_gauss = AIC(sp_g), AIC_nongauss = AIC(sp_ng), BIC_gauss = BIC(sp_g), BIC_nongauss = BIC(sp_ng))
+c(AIC_gauss = AIC(sp_arma), AIC_nongauss = AIC(sp_ng), BIC_gauss = BIC(sp_arma), BIC_nongauss = BIC(sp_ng))
 sp_ng
 ```
 
@@ -122,6 +135,7 @@ The normal inverse Gaussian family is selected. The copula models are fitted to 
 
 ```{r par-fit}
 v <- mdf(mg, xtr)
+par_arma <- tsfit(v, armacop(order = c(1, 1)), pseudo = FALSE)
 par_g <- tsfit(v, spec, pseudo = FALSE)
 par_ng <- autodvinecop(v, par_g, nreplace = 10, choices = choices, aux = "t",
                        ICtol = 0.5, nstrike = 3, tautol = 1e-3, pseudo = FALSE,
@@ -133,8 +147,8 @@ The AIC and BIC values of the four copula models are those of the models fitted 
 
 ```{r ic-table}
 ic <- function(f) c(npar = attr(logLik(f), "df"), AIC = AIC(f), BIC = BIC(f))
-round(rbind("semiparametric, Gaussian" = ic(sp_g), "semiparametric, non-Gaussian" = ic(sp_ng),
-            "parametric, Gaussian" = ic(par_g), "parametric, non-Gaussian" = ic(par_ng)), 1)
+round(rbind("semiparametric, Gaussian" = ic(sp_arma), "semiparametric, non-Gaussian" = ic(sp_ng),
+            "parametric, Gaussian" = ic(par_arma), "parametric, non-Gaussian" = ic(par_ng)), 1)
 ```
 
 The same copulas are selected at lags 1, 2, 4 and 5; at lag 3 the semiparametric approach chooses a Gumbel copula (rotated by 180 degrees) with a small improvement in AIC, while the parametric approach keeps the Gaussian copula. The lags beyond the last explicit copula stay Gaussian.
@@ -146,9 +160,9 @@ We now compare the forecasts of five models. The benchmark is a Gaussian ARMA mo
 ```{r models}
 models <- list(
   Gaussian = tsfit(xtr, tsmod(marg("gauss"), armacop(order = c(1, 1))))@model,
-  "SP Gaussian" = tsmod(emarg(xtr), sp_g@model),
+  "SP Gaussian" = tsmod(emarg(xtr), sp_arma@model),
   "SP non-Gaussian" = tsmod(emarg(xtr), sp_ng@model),
-  "P Gaussian" = tsmod(mg@model, par_g@model),
+  "P Gaussian" = tsmod(mg@model, par_arma@model),
   "P non-Gaussian" = tsmod(mg@model, par_ng@model))
 x <- growth[1:nte]
 lev <- (1:19) / 20
@@ -197,6 +211,53 @@ colnames(sc$profile)[1] <- "Gaussian"
 plot(sc, relative = TRUE, main = "quantile score relative to the Gaussian ARMA model")
 ```
 
+## A seasonal extension
+
+The series is seasonally adjusted, but we can ask whether a seasonal ARMA model with period 12 fits the dependence better. `armacop` takes the orders of the seasonal AR and MA parts in the argument `seasonal` and the period in `period`. We add seasonal terms to the ARMA(1,1) model of the ranks and compare the Gaussian fits.
+
+```{r seasonal-grid}
+seas <- expand.grid(P = 0:1, Q = 0:1)
+sfits <- lapply(seq_len(nrow(seas)), function(i) {
+  if (all(seas[i, ] == 0)) return(sp_arma)
+  tsfit(u, armacop(order = c(1, 1), seasonal = unlist(seas[i, ]), period = 12))
+})
+cbind(seas, round(t(sapply(sfits, ic)), 1))
+```
+
+A seasonal AR term alone or a seasonal MA term alone does not help, but the two together improve the AIC by about 11 points and the BIC by about 3. The fitted seasonal AR and MA coefficients are close to cancelling each other.
+
+```{r seasonal-fit}
+sar_g <- sfits[[4]]
+sar_g
+```
+
+The kpacf of this model has a long memory from the near cancellation, and the corresponding D-vine needs a long truncation. We replace the Gaussian pair copulas as before, with the same settings.
+
+```{r seasonal-auto}
+sar_start <- tsfit(u, sdvinecop(sar_g@model, tail = pc("gauss"), tautol = 1e-3))
+sar_ng <- autodvinecop(u, sar_start, nreplace = 20, choices = choices, aux = "t",
+                       ICtol = 0.5, nstrike = 3, tautol = 1e-3, verbose = FALSE)
+sar_ng@path[sar_ng@path$accepted, c("lag", "choice", "tau", "improvement")]
+round(rbind("ARMA(1,1), Gaussian" = ic(sp_arma), "ARMA(1,1), non-Gaussian" = ic(sp_ng),
+            "seasonal, Gaussian" = ic(sar_g), "seasonal, non-Gaussian" = ic(sar_ng)), 1)
+```
+
+Similar copulas are selected at the first lags (a Student t copula, then Frank and Gumbel copulas), and the non-Gaussian copulas bring a similar gain in AIC, about 33 points, as for the non-seasonal model. The forecasts for the same 240 months show whether the seasonal terms help.
+
+```{r seasonal-forecast}
+seasonal_models <- list(
+  Gaussian = models[["Gaussian"]],
+  "SP non-Gaussian" = models[["SP non-Gaussian"]],
+  "SP Gaussian, seasonal" = tsmod(emarg(xtr), sar_g@model),
+  "SP non-Gaussian, seasonal" = tsmod(emarg(xtr), sar_ng@model))
+cat("Parameters fixed\n")
+score(lapply(seasonal_models, tsroll, data = x, start = ntr + 1, levels = lev))
+cat("\nParameters re-estimated every 12 months\n")
+score(lapply(seasonal_models, tsroll, data = x, start = ntr + 1, levels = lev, refit = 12))
+```
+
+The seasonal terms add little to the forecasts with fixed parameters (the non-Gaussian model is 3.6% better than the benchmark with them, 3.7% without) and slightly improve them when the models are re-estimated (4.7% against 3.7%). The non-Gaussian copulas are what matters.
+
 ## The pandemic
 
 The period after December 2019 contains the collapse of industrial production in March and April 2020 (a fall of 14% in April) and the rebound that followed. We extend the evaluation to September 2026, keeping the models estimated on the 1960 to 1999 data and not re-estimating them.
@@ -241,5 +302,6 @@ A copula with tail dependence describes what has happened in the estimation samp
 
 * The monthly growth of US industrial production has serial dependence that is not Gaussian. Replacing the first pair copulas of an ARMA(1,1) D-vine by a Student t, a Frank and rotated Gumbel and Clayton copulas improves the AIC by about 30 points, whether the margin is empirical or parametric.
 * The improvement carries over to forecasts for 2000 to 2019: the log predictive density improves significantly, and the quantile forecasts are 2 to 4% better than those of a Gaussian ARMA model.
+* A seasonal ARMA(1,1)(1,1) model with period 12 improves the AIC of both the Gaussian and the non-Gaussian copula models, but adds little to the forecasts.
 * The pandemic is a stress test for the parametric non-Gaussian model, whose advantage over the Gaussian copula disappears, while the semiparametric model, whose margin is bounded by the data, keeps its advantage.
 * `sdvinecop` with a Gaussian tail represents the process, `autodvinecop` chooses the pair copulas, `plot` and `ktauhat` show the dependence structure, and `tsroll` and `tsscore` evaluate the forecasts.
