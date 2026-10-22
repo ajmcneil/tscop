@@ -1,0 +1,245 @@
+---
+title: "Non-Gaussian ARMA dependence for industrial production growth"
+author: "Alexander J. McNeil"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Non-Gaussian ARMA dependence for industrial production growth}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5, fig.height = 4.5, dpi = 110)
+options(digits = 4)
+library(tscop)
+set.seed(1)
+```
+
+A stationary time series can be described by its marginal distribution and a *copula process* for the serial dependence of its probability integral transforms. A Gaussian ARMA model implies a copula process whose partial dependence at each lag is Gaussian, and the ARMA coefficients determine the strength of the dependence at every lag through the *Kendall partial autocorrelation function* (kpacf). In a D-vine representation of the copula process each lag has a pair copula, and the Gaussian ones can be replaced by non-Gaussian pair copulas (with tail dependence, asymmetry, or both) at the lags where the data call for it, while the kpacf of the ARMA model is retained. Beyond the lags that are replaced, the pair copulas stay Gaussian: the model has a *Gaussian tail*.
+
+This vignette fits such models to the monthly growth of US industrial production, with the function `autodvinecop` choosing the pair copulas automatically, and compares their forecasts with those of Gaussian ARMA models.
+
+## Data
+
+The dataset `indpro` contains the total index of US industrial production, seasonally adjusted, from the Federal Reserve Board (release G.17). We work with the monthly growth rate in percent. The first 479 observations (February 1960 to December 1999) are used for estimation, and the following 240 (2000 to 2019) for the forecast comparison; we look at the pandemic period afterwards.
+
+```{r data}
+data(indpro)
+growth <- 100 * diff(log(indpro$index))
+dates <- indpro$date[-1]
+ntr <- sum(dates <= as.Date("1999-12-01"))
+nte <- sum(dates <= as.Date("2019-12-01"))
+xtr <- growth[1:ntr]
+c(n = length(growth), training = ntr, test = nte - ntr, pandemic = length(growth) - nte)
+```
+
+```{r series, fig.width = 7, fig.height = 3.2, fig.cap = "Monthly growth of US industrial production (percent). The dotted lines mark the end of the estimation period and the start of the pandemic."}
+op <- par(mar = c(4, 4, 1, 1))
+plot(dates, growth, type = "l", xlab = "", ylab = "growth (%)")
+abline(v = dates[c(ntr, nte)], lty = 3)
+par(op)
+```
+
+The growth rate is serially correlated and has heavy tails and a skew towards large falls in recessions. We first choose the order of the ARMA model. The AIC and the BIC are computed for Gaussian ARMA models fitted to the estimation sample.
+
+```{r order}
+orders <- expand.grid(p = 0:3, q = 0:3)
+fits <- lapply(seq_len(nrow(orders)), function(i)
+  arima(xtr, order = c(orders$p[i], 0, orders$q[i])))
+orders$AIC <- sapply(fits, AIC)
+orders$BIC <- sapply(fits, BIC)
+rbind(AIC = orders[which.min(orders$AIC), ], BIC = orders[which.min(orders$BIC), ])
+```
+
+The AIC prefers a larger model but the value for ARMA(1,1) is only about one unit higher, and the BIC selects ARMA(1,1), which we use.
+
+## Gaussian ARMA copula models
+
+The model object `armacop(order = c(1, 1))` is a Gaussian ARMA copula process, and `sdvinecop` represents the same process as a D-vine. With `tail = pc("gauss")` all the pair copulas are Gaussian, and the kpacf is that of the ARMA model.
+
+```{r gaussian}
+spec <- sdvinecop(armacop(order = c(1, 1)), tail = pc("gauss"), tautol = 1e-3)
+spec
+```
+
+The argument `tautol` sets the effective lag $K$ of the model: pair copulas beyond the last lag at which the absolute Kendall's tau exceeds `tautol` are ignored. In the *semiparametric* approach the margin is estimated by the empirical distribution function, so the copula model is fitted to the rank-based pseudo-observations $U_t = R_t / (n + 1)$.
+
+```{r sp-gauss}
+n <- length(xtr)
+u <- rank(xtr) / (n + 1)
+sp_g <- tsfit(u, spec)
+sp_g
+```
+
+This is the fit of the Gaussian ARMA(1,1) copula, which `tsfit` of the `armacop` object would also give.
+
+## Replacing Gaussian pair copulas: `autodvinecop`
+
+The function `autodvinecop` starts from a fitted model and works through the lags one by one. At each lag it considers the families `choices`, each in the rotation that suits the sign of the Kendall's tau at that lag, together with the Student t copula (through the argument `aux`); it keeps the candidate with the lowest AIC and refits the model. It stops when the improvement in AIC has been below `ICtol` on `nstrike` consecutive lags, or after `nreplace` lags.
+
+```{r sp-auto}
+choices <- c("gumbel", "clayton", "frank", "joe")
+sp_ng <- autodvinecop(u, sp_g, nreplace = 20, choices = choices, aux = "t",
+                      ICtol = 0.5, nstrike = 3, tautol = 1e-3, verbose = FALSE)
+sp_ng@path[, c("lag", "choice", "tau", "criterion", "improvement", "accepted")]
+```
+
+The result is again a fitted `sdvinecop` model. Its AIC and BIC can be compared with those of the Gaussian model.
+
+```{r sp-compare}
+c(AIC_gauss = AIC(sp_g), AIC_nongauss = AIC(sp_ng), BIC_gauss = BIC(sp_g), BIC_nongauss = BIC(sp_ng))
+sp_ng
+```
+
+The first pair copula is a Student t copula, which gives tail dependence between successive growth rates, followed by a Frank copula and then Gumbel and Clayton copulas rotated by 180 degrees, which have upper tail dependence. The `plot` method draws the pair copulas of the first lags as contour plots of the density of the partial copula of $(U_t, U_{t+k})$ given the observations in between, with the data pairs conditioned through the h-functions of the earlier lags.
+
+```{r pairs, fig.width = 6.5, fig.height = 6.5, fig.cap = "Pair copulas at lags 1 to 4 of the non-Gaussian semiparametric model, with the data."}
+plot(sp_ng, data = TRUE, fill = FALSE)
+```
+
+The kpacf of the ARMA model is the sequence of Kendall's taus of the pair copulas. The function `ktauhat` compares it with an estimate from the data, obtained by the same conditioning on the intermediate observations.
+
+```{r kpacf, fig.width = 6.5, fig.height = 4, fig.cap = "Kendall partial autocorrelations: the model (line) and the data (points)."}
+kh <- ktauhat(sp_ng, lagmax = 24)
+plot(kh$lag, kh$tau_data, xlab = "lag", ylab = "tau",
+     ylim = range(c(kh$tau_data, kh$tau_model)))
+lines(kh$lag, kh$tau_model, col = 2, lwd = 2)
+```
+
+## The fully parametric approach
+
+In the fully parametric approach a parametric margin is fitted first and the copula to its probability integral transforms. We choose the margin by AIC among some of the available families.
+
+```{r margin}
+am <- automarg(xtr, families = c("gauss", "st", "sst", "hyp", "gh", "nig", "jsu"))
+head(am@table[, c("family", "npar", "loglik", "AIC", "delta")], 4)
+mg <- am@best
+mg
+```
+
+The normal inverse Gaussian family is selected. The copula models are fitted to the transforms in the same way as before; `pseudo = FALSE` tells `tsfit` and `autodvinecop` that the data are not ranks.
+
+```{r par-fit}
+v <- mdf(mg, xtr)
+par_g <- tsfit(v, spec, pseudo = FALSE)
+par_ng <- autodvinecop(v, par_g, nreplace = 10, choices = choices, aux = "t",
+                       ICtol = 0.5, nstrike = 3, tautol = 1e-3, pseudo = FALSE,
+                       verbose = FALSE)
+par_ng@path[, c("lag", "choice", "tau", "improvement", "accepted")]
+```
+
+The AIC and BIC values of the four copula models are those of the models fitted to the pseudo-observations (ranks for the semiparametric approach, probability integral transforms for the parametric approach), so the semiparametric and parametric values are not strictly comparable.
+
+```{r ic-table}
+ic <- function(f) c(npar = attr(logLik(f), "df"), AIC = AIC(f), BIC = BIC(f))
+round(rbind("semiparametric, Gaussian" = ic(sp_g), "semiparametric, non-Gaussian" = ic(sp_ng),
+            "parametric, Gaussian" = ic(par_g), "parametric, non-Gaussian" = ic(par_ng)), 1)
+```
+
+The same copulas are selected at lags 1, 2, 4 and 5; at lag 3 the semiparametric approach chooses a Gumbel copula (rotated by 180 degrees) with a small improvement in AIC, while the parametric approach keeps the Gaussian copula. The lags beyond the last explicit copula stay Gaussian.
+
+## Forecasting
+
+We now compare the forecasts of five models. The benchmark is a Gaussian ARMA model, fitted with `tsmod`, which combines a margin and a copula process. The other four use the empirical margin or the normal inverse Gaussian margin with the Gaussian or the non-Gaussian copula process. For each of the 240 months from January 2000 to December 2019 we compute the one-step-ahead predictive quantiles at 19 levels. In `tsroll` the parameters are either held at their estimates from the estimation period (the default), or re-estimated every `refit` months on an expanding window, with the model structure (the selected copulas) kept.
+
+```{r models}
+models <- list(
+  Gaussian = tsfit(xtr, tsmod(marg("gauss"), armacop(order = c(1, 1))))@model,
+  "SP Gaussian" = tsmod(emarg(xtr), sp_g@model),
+  "SP non-Gaussian" = tsmod(emarg(xtr), sp_ng@model),
+  "P Gaussian" = tsmod(mg@model, par_g@model),
+  "P non-Gaussian" = tsmod(mg@model, par_ng@model))
+x <- growth[1:nte]
+lev <- (1:19) / 20
+fixed <- lapply(models, tsroll, data = x, start = ntr + 1, levels = lev)
+rolled <- lapply(models, tsroll, data = x, start = ntr + 1, levels = lev, refit = 12)
+```
+
+We summarise each set of forecasts by the average quantile score (AQS, the pinball loss averaged over the levels; smaller is better), and test the difference to the Gaussian benchmark with Diebold-Mariano tests with Newey-West standard errors. The forecasts are scored from their quantiles.
+
+```{r scores}
+score <- function(fc) {
+  q <- lapply(fc, function(f) f@quantile)
+  sc <- do.call(tsscore, c(list(x = q[[1]]), q[-1],
+                           list(observed = fc[[1]]@observed, levels = lev, p = 0.05)))
+  dm <- sc$dm[sc$dm$loss == "aqs", ]
+  data.frame(model = names(fc), AQS_x1000 = 1000 * sc$summary$aqs,
+             vs_Gaussian_pct = 100 * (sc$summary$aqs / sc$summary$aqs[1] - 1),
+             DM_p = c(NA, dm$p.value), row.names = NULL)
+}
+cat("Parameters fixed at the estimates from the estimation period\n")
+score(fixed)
+cat("\nParameters re-estimated every 12 months\n")
+score(rolled)
+```
+
+The non-Gaussian copulas improve the forecasts: by about 3.7% in AQS against the Gaussian ARMA model for the semiparametric version, and by 2 to 3% for the parametric version, while the Gaussian copulas with a heavier-tailed margin give much smaller gains, which are not significant. Because the pairs of models with the same margin differ only in their copula, the log predictive density gives a more direct comparison of the dependence structure. It is included in the forecasts through the margin, and the Diebold-Mariano test compares the negative log scores:
+
+```{r logscore}
+sp_gauss <- fixed[["SP Gaussian"]]; sp_non <- fixed[["SP non-Gaussian"]]
+p_gauss <- fixed[["P Gaussian"]]; p_non <- fixed[["P non-Gaussian"]]
+lsc <- function(a, b) {
+  d <- tsscore(a, b)$dm
+  d <- d[d$loss == "neglogscore", ]
+  c(gain_per_obs = d$diff, DM_stat = d$statistic, p_value = d$p.value)
+}
+rbind("semiparametric" = lsc(sp_gauss, sp_non), "parametric" = lsc(p_gauss, p_non))
+```
+
+The non-Gaussian copula improves the average log predictive density by about 0.05 per month in both approaches (positive values favour the non-Gaussian model), which is highly significant.
+
+```{r profile, fig.width = 6.5, fig.height = 4, fig.cap = "Average quantile score by level relative to the Gaussian ARMA benchmark (parameters fixed); negative values favour the model."}
+q <- lapply(fixed, function(f) f@quantile)
+sc <- do.call(tsscore, c(list(x = q[[1]]), q[-1],
+                         list(observed = fixed[[1]]@observed, levels = lev, p = 0.05)))
+colnames(sc$profile)[1] <- "Gaussian"
+plot(sc, relative = TRUE, main = "quantile score relative to the Gaussian ARMA model")
+```
+
+## The pandemic
+
+The period after December 2019 contains the collapse of industrial production in March and April 2020 (a fall of 14% in April) and the rebound that followed. We extend the evaluation to September 2026, keeping the models estimated on the 1960 to 1999 data and not re-estimating them.
+
+```{r pandemic}
+xall <- growth
+fixed_all <- lapply(models, tsroll, data = xall, start = ntr + 1, levels = lev)
+nte_all <- length(xall) - ntr
+c(forecasts = nte_all)
+score(fixed_all)
+```
+
+The semiparametric non-Gaussian model keeps its advantage, but the advantage of the parametric non-Gaussian model is largely gone: it is only 0.7% better than the benchmark, against 1.6% for the Gaussian copula with the same margin. The forecasts around the collapse show one reason. The Student t copula has positive tail dependence at lag 1, calibrated on the earlier data, so after an extreme fall the predictive distribution of the next month is shifted far into the lower tail (the red lines), while the growth in the months that followed was positive. With the empirical margin the predictive quantiles cannot leave the range of the estimation data, which limits the damage, while the parametric margin has no such bound:
+
+```{r pandemic-range}
+sapply(fixed_all[c("SP non-Gaussian", "P non-Gaussian")], function(f) range(f@quantile))
+```
+
+```{r pandemic-plot, fig.width = 7, fig.height = 4, fig.cap = "Predictive 5%, 50% and 95% quantiles for the growth of industrial production around the pandemic: the Gaussian-copula (blue) and non-Gaussian-copula (red) parametric models, and the observed growth (grey bars)."}
+fdates <- dates[ntr + 1:nte_all]
+i <- fdates >= as.Date("2019-06-01") & fdates <= as.Date("2021-12-01")
+q_g <- fixed_all[["P Gaussian"]]@quantile[i, ]
+q_n <- fixed_all[["P non-Gaussian"]]@quantile[i, ]
+plot(fdates[i], xall[ntr + 1:nte_all][i], type = "h", xlab = "", ylab = "growth (%)",
+     ylim = c(-22, 12), col = "grey40")
+for (k in c(1, 10, 19)) {
+  lines(fdates[i], q_g[, k], col = "blue", lty = if (k == 10) 1 else 2)
+  lines(fdates[i], q_n[, k], col = "red", lty = if (k == 10) 1 else 2)
+}
+```
+
+Re-estimating the models every 12 months on an expanding window lets them adapt to the new data, and again the semiparametric non-Gaussian model has the best forecasts:
+
+```{r pandemic-rolled}
+rolled_all <- lapply(models, tsroll, data = xall, start = ntr + 1, levels = lev, refit = 12)
+score(rolled_all)
+```
+
+A copula with tail dependence describes what has happened in the estimation sample, and a single extraordinary observation can make its predictive distribution misleading in the months that follow, in particular when the margin is unbounded.
+
+## Summary
+
+* The monthly growth of US industrial production has serial dependence that is not Gaussian. Replacing the first pair copulas of an ARMA(1,1) D-vine by a Student t, a Frank and rotated Gumbel and Clayton copulas improves the AIC by about 30 points, whether the margin is empirical or parametric.
+* The improvement carries over to forecasts for 2000 to 2019: the log predictive density improves significantly, and the quantile forecasts are 2 to 4% better than those of a Gaussian ARMA model.
+* The pandemic is a stress test for the parametric non-Gaussian model, whose advantage over the Gaussian copula disappears, while the semiparametric model, whose margin is bounded by the data, keeps its advantage.
+* `sdvinecop` with a Gaussian tail represents the process, `autodvinecop` chooses the pair copulas, `plot` and `ktauhat` show the dependence structure, and `tsroll` and `tsscore` evaluate the forecasts.

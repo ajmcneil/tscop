@@ -1,0 +1,12 @@
+test_that("the indpro dataset is a complete monthly series", {
+  expect_s3_class(indpro, "data.frame")
+  expect_named(indpro, c("date", "index"))
+  expect_s3_class(indpro$date, "Date")
+  expect_false(anyNA(indpro$index))
+  expect_true(all(indpro$index > 0))
+  mon <- as.integer(format(indpro$date, "%Y")) * 12L + as.integer(format(indpro$date, "%m"))
+  expect_true(all(diff(mon) == 1L))
+  expect_equal(indpro$date[1], as.Date("1960-01-01"))
+  expect_equal(mean(indpro$index[format(indpro$date, "%Y") == "2017"]), 100, tolerance = 1e-5)
+  expect_s3_class(attr(indpro, "downloaded"), "Date")
+})
