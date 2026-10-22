@@ -202,19 +202,18 @@ with(fixed, tsscore(Gaussian, SP_nonGaussian))
 
 The output has two parts. The first table gives for each forecast the average quantile score (AQS: the pinball loss of the predictive quantiles, averaged over the forecasts and the levels; smaller is better) and the negative log predictive density (smaller is better). The second table gives Diebold-Mariano tests, with Newey-West standard errors, of the null hypothesis that the other forecast is as accurate as the first, for each of the two losses; positive statistics mean that the other forecast is better. If the forecasts also contain value-at-risk and expected shortfall (the default of `tsroll`), `tsscore` adds backtests of these risk measures and their scores to the tests.
 
-Now we score all five forecasts together. The results are in the elements `summary` (the first table) and `dm` (the Diebold-Mariano tests, one row for each forecast other than the first and each loss) of the object that `tsscore` returns. The function `tstable` arranges one loss in a table.
+Now we score all five forecasts together. The function `tstable` arranges one loss of the result in a table: the score of each forecast (here the average quantile score multiplied by 1000), its percentage change relative to the first forecast and the p-value of the Diebold-Mariano test against the first forecast. (The table is built from the elements `summary` and `dm` of the `tsscore` object, which hold the scores and the tests.)
 
 ```{r tsscore-five}
 sc <- with(fixed, tsscore(Gaussian, SP_Gaussian, SP_nonGaussian, P_Gaussian, P_nonGaussian))
-sc$summary[, c("forecast", "aqs")]
-sc$dm[sc$dm$loss == "aqs", c("forecast", "diff", "statistic", "p.value")]
+tstable(sc, scale = 1000)
 ```
 
-The function `tstable` arranges one loss of one or several `tsscore` results in a table: the score of each forecast (here multiplied by 1000), its percentage change relative to the first forecast and the p-value of the Diebold-Mariano test. The results for forecasts with parameters held fixed and re-estimated, which are made for the same forecasts, can be put side by side.
+The results of several comparisons that are made for the same forecasts can be put side by side. Here we add the comparison for the forecasts with the parameters re-estimated every 12 months, which we call the update.
 
 ```{r aqs-table}
 sc_rolled <- with(rolled, tsscore(Gaussian, SP_Gaussian, SP_nonGaussian, P_Gaussian, P_nonGaussian))
-tstable(list(fixed = sc, re_estimated = sc_rolled), scale = 1000)
+tstable(list(fixed = sc, update = sc_rolled), scale = 1000)
 ```
 
 The non-Gaussian copulas improve the forecasts: by about 3.7% in AQS against the Gaussian ARMA model for the semiparametric version, and by 2 to 3% for the parametric version, while the Gaussian copulas with a heavier-tailed margin give much smaller gains, which are not significant.
@@ -277,7 +276,7 @@ fixed_s <- lapply(seasonal_models, tsroll, data = x, start = ntr + 1, levels = l
 rolled_s <- lapply(seasonal_models, tsroll, data = x, start = ntr + 1, levels = lev, p = NULL, refit = 12)
 sc_s <- with(fixed_s, tsscore(Gaussian, SP_nonGaussian, SP_Gaussian_seasonal, SP_nonGaussian_seasonal))
 sc_s_rolled <- with(rolled_s, tsscore(Gaussian, SP_nonGaussian, SP_Gaussian_seasonal, SP_nonGaussian_seasonal))
-tstable(list(fixed = sc_s, re_estimated = sc_s_rolled), scale = 1000)
+tstable(list(fixed = sc_s, update = sc_s_rolled), scale = 1000)
 ```
 
 The seasonal terms add little to the forecasts with fixed parameters (the non-Gaussian model is 3.6% better than the benchmark with them, 3.7% without) and slightly improve them when the models are re-estimated (4.7% against 3.7%). The non-Gaussian copulas are what matters.
@@ -314,12 +313,12 @@ for (k in c(1, 10, 19)) {
 }
 ```
 
-Re-estimating the models every 12 months on an expanding window lets them adapt to the new data, and again the semiparametric non-Gaussian model has the best forecasts:
+Re-estimating the models every 12 months on an expanding window lets them adapt to the new data, and again the semiparametric non-Gaussian model has the best forecasts. The table puts the update next to the fixed parameters:
 
 ```{r pandemic-rolled}
 rolled_all <- lapply(models, tsroll, data = xall, start = ntr + 1, levels = lev, p = NULL, refit = 12)
 sc_all_rolled <- with(rolled_all, tsscore(Gaussian, SP_Gaussian, SP_nonGaussian, P_Gaussian, P_nonGaussian))
-tstable(sc_all_rolled, scale = 1000)
+tstable(list(fixed = sc_all, update = sc_all_rolled), scale = 1000)
 ```
 
 A copula with tail dependence describes what has happened in the estimation sample, and a single extraordinary observation can make its predictive distribution misleading in the months that follow, in particular when the margin is unbounded.
