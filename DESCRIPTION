@@ -51,6 +51,7 @@ Suggests:
 Remotes:
     ajmcneil/udp
 VignetteBuilder: knitr
+LazyData: true
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Config/roxygen2/version: 8.1.0
@@ -93,3 +94,4 @@ Collate:
     'tscop-package.R'
     'RcppExports.R'
     'plot-pairs.R'
+    'data.R'

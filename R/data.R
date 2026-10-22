@@ -1,0 +1,25 @@
+#' US industrial production
+#'
+#' The total index of industrial production of the United States, monthly,
+#' seasonally adjusted, from January 1960 to September 2026. The index measures
+#' the real output of manufacturing, mining and electric and gas utilities
+#' (2017 = 100).
+#'
+#' The values are revised regularly by the Federal Reserve Board; the dataset is
+#' the vintage downloaded on the date stored in `attr(indpro, "downloaded")`.
+#' The script that builds it is `data-raw/indpro.R` in the source package.
+#'
+#' @format A data frame with 801 rows and two columns:
+#' \describe{
+#'   \item{date}{the first day of the month (class `Date`).}
+#'   \item{index}{the total index of industrial production, seasonally adjusted
+#'     (2017 = 100).}
+#' }
+#' @source Board of Governors of the Federal Reserve System, Industrial
+#'   Production and Capacity Utilization, statistical release G.17, series
+#'   B50001 (total index, seasonally adjusted),
+#'   <https://www.federalreserve.gov/releases/g17/>.
+#' @examples
+#' growth <- 100 * diff(log(indpro$index))     # monthly growth rate in percent
+#' summary(growth)
+"indpro"
