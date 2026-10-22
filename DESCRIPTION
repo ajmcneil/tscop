@@ -95,3 +95,4 @@ Collate:
     'RcppExports.R'
     'plot-pairs.R'
     'data.R'
+    'tstable.R'

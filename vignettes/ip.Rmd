@@ -168,16 +168,16 @@ models <- list(
 
 ### One-step-ahead forecasts: `tsroll`
 
-The function `tsroll` computes, for each month of a holdout period, the predictive distribution of the next growth rate given all the data up to the previous month. We give it a model, the data, the position `start` of the first observation to forecast and the probability `levels` of the predictive quantiles to return. Here the holdout period consists of the 240 months from January 2000 to December 2019.
+The function `tsroll` computes, for each month of a holdout period, the predictive distribution of the next growth rate given all the data up to the previous month. We give it a model, the data, the position `start` of the first observation to forecast and the probability `levels` of the predictive quantiles to return. Here the holdout period consists of the 240 months from January 2000 to December 2019. By default `tsroll` also computes the value-at-risk and expected shortfall of the lower tail at the probabilities 1% and 5%, which are of little interest for this series, so we set `p = NULL` to skip them.
 
 ```{r tsroll-one}
 x <- growth[1:nte]
 lev <- (1:19) / 20
-Gaussian <- tsroll(models$Gaussian, data = x, start = ntr + 1, levels = lev)
+Gaussian <- tsroll(models$Gaussian, data = x, start = ntr + 1, levels = lev, p = NULL)
 Gaussian
 ```
 
-The result is an object of class `tsforecast` with the observations that were forecast and, for each of them, the predictive quantiles, the probability integral transform (PIT), the log predictive density and the value-at-risk and expected shortfall at the probabilities 1% and 5%. For example, these are the predictive 5%, 50% and 95% quantiles for the first three months, with the observed growth rates:
+The result is an object of class `tsforecast` with the observations that were forecast and, for each of them, the predictive quantiles, the probability integral transform (PIT) and the log predictive density (and the value-at-risk and expected shortfall if `p` is given). For example, these are the predictive 5%, 50% and 95% quantiles for the first three months, with the observed growth rates:
 
 ```{r tsroll-slots}
 round(Gaussian@quantile[1:3, c(1, 10, 19)], 2)
@@ -187,22 +187,22 @@ round(Gaussian@observed[1:3], 2)
 By default the parameters of the model stay at their estimates from the estimation period; each forecast uses the data up to the previous month. With the argument `refit = 12` the model is re-estimated every 12 months on an expanding window, starting from the previous estimates and keeping its structure (the selected copulas). We compute both kinds of forecasts for all five models. The function `lapply` applies the same `tsroll` call to every model in the list and returns the forecasts in a list with the names of the models.
 
 ```{r tsroll-all}
-fixed <- lapply(models, tsroll, data = x, start = ntr + 1, levels = lev)
-rolled <- lapply(models, tsroll, data = x, start = ntr + 1, levels = lev, refit = 12)
+fixed <- lapply(models, tsroll, data = x, start = ntr + 1, levels = lev, p = NULL)
+rolled <- lapply(models, tsroll, data = x, start = ntr + 1, levels = lev, p = NULL, refit = 12)
 names(fixed)
 ```
 
 ### Evaluating forecasts: `tsscore`
 
-The function `tsscore` evaluates one or several sets of forecasts of the same observations. The first forecast is the reference to which the others are compared, and the forecasts are labelled by the names of the arguments. Since our forecasts are in a list we use `with`, which lets us refer to its elements by name. Here we compare two forecasts, with the 5% level for the value-at-risk and expected shortfall backtests:
+The function `tsscore` evaluates one or several sets of forecasts of the same observations. The first forecast is the reference to which the others are compared, and the forecasts are labelled by the names of the arguments. Since our forecasts are in a list we use `with`, which lets us refer to its elements by name. Here we compare two forecasts:
 
 ```{r tsscore-two}
-with(fixed, tsscore(Gaussian, SP_nonGaussian, p = 0.05))
+with(fixed, tsscore(Gaussian, SP_nonGaussian))
 ```
 
-The output has four parts. The first table gives for each forecast the average quantile score (AQS: the pinball loss of the predictive quantiles, averaged over the forecasts and the levels; smaller is better), the negative log predictive density (smaller is better) and the Fissler-Ziegel loss of the value-at-risk and expected shortfall pair. The next two tables are backtests of the 5% value-at-risk (the number of breaches against the number expected, and the Kupiec and Christoffersen tests) and of the expected shortfall. The last table gives Diebold-Mariano tests, with Newey-West standard errors, of the null hypothesis that the other forecast is as accurate as the first; positive statistics mean that the other forecast is better.
+The output has two parts. The first table gives for each forecast the average quantile score (AQS: the pinball loss of the predictive quantiles, averaged over the forecasts and the levels; smaller is better) and the negative log predictive density (smaller is better). The second table gives Diebold-Mariano tests, with Newey-West standard errors, of the null hypothesis that the other forecast is as accurate as the first, for each of the two losses; positive statistics mean that the other forecast is better. If the forecasts also contain value-at-risk and expected shortfall (the default of `tsroll`), `tsscore` adds backtests of these risk measures and their scores to the tests.
 
-Now we score all five forecasts together. The results are in the elements `summary` (the first table) and `dm` (the Diebold-Mariano tests, one row for each forecast other than the first and each loss) of the object that `tsscore` returns.
+Now we score all five forecasts together. The results are in the elements `summary` (the first table) and `dm` (the Diebold-Mariano tests, one row for each forecast other than the first and each loss) of the object that `tsscore` returns. The function `tstable` arranges one loss in a table.
 
 ```{r tsscore-five}
 sc <- with(fixed, tsscore(Gaussian, SP_Gaussian, SP_nonGaussian, P_Gaussian, P_nonGaussian))
@@ -210,22 +210,11 @@ sc$summary[, c("forecast", "aqs")]
 sc$dm[sc$dm$loss == "aqs", c("forecast", "diff", "statistic", "p.value")]
 ```
 
-To compare the models we put the AQS, its percentage change relative to the benchmark and the p-value of the test in a table. We write the steps as a small function because we need them several times.
+The function `tstable` arranges one loss of one or several `tsscore` results in a table: the score of each forecast (here multiplied by 1000), its percentage change relative to the first forecast and the p-value of the Diebold-Mariano test. The results for forecasts with parameters held fixed and re-estimated, which are made for the same forecasts, can be put side by side.
 
 ```{r aqs-table}
-aqs_table <- function(sc) {
-  aqs <- sc$summary$aqs
-  dm <- sc$dm[sc$dm$loss == "aqs", ]
-  data.frame(model = sc$summary$forecast,
-             AQS_x1000 = 1000 * aqs,
-             change_pct = 100 * (aqs / aqs[1] - 1),   # relative to the first forecast
-             DM_p = c(NA, dm$p.value))
-}
-cat("Parameters fixed at the estimates from the estimation period\n")
-aqs_table(sc)
 sc_rolled <- with(rolled, tsscore(Gaussian, SP_Gaussian, SP_nonGaussian, P_Gaussian, P_nonGaussian))
-cat("\nParameters re-estimated every 12 months\n")
-aqs_table(sc_rolled)
+tstable(list(fixed = sc, re_estimated = sc_rolled), scale = 1000)
 ```
 
 The non-Gaussian copulas improve the forecasts: by about 3.7% in AQS against the Gaussian ARMA model for the semiparametric version, and by 2 to 3% for the parametric version, while the Gaussian copulas with a heavier-tailed margin give much smaller gains, which are not significant.
@@ -235,11 +224,11 @@ The negative log predictive density, which is also in the `tsscore` output, need
 ```{r logscore}
 sc_sp <- with(fixed, tsscore(SP_Gaussian, SP_nonGaussian))
 sc_p <- with(fixed, tsscore(P_Gaussian, P_nonGaussian))
-logscore_gain <- function(sc) sc$dm[sc$dm$loss == "neglogscore", c("diff", "statistic", "p.value")]
-rbind(semiparametric = logscore_gain(sc_sp), parametric = logscore_gain(sc_p))
+tstable(sc_sp, loss = "neglogscore")
+tstable(sc_p, loss = "neglogscore")
 ```
 
-The non-Gaussian copula improves the average log predictive density by about 0.05 per month in both approaches, which is highly significant. The `plot` method of the `tsscore` object shows where in the distribution the forecasts differ: the quantile score at each level, relative to the first forecast.
+The change is the difference in the negative log predictive density per month, so negative values favour the non-Gaussian copula. It improves the average log predictive density by about 0.05 per month in both approaches, which is highly significant. The `plot` method of the `tsscore` object shows where in the distribution the forecasts differ: the quantile score at each level, relative to the first forecast.
 
 ```{r profile, fig.width = 6.5, fig.height = 4, fig.cap = "Average quantile score by level relative to the Gaussian ARMA benchmark (parameters fixed); negative values favour the model."}
 plot(sc, relative = TRUE, main = "quantile score relative to the Gaussian ARMA model")
@@ -284,12 +273,11 @@ seasonal_models <- list(
   SP_nonGaussian = models$SP_nonGaussian,
   SP_Gaussian_seasonal = tsmod(emarg(xtr), sar_g@model),
   SP_nonGaussian_seasonal = tsmod(emarg(xtr), sar_ng@model))
-fixed_s <- lapply(seasonal_models, tsroll, data = x, start = ntr + 1, levels = lev)
-rolled_s <- lapply(seasonal_models, tsroll, data = x, start = ntr + 1, levels = lev, refit = 12)
-cat("Parameters fixed\n")
-aqs_table(with(fixed_s, tsscore(Gaussian, SP_nonGaussian, SP_Gaussian_seasonal, SP_nonGaussian_seasonal)))
-cat("\nParameters re-estimated every 12 months\n")
-aqs_table(with(rolled_s, tsscore(Gaussian, SP_nonGaussian, SP_Gaussian_seasonal, SP_nonGaussian_seasonal)))
+fixed_s <- lapply(seasonal_models, tsroll, data = x, start = ntr + 1, levels = lev, p = NULL)
+rolled_s <- lapply(seasonal_models, tsroll, data = x, start = ntr + 1, levels = lev, p = NULL, refit = 12)
+sc_s <- with(fixed_s, tsscore(Gaussian, SP_nonGaussian, SP_Gaussian_seasonal, SP_nonGaussian_seasonal))
+sc_s_rolled <- with(rolled_s, tsscore(Gaussian, SP_nonGaussian, SP_Gaussian_seasonal, SP_nonGaussian_seasonal))
+tstable(list(fixed = sc_s, re_estimated = sc_s_rolled), scale = 1000)
 ```
 
 The seasonal terms add little to the forecasts with fixed parameters (the non-Gaussian model is 3.6% better than the benchmark with them, 3.7% without) and slightly improve them when the models are re-estimated (4.7% against 3.7%). The non-Gaussian copulas are what matters.
@@ -300,10 +288,11 @@ The period after December 2019 contains the collapse of industrial production in
 
 ```{r pandemic}
 xall <- growth
-fixed_all <- lapply(models, tsroll, data = xall, start = ntr + 1, levels = lev)
+fixed_all <- lapply(models, tsroll, data = xall, start = ntr + 1, levels = lev, p = NULL)
 nte_all <- length(xall) - ntr
 c(forecasts = nte_all)
-aqs_table(with(fixed_all, tsscore(Gaussian, SP_Gaussian, SP_nonGaussian, P_Gaussian, P_nonGaussian)))
+sc_all <- with(fixed_all, tsscore(Gaussian, SP_Gaussian, SP_nonGaussian, P_Gaussian, P_nonGaussian))
+tstable(sc_all, scale = 1000)
 ```
 
 (The log predictive densities of the semiparametric models are infinite in April 2020, because the kernel density estimate of the margin is zero far outside the range of the estimation data, so the tests of the log score in the `tsscore` output are `NA` here.) The semiparametric non-Gaussian model keeps its advantage, but the advantage of the parametric non-Gaussian model is largely gone: it is only 0.7% better than the benchmark, against 1.6% for the Gaussian copula with the same margin. The forecasts around the collapse show one reason. The Student t copula has positive tail dependence at lag 1, calibrated on the earlier data, so after an extreme fall the predictive distribution of the next month is shifted far into the lower tail (the red lines), while the growth in the months that followed was positive. With the empirical margin the predictive quantiles cannot leave the range of the estimation data, which limits the damage, while the parametric margin has no such bound:
@@ -328,8 +317,9 @@ for (k in c(1, 10, 19)) {
 Re-estimating the models every 12 months on an expanding window lets them adapt to the new data, and again the semiparametric non-Gaussian model has the best forecasts:
 
 ```{r pandemic-rolled}
-rolled_all <- lapply(models, tsroll, data = xall, start = ntr + 1, levels = lev, refit = 12)
-aqs_table(with(rolled_all, tsscore(Gaussian, SP_Gaussian, SP_nonGaussian, P_Gaussian, P_nonGaussian)))
+rolled_all <- lapply(models, tsroll, data = xall, start = ntr + 1, levels = lev, p = NULL, refit = 12)
+sc_all_rolled <- with(rolled_all, tsscore(Gaussian, SP_Gaussian, SP_nonGaussian, P_Gaussian, P_nonGaussian))
+tstable(sc_all_rolled, scale = 1000)
 ```
 
 A copula with tail dependence describes what has happened in the estimation sample, and a single extraordinary observation can make its predictive distribution misleading in the months that follow, in particular when the margin is unbounded.

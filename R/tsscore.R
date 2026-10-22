@@ -42,6 +42,9 @@ ts_unpack_fc <- function(f, observed, levels, p) {
   if (is(f, "tsforecast")) {
     # value-at-risk and expected shortfall at the requested probabilities p (a subset of those of the forecast)
     var <- f@var; es <- f@es; pp <- f@p
+    if (length(p) > 0L && length(f@p) == 0L) {
+      stop("the forecasts contain no value-at-risk or expected shortfall; compute them with tsroll(p = ...)", call. = FALSE)
+    }
     if (length(p) > 0L) {
       j <- vapply(p, function(a) { k <- which(abs(f@p - a) < 1e-9); if (length(k) == 1L) k else NA_integer_ }, 1L)
       if (anyNA(j)) stop("the forecasts contain the value-at-risk and expected shortfall only at p = ", paste(f@p, collapse = ", "), call. = FALSE)

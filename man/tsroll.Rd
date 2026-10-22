@@ -38,7 +38,9 @@ smaller).}
 
 \item{levels}{probability levels of the predictive quantiles (default \code{(1:99)/100}).}
 
-\item{p}{tail probabilities of the value-at-risk and expected shortfall (default \code{c(0.01, 0.05)}).}
+\item{p}{tail probabilities of the value-at-risk and expected shortfall (default \code{c(0.01, 0.05)}). With \code{p = NULL}
+no risk measures are computed: the forecasts then have no value-at-risk or expected shortfall, \code{\link[=tsscore]{tsscore()}} scores only
+the forecasts, and the computation is faster, because the expected shortfall needs many extra predictive quantiles.}
 
 \item{es_nodes}{number of quadrature nodes of the expected shortfall (default 32).}
 
