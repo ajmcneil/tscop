@@ -187,7 +187,9 @@ tr_refit <- function(model, xw, fit_args) {
 #' @param width the width of a rolling window (default 1500, or the number of observations before `start` if
 #'   smaller).
 #' @param levels probability levels of the predictive quantiles (default `(1:99)/100`).
-#' @param p tail probabilities of the value-at-risk and expected shortfall (default `c(0.01, 0.05)`).
+#' @param p tail probabilities of the value-at-risk and expected shortfall (default `c(0.01, 0.05)`). With `p = NULL`
+#'   no risk measures are computed: the forecasts then have no value-at-risk or expected shortfall, [tsscore()] scores only
+#'   the forecasts, and the computation is faster, because the expected shortfall needs many extra predictive quantiles.
 #' @param es_nodes number of quadrature nodes of the expected shortfall (default 32).
 #' @param fit_args further arguments passed to [tsfit()] in the re-estimations (for example
 #'   `list(method = "joint")` for a [tsmod-class] model).
@@ -221,7 +223,8 @@ tsroll <- function(object, data, start, refit = Inf, window = c("expanding", "ro
     stop("'start' must be a whole number between 2 and the length of the data", call. = FALSE)
   }
   if (!is.numeric(levels) || anyNA(levels) || any(levels <= 0 | levels >= 1)) stop("'levels' must be probabilities strictly inside (0, 1)", call. = FALSE)
-  if (!is.numeric(p) || anyNA(p) || any(p <= 0 | p >= 1)) stop("'p' must be probabilities strictly inside (0, 1)", call. = FALSE)
+  if (is.null(p)) p <- numeric(0)
+  if (!is.numeric(p) || anyNA(p) || any(p <= 0 | p >= 1)) stop("'p' must be probabilities strictly inside (0, 1), or NULL", call. = FALSE)
   if (!is.numeric(refit) || length(refit) != 1L || refit < 1 || (is.finite(refit) && refit != round(refit))) {
     stop("'refit' must be a positive whole number or Inf", call. = FALSE)
   }
